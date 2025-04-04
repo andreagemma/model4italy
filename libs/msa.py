@@ -1,5 +1,6 @@
 from __future__ import annotations
 from libs import Logger
+import libs.database.database
 import multiprocessing as mp
 import time
 from operator import itemgetter
@@ -21,7 +22,7 @@ from .loaders import BaseLoader
 from .writers import BaseWriter
 from .utils.util import min2hhmm
 from . import BaseSimulator
-from .utils import save_dict, load_dict
+from .utils import save_dict, load_dict, getsize
 
 
 class MSA:
@@ -367,6 +368,7 @@ class MSA:
             ))
         ret = SPP.multiple_paths(self.G, tasks=tasks, link_cost=self.links_cost, turn_cost=self.turns_cost, node_cost=self.nodes_cost)
         SPP.shutdown_parallel()
+        #print(getsize(ret)/1024/1024)
         self.m_paths.merge(ret, k)
 
     def update_performance(self, k: int):
@@ -383,6 +385,7 @@ class MSA:
                 tstart=self.current_time_start,
                 tend=self.current_time_end,
             )        
+            #print(getsize(self.simulator)/1024/1024)
             
             if isinstance(self.simulator, MicroSimulator):
                 if update_costs:

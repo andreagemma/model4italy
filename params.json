@@ -1,9 +1,19 @@
 {
     "simulation_id": 22,
-    "description": "Eur_1h-offline",
+    "description": "Eur_1h-simulation",
     "start": "07:00",
     "end": "08:00",
     "op": "assignment",
+    "settings": {
+        "MSA_MAX_ITE": 1,
+        "MSA_MAX_TIMESLICE": 360,
+        "NUMCPU": 4,
+        "MSA_K": 3,
+        "LOAD_PATHS": false,
+        "SAVE_PATHS": false,
+        "LOAD_GRAPH": false,
+        "SAVE_GRAPH": false
+    },
     "params": {
         "input": {
             "loader": "FileLoader"
@@ -11,10 +21,12 @@
         "output": {
             "writer": "FileWriter",
             "location": "./dati/output/{description}",
-            "aggregated_results": "{simulation_id}_aggregated_results.parquet",
-            "sim_results": "{simulation_id}_sim_results.csv",
-            "stat_results": "{simulation_id}_stat_results.csv",
-            "paths": "{simulation_id}_paths.parquet"
+            "state": "./dati/output/eur/state",
+
+            "aggregated_results_old": "{simulation_id}_aggregated_results.parquet",
+            "sim_results_old": "{simulation_id}_sim_results.csv",
+            "stat_results_old": "{simulation_id}_stat_results.csv",
+            "paths_old": "{simulation_id}_paths.parquet"
         },
         "heavy_vehicles_ban": false,
         "modes": [
@@ -29,7 +41,7 @@
                 "mode": "c",
                 "matrices": [
                     {
-                        "src": "dati/GrafoEur/mat_car.csv",
+                        "src": "dati/GrafoEur/mat_car.parquet",
                         "mapping": {
                             "o": "o",
                             "d": "d",
