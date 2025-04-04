@@ -184,7 +184,7 @@ class SPP:
                     continue
                 links = paths_links.get(target_link, [])
                 if len(links) > 0:
-                    path = Path(source=source, target=target, t_start=t_start, links=links, costs=[paths_costs[link] for link in links], mode=mode, t_base=t_base)
+                    path = Path(source=source, target=target, t_start=t_start, links=links, tot_cost=paths_costs[links[-1]], mode=mode, t_base=t_base)
                     pl.add_path(path)
         return pl
 

@@ -21,7 +21,7 @@ from .loaders import BaseLoader
 from .writers import BaseWriter
 from .utils.util import min2hhmm
 from . import BaseSimulator
-from .utils import save_dict, load_dict
+from .utils import save_dict, load_dict, getsize
 
 
 class MSA:
@@ -366,6 +366,7 @@ class MSA:
             self.modes
             ))
         ret = SPP.multiple_paths(self.G, tasks=tasks, link_cost=self.links_cost, turn_cost=self.turns_cost, node_cost=self.nodes_cost)
+        print(getsize(ret)/1024/1024)
         SPP.shutdown_parallel()
         self.m_paths.merge(ret, k)
 
@@ -399,7 +400,6 @@ class MSA:
         for path in self.m_paths.all_paths():
             if len(path["links"]) == 0:
                 continue
-            costs = []
             cost = 0
             prev_l = None
             for i, l_idx in enumerate(path.get_links()):
@@ -413,11 +413,9 @@ class MSA:
                     cost += self.G.get_node(l["i"]).get_value(name=self.nodes_cost, t=t, in_link=prev_l, out_link=l, graph=self.G, default=0)
                 if update_links:
                     cost += l.get_value(name=self.links_cost, t=t, delta_t=self.delta_t, in_link=prev_l, graph=self.G, default=0)
-                costs.append(cost)
                 prev_l = l
 
             path["tot_cost"] = cost
-            path["costs"] = costs
 
 
 
@@ -446,12 +444,13 @@ class MSA:
         self.log.info ("Assignment matrix calculation...")
         for (source, target, t_start, mode), paths in self.m_paths.all_kpaths():
             for path in paths:
+                costs = tuple(path.get_costs())
                 self.OD[o, d, self.current_time_start + t_start] * self.eq_factors.get(mode, 1)
                 f = self.od[o, d, time_start + tstart * self.delta_t]
 
                 if f <= 0:
                     continue
-                idxs = list(map(lambda x: int(x // self.delta_t), path["costs"]))
+                idxs = list(map(lambda x: int(x // self.delta_t), costs))
                 links = path["links"]
                 for idx, l in zip(idxs, links):  # [t for t in zip(idxs, links) if t[1] in self.matrix_ass.detectors]:
                     if self.assegna_flussi_msa:
