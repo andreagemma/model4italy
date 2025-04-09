@@ -13,8 +13,10 @@ class KPathList(KPathContainer):
         self.update(**kwargs)
         self["type"] = self.__class__.__name__
         self.setdefault("paths", {})
+        self.setdefault("ull", {}) # Unique Link List
 
     def add_path(self, to_add: Path, k: Optional[int] = None, **kwargs):
+        to_add["links"] = self["ull"].setdefault(to_add["links"], to_add["links"])
         key = to_add.key()
         l = self["paths"].setdefault(key, [])
         if k is None:
@@ -67,7 +69,10 @@ class KPathList(KPathContainer):
         for paths in self["paths"].values():
             n += len(paths)
         return n
-
+    
+    def n_unique_paths(self, **kwargs) -> int:
+        return len(self["ull"])
+    
     def k_paths(self, **kwargs) -> int:
         k = 0
         for paths in self["paths"].values():

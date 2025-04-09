@@ -78,3 +78,88 @@ def run_assignment(params, ini, execution_id=None):
             Execution.set_execution_failed(execution_id, ex=ex, raise_exception=False)
             log.info(f"Execution ({execution_id}) terminated abnormally in %.2f seconds", time.time() - t_start)
         raise ex
+
+
+import asyncio
+import websockets
+import json
+import time
+import requests
+from datetime import datetime, timedelta
+
+def load_config(path="config.json"):
+    with open(path, "r") as f:
+        return json.load(f)
+
+def build_payload(config, sim_id, start_time_str):
+    end_time = (datetime.strptime(start_time_str, "%H:%M") + timedelta(
+        minutes=config["simulation"]["interval_minutes"])).strftime("%H:%M")
+    params = config["params"].copy()
+    params["aggregated_results"] = f"agg_{start_time_str.replace(':', '')}.csv"
+
+    return {
+        "simulation_id": sim_id,
+        "start": start_time_str,
+        "end": end_time,
+        "op": "assignment",
+        "settings": config["settings"],
+        "params": params
+    }
+
+def visualizza_risultati(execution_id):
+    print(f"[{execution_id}] ✅ Simulazione completata. Visualizzazione risultati...")
+
+def controlla_stato(execution_id, base_url):
+    status_url = f"{base_url}/{execution_id}"
+    while True:
+        try:
+            r = requests.get(status_url)
+            r.raise_for_status()
+            data = r.json()
+            stato = data.get("status")
+            if stato == "completed":
+                visualizza_risultati(execution_id)
+                return
+            elif stato == "error":
+                print(f"[{execution_id}] ❌ Errore nella simulazione:")
+                print(f"  Dettagli: {data.get('details')}")
+                return
+            elif stato in ["pending", "running"]:
+                print(f"[{execution_id}] ⏳ Stato attuale: {stato}. Attesa 5 secondi...")
+                time.sleep(5)
+        except Exception as e:
+            print(f"[{execution_id}] ⚠️ Errore nella richiesta di stato: {e}")
+            time.sleep(5)
+
+async def rolling_horizon():
+    config = load_config()
+    uri_ws = config["server_uri"]
+    uri_status = config["status_uri_base"]
+
+    start = datetime.strptime(config["simulation"]["start_time"], "%H:%M")
+    end = datetime.strptime(config["simulation"]["end_time"], "%H:%M")
+    step = config["simulation"]["interval_minutes"]
+    sim_id = config["simulation"]["initial_simulation_id"]
+
+    async with websockets.connect(uri_ws) as websocket:
+        while start < end:
+            start_str = start.strftime("%H:%M")
+            payload = build_payload(config, sim_id, start_str)
+            print(f"[{start_str}] 🚀 Invio simulazione rolling-horizon...")
+            await websocket.send(json.dumps(payload))
+            response = await websocket.recv()
+            res_json = json.loads(response)
+            execution_id = res_json.get("execution_id")
+
+            if execution_id:
+                print(f"[{start_str}] 🆔 ID simulazione: {execution_id}")
+                controlla_stato(execution_id, uri_status)
+            else:
+                print(f"[{start_str}] ❌ Nessun ID ricevuto nella risposta: {response}")
+
+            sim_id += 1
+            start += timedelta(minutes=step)
+
+# Avvio
+if __name__ == "__main__":
+    asyncio.run(rolling_horizon())

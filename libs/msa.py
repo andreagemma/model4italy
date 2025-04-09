@@ -366,9 +366,10 @@ class MSA:
             self.modes
             ))
         ret = SPP.multiple_paths(self.G, tasks=tasks, link_cost=self.links_cost, turn_cost=self.turns_cost, node_cost=self.nodes_cost)
-        print(getsize(ret)/1024/1024)
         SPP.shutdown_parallel()
+        self.log.info("Ite: %s - Paths calculated", self.iteration)        
         self.m_paths.merge(ret, k)
+        #print(getsize(self.m_paths)/1024/1024,len(self.m_paths["paths"]),len(self.m_paths["ull"]))
 
     def update_performance(self, k: int):
         def reset(l: Link):
@@ -433,11 +434,11 @@ class MSA:
             else:
                 tot_vehicles = 0
             self.log.info(
-                f"""Ite: {self.iteration} - cpu_time: {int(self.t_end - t_start)}, total_flows: {int(self.tot_dom)}, moving_vehicles: {tot_vehicles}, n_paths: {self.m_paths.n_paths()}, k_calculated: {self.m_paths.k_paths()}"""
+                f"""Ite: {self.iteration} - cpu_time: {int(self.t_end - t_start)}, total_flows: {int(self.tot_dom)}, moving_vehicles: {tot_vehicles}, n_paths: {self.m_paths.n_paths()}, n_unique_paths: {self.m_paths.n_unique_paths()}, k: {self.m_paths.k_paths()}"""
             )
         else:
             self.log.info(
-                f"""Ite: {self.iteration} - cpu_time: {int(self.t_end - t_start)}, total_flows: {int(self.tot_dom)}, n_paths: {self.m_paths.n_paths()}, k_calculated: {self.m_paths.k_paths()}"""
+                f"""Ite: {self.iteration} - cpu_time: {int(self.t_end - t_start)}, total_flows: {int(self.tot_dom)}, n_paths: {self.m_paths.n_paths()}, n_unique_paths: {self.m_paths.n_unique_paths()}, k: {self.m_paths.k_paths()}"""
             )
 
     def calc_matrice_ass(self, time_start, time_end):

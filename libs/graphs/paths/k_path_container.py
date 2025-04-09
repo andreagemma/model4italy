@@ -58,6 +58,9 @@ class KPathContainer(PathContainer):
 
     def n_paths(self, **kwargs) -> int:
         return len(self.all_paths(**kwargs))
+    
+    def n_unique_paths(self, **kwargs) -> int:
+        return len(self.all_paths(**kwargs))
 
     def k_paths(self, **kwargs) -> int:
         return max(path["k"] for path in self.all_paths(**kwargs))

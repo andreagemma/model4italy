@@ -97,16 +97,15 @@ class BaseLoader(ABC):
         elif isinstance(params, dict):
             self.dparams = params
 
-        if "date_simulation" not in self.dparams:
-            self.dparams["date_simulation"] = datetime.now().strftime("%Y-%m-%d")
-        self.dparams["start"] = util.min2hhmm(util.hhmm2min(self.dparams.get("start", "00:00")))
-        self.dparams["end"] = util.min2hhmm(util.hhmm2min(self.dparams.get("end", "23:59")))
-
-        self.dparams["t_start"] = util.hhmm2min(self.dparams.get("start", "00:00"))
-        self.dparams["t_end"] = util.hhmm2min(self.dparams.get("end", "23:59"))
+        if "start" in self.dparams:
+            self.dparams["start"] = util.min2hhmm(util.hhmm2min(self.dparams.get("start", "00:00")))
+            self.dparams["t_start"] = util.hhmm2min(self.dparams.get("start", "00:00"))
+        if "end" in self.dparams:
+            self.dparams["end"] = util.min2hhmm(util.hhmm2min(self.dparams.get("end", "23:59")))
+            self.dparams["t_end"] = util.hhmm2min(self.dparams.get("end", "23:59"))
         
-        self.dparams["datetime_start"] = self.dparams["date_simulation"] + " " + self.dparams["start"]
-        self.dparams["datetime_end"] = self.dparams["date_simulation"] + " " + self.dparams["end"]
+        #self.dparams["datetime_start"] = self.dparams["date_simulation"] + " " + self.dparams["start"]
+        #self.dparams["datetime_end"] = self.dparams["date_simulation"] + " " + self.dparams["end"]
         self.params = json.loads(json.dumps(self.dparams), object_hook=lambda d: namedtuple("X", d.keys())(*d.values()) if isinstance(d, dict) else d)
 
         if "settings" in self.dparams:

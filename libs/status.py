@@ -6,7 +6,8 @@ class Status:
 
 
     SIM_COMPLETED = "completed"
-    SIM_PENDING = "started"
+    SIM_RUNNING = "running"
+    SIM_PENDING = "pending"
     SIM_FAILED = "failed"
 
     def __init__(self, status, error=None, details=None, execution_id=None, execution_uuid=None, **kwargs):

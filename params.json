@@ -1,18 +1,18 @@
 {
     "simulation_id": 22,
-    "description": "Eur_1h-simulation",
-    "start": "07:00",
-    "end": "08:00",
+    "description": "CAV_24h-offline2",
+    "start": "00:00",
+    "end": "23:59",
     "op": "assignment",
     "settings": {
-        "MSA_MAX_ITE": 1,
-        "MSA_MAX_TIMESLICE": 360,
+        "MSA_MAX_ITE": 6,
+        "MSA_MAX_TIMESLICE": 180,
         "NUMCPU": 4,
         "MSA_K": 3,
         "LOAD_PATHS": false,
-        "SAVE_PATHS": false,
+        "SAVE_PATHS": true,
         "LOAD_GRAPH": false,
-        "SAVE_GRAPH": false
+        "SAVE_GRAPH": true
     },
     "params": {
         "input": {
@@ -21,11 +21,13 @@
         "output": {
             "writer": "FileWriter",
             "location": "./dati/output/{description}",
-            "state": "./dati/output/eur/state",
-
+            "state": "./dati/output/cav2/state",
+            "aggregated_results": null,
+            "sim_results": null,            
+            "paths": null,
             "aggregated_results_old": "{simulation_id}_aggregated_results.parquet",
-            "sim_results_old": "{simulation_id}_sim_results.csv",
-            "stat_results_old": "{simulation_id}_stat_results.csv",
+            "sim_results_old": "{simulation_id}_sim_results.parquet",
+            "stat_results_old": "{simulation_id}_stat_results.parquet",
             "paths_old": "{simulation_id}_paths.parquet"
         },
         "heavy_vehicles_ban": false,
@@ -41,7 +43,7 @@
                 "mode": "c",
                 "matrices": [
                     {
-                        "src": "dati/GrafoEur/mat_car.parquet",
+                        "src": "dati/GrafoCAVEsteso2021-12/mat_car.parquet",
                         "mapping": {
                             "o": "o",
                             "d": "d",
@@ -53,70 +55,43 @@
             }
         ],
         "zones": {
-            "src": "dati/GrafoEur/zones.csv",
+            "src": "dati/GrafoCAVEsteso2021-12/zones.csv",
             "mapping": {
                 "id": "id_zone"
             }
         },
         "supply": [
             {
-                "links_src": "dati/GrafoEur/eur_links.shp",
-                "nodes_src": "dati/GrafoEur/eur_nodes.shp",
-                "turns_src": "dati/GrafoEur/turns_proh.csv",
+                "links_src": "dati/GrafoCAVEsteso2021-12/cav_links.shp",
+                "nodes_src": "dati/GrafoCAVEsteso2021-12/cav_nodes.shp",
+                "turns_src": "dati/GrafoCAVEsteso2021-12/turns_proh.csv",
                 "mapping": {
                     "nodes": {
-                        "id": "id",
-                        "id1": "id"
+                        "id": "id"
                     },
                     "links": {
                         "id": "id",
                         "from_node": "from_node",
                         "to_node": "to_node",
                         "v0": "v0",
-                        "connector": "connect",
-                        "lanes": "n_lanes",
+                        "connector": "connector",
+                        "lanes": "lanes",
                         "alpha": "alpha",
                         "rcr": "rcr",
                         "capacity": "capacity",
                         "length": "length",
-                        "vdf": "vdf",
-                        "vdf_a": "vdf_a",
-                        "vdf_b": "vdf_b",
                         "geometry": "geometry"
                     },
                     "turns": {
-                        "from_node": "fromnodeno",
-                        "via_node": "vianodeno",
-                        "to_node": "tonodeno"
+                        "from_node": "from_node",
+                        "via_node": "via_node",
+                        "to_node": "to_node"
                     }
                 }
             }
         ],
-        "links_sets": [
-            {
-                "src": "dati/GrafoEur/links_sets.csv",
-                "mapping": {
-                    "set": "id_set",
-                    "id_link": "id_link"
-                }
-            }
-        ],
-        "events1": [
-            {
-                "src": "dati/GrafoEur/events.csv",
-                "mapping": {
-                    "id": "id",
-                    "type": "type",
-                    "start": "start",
-                    "end": "end",
-                    "params": "params"
-                }
-            }
-        ],
-        "traffic_lights": [
-            {
-                "src": "dati/GrafoEur/sign_nodes.json"
-            }
-        ]
+        "links_sets": [],
+        "events": [],
+        "traffic_lights": []
     }
 }
