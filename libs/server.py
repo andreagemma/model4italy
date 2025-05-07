@@ -7,8 +7,8 @@ import json
 from threading import Thread
 from sqlalchemy.exc import SQLAlchemyError
 from .simulators import BaseSimulator, MicroSimulator, StaticSimulator
-from .loaders import BaseLoader, FileLoader
-from .writers import FileWriter, BaseWriter
+from .connectors import Loader, FileLoader
+from .connectors import FileWriter, BaseWriter
 from . import MSA
 from .database.database import DB, Execution
 from .status import Status

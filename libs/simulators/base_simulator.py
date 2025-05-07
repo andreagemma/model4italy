@@ -1,6 +1,6 @@
 import pandas as pd
 
-from ..loaders import BaseLoader
+from ..connectors import Loader
 from ..graphs import KPathList
 from abc import ABC, abstractmethod
 from .. import Logger
@@ -9,8 +9,8 @@ class BaseSimulator():
 
     log = Logger.getLogger("SIM")
     
-    def __init__(self,loader: BaseLoader) -> None:
-        self.loader: BaseLoader = loader        
+    def __init__(self,loader: Loader) -> None:
+        self.loader: Loader = loader        
     
     @abstractmethod
     def update_performance(self, k: int, tstart: int, tend: int):

@@ -1,24 +1,19 @@
 import time
 import traceback
 from .simulators import BaseSimulator, MicroSimulator, StaticSimulator
-from .loaders import BaseLoader, FileLoader
-from .writers import FileWriter, BaseWriter
+from .connectors import Loader, Writer
 from . import Logger
 from . import MSA
 from .database import Execution
 import json
 import os
+from datetime import datetime
+from .params_parser import ParamsParser
 
 def run_assignment(params, ini, execution_id=None):
     t_start = time.time()
-    if isinstance(params, str):
-        if os.path.exists(params):
-            with open(params, "r") as f:
-                params = json.load(f)
-        else:            
-            params = json.loads(params)
-    if not isinstance(params, dict):    
-        raise ValueError("Invalid 'params' parameter")
+    parser = ParamsParser(params=params, settings=ini)
+    params = parser.params
 
     if execution_id is None:
         execution = Execution.create_execution(params=params)        
@@ -27,24 +22,19 @@ def run_assignment(params, ini, execution_id=None):
         log.info("Execution created")
     else:
         log = Logger.getLogger("M4I")
-
     
     if execution_id is None:
         log.info(f"Executing assignment...")
     else:
         log.info(f"Executing assignment ({execution_id})")
     try:
-        params["execution_id"] = execution_id
-
+        parser.set_value("execution_id", execution_id)
+        parser.set_default("date_simulation",datetime.now().strftime("%Y-%m-%d"))
+        parser.set_default("time_simulation",datetime.now().strftime("%H:%M:%S"))
         # Load the network
-        cls_name = params.get("params", {}).get("input", {}).get("loader", "FileLoader")
-        ClassLoader = BaseLoader.get_cls_by_name(cls_name)
-        cls_name = params.get("params", {}).get("output", {}).get("writer", "FileWriter")
-        ClassWriter = BaseWriter.get_cls_by_name(cls_name)
 
-        loader: BaseLoader = ClassLoader(params=params, settings=ini)
-        writer: BaseWriter = ClassWriter(params=params, settings=ini, loader=loader)
-        loader.load()
+        loader: Loader = Loader(parser=parser)
+        writer: Writer = Writer(parser=parser)
 
         # Initialize the simulator
         simulator: BaseSimulator = MicroSimulator(loader=loader)
@@ -80,86 +70,3 @@ def run_assignment(params, ini, execution_id=None):
         raise ex
 
 
-import asyncio
-import websockets
-import json
-import time
-import requests
-from datetime import datetime, timedelta
-
-def load_config(path="config.json"):
-    with open(path, "r") as f:
-        return json.load(f)
-
-def build_payload(config, sim_id, start_time_str):
-    end_time = (datetime.strptime(start_time_str, "%H:%M") + timedelta(
-        minutes=config["simulation"]["interval_minutes"])).strftime("%H:%M")
-    params = config["params"].copy()
-    params["aggregated_results"] = f"agg_{start_time_str.replace(':', '')}.csv"
-
-    return {
-        "simulation_id": sim_id,
-        "start": start_time_str,
-        "end": end_time,
-        "op": "assignment",
-        "settings": config["settings"],
-        "params": params
-    }
-
-def visualizza_risultati(execution_id):
-    print(f"[{execution_id}] ✅ Simulazione completata. Visualizzazione risultati...")
-
-def controlla_stato(execution_id, base_url):
-    status_url = f"{base_url}/{execution_id}"
-    while True:
-        try:
-            r = requests.get(status_url)
-            r.raise_for_status()
-            data = r.json()
-            stato = data.get("status")
-            if stato == "completed":
-                visualizza_risultati(execution_id)
-                return
-            elif stato == "error":
-                print(f"[{execution_id}] ❌ Errore nella simulazione:")
-                print(f"  Dettagli: {data.get('details')}")
-                return
-            elif stato in ["pending", "running"]:
-                print(f"[{execution_id}] ⏳ Stato attuale: {stato}. Attesa 5 secondi...")
-                time.sleep(5)
-        except Exception as e:
-            print(f"[{execution_id}] ⚠️ Errore nella richiesta di stato: {e}")
-            time.sleep(5)
-
-async def rolling_horizon():
-    config = load_config()
-    uri_ws = config["server_uri"]
-    uri_status = config["status_uri_base"]
-
-    start = datetime.strptime(config["simulation"]["start_time"], "%H:%M")
-    end = datetime.strptime(config["simulation"]["end_time"], "%H:%M")
-    step = config["simulation"]["interval_minutes"]
-    sim_id = config["simulation"]["initial_simulation_id"]
-
-    async with websockets.connect(uri_ws) as websocket:
-        while start < end:
-            start_str = start.strftime("%H:%M")
-            payload = build_payload(config, sim_id, start_str)
-            print(f"[{start_str}] 🚀 Invio simulazione rolling-horizon...")
-            await websocket.send(json.dumps(payload))
-            response = await websocket.recv()
-            res_json = json.loads(response)
-            execution_id = res_json.get("execution_id")
-
-            if execution_id:
-                print(f"[{start_str}] 🆔 ID simulazione: {execution_id}")
-                controlla_stato(execution_id, uri_status)
-            else:
-                print(f"[{start_str}] ❌ Nessun ID ricevuto nella risposta: {response}")
-
-            sim_id += 1
-            start += timedelta(minutes=step)
-
-# Avvio
-if __name__ == "__main__":
-    asyncio.run(rolling_horizon())

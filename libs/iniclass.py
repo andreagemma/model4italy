@@ -1,6 +1,6 @@
 # indica se viene usato il DB per caricare o solvare i dati
 # Usare False in caso di Debug
-from libs.utils import ConfigReader, generate_sqlalchemy_url
+from .utils import ConfigReader, generate_sqlalchemy_url
 import logging
 
 class IniClass:
@@ -14,8 +14,8 @@ class IniClass:
             db_query="SELECT value FROM settings WHERE name = :name"
         )
 
-        self.USE_LOG = config_reader.getboolean("USE_LOG", 'LOGGING', True)
-        self.DIR_LOG = config_reader.get("DIR_LOG", 'LOGGING', True)
+        self.LOG_USE = config_reader.getboolean("LOG_USE", 'LOGGING', True)
+        self.LOG_DIR = config_reader.get("LOG_DIR", 'LOGGING', True)
 
         self.DB_SETTINGS_USE = config_reader.getboolean("DB_SETTINGS_USE","DATABASE_SETTINGS", False)
         if self.DB_SETTINGS_USE:
@@ -50,8 +50,6 @@ class IniClass:
         # GENERAL
         self.SRC_COEFS = config_reader.get("SRC_COEFS", 'GENERAL', r'coefficients.json')
         self.SRC_CONV_TBL = config_reader.get("SRC_CONV_TBL", 'GENERAL', None)
-        self.NUMCPU = config_reader.getint("NUMCPU", 'GENERAL', 1)
-        self.PARALLEL_ENGINE = config_reader.get("PARALLEL_ENGINE", 'GENERAL', "ray")
         self.DEBUG = config_reader.getboolean("DEBUG", 'GENERAL', False)
 
 
@@ -86,8 +84,21 @@ class IniClass:
         self.OD_ESTIMATION_MSA_RGAP = config_reader.getfloat("OD_ESTIMATION_MSA_RGAP", 'OD_ESTIMATION', 0.001)
         self.OD_ESTIMATION_MSA_TIMESLICE = config_reader.getint("OD_ESTIMATION_MSA_TIMESLICE", 'OD_ESTIMATION', 60)
         
+        # FCD
+        self.FCD_HORIZON = config_reader.getint("FCD_HORIZON", 'FCD', 60) # orario di previsione in minuti
+        self.FCD_TIMESLICE = config_reader.getint("FCD_TIMESLICE", 'FCD', 15) # numero massimo di iterazioni per la previsione
+        self.FCD_MAP_MATCHING_CPUS = config_reader.getint("FCD_MAP_MATCHING_CPUS", 'FCD', 1) # numero di processi per il map matching
+        self.FCD_PATH_MATCHING_CPUS = config_reader.getint("FCD_PATH_MATCHING_CPUS", 'FCD', 1)
+        self.FCD_MAP_MATCHING_MAX_DISTANCE = config_reader.getfloat("FCD_MAP_MATCHING_MAX_DISTANCE", 'FCD', 50) # distanza massima per il map matching in metri
+        self.FCD_MAP_MATCHING_MAX_ANGLE = config_reader.getfloat("FCD_MAP_MATCHING_MAX_ANGLE", 'FCD', 45) # angolo massimo per il map matching in gradi
+        self.FCD_CRS_DATA = config_reader.get("FCD_CRS_DATA", 'FCD', "EPSG:4326") # CRS dei dati FCD
+        self.FCD_CRS_CALC = config_reader.get("FCD_CRS_CALC", 'FCD', "EPSG:6875") # CRS dei dati FCD
+        self.FCD_PATH_START_FROM_ZONE = config_reader.getboolean("FCD_PATH_START_FROM_ZONE", 'FCD', False) # se True il path inizia dalla zona di partenza
+        self.FCD_PATH_END_TO_ZONE = config_reader.getboolean("FCD_PATH_END_TO_ZONE", 'FCD', False) # se True il path termina nella zona di arrivo
+        
         # OUPTUT
         self.OUTPUT_AGG_INT = config_reader.getfloat("OUTPUT_AGG_INT", 'OUTPUT', 15)
+        self.OUTPUT_STATE_COMPRESSION = config_reader.getboolean("OUTPUT_STATE_COMPRESSION", 'OUTPUT', "pickle")
 
         # FLASK
         self.FLASK_HOST = config_reader.get("FLASK_HOST", 'FLASK', '0.0.0.0')
@@ -97,9 +108,24 @@ class IniClass:
         # INTERNAL DATABASE
         self.DATABASE_URL = config_reader.get("DATABASE_URL", 'DATABASE', 'sqlite:///executions.db')
 
+        # IPC
+        self.IPC_BACKEND = config_reader.get("IPC_BACKEND", 'IPC', "local") # local or redis
+        self.IPC_HOST = config_reader.get("IPC_HOST", 'IPC', "localhost") # localhost or redis server address
+        self.IPC_PORT = config_reader.getint("IPC_PORT", 'IPC', 6379) # redis server port or free port for local
+        self.IPC_DB = config_reader.getint("IPC_DB", 'IPC', 0) # redis db number or not used for local
+        self.IPC_COMPRESSION = config_reader.get("IPC_COMPRESSION", 'IPC', "lz4") # compression method for data tranfer # "blosclz", "lz4", "lz4hc", "snappy", "zlib", "zstd", "gzip", "bz2", "zip", "lzma" or None (lz4 default)
+        self.IPC_COMPRESSION_LEVEL = config_reader.getint("IPC_COMPRESSION_LEVEL", 'IPC', 5) # compression level for data tranfer (1-9) (default 5)
+        
+        # PARALLEL
+        self.PARALLEL_NUMCPU = config_reader.getint("NUMCPU", 'PARALLEL', 1)
+        self.PARALLEL_ENGINE = config_reader.get("PARALLEL_ENGINE", 'PARALLEL', "ray")
+        self.PARALLEL_CLUSTER_ADDRESS = config_reader.get("PARALLEL_CLUSTER_ADDRESS", 'PARALLEL', None)
+
         for section, name, value in config_reader.items():
             if not hasattr(self, name.upper()):
                 setattr(self, name.upper(), value)
 
-        if self.USE_LOG:
+        if self.LOG_USE:
             logging.info("File %s caricato", __file__)
+
+        

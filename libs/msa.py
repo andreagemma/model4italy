@@ -9,7 +9,7 @@ import itertools
 import pdb
 import pandas as pd
 
-from libs.writers.state_manager import StateManager
+from .connectors import StateManager
 from libs.matrix_od.matrix_ass import MatrixAss
 from libs.simulators.micro_sim.sim import Simulator
 from libs.simulators.micro_sim.micro_simulator import MicroSimulator
@@ -17,8 +17,8 @@ from .matrix_od import MatrixOD, MatrixODT, MatrixAss
 from .graphs import DynamicGraph as Graph, DynamicLink as Link, DynamicNode as Node, DynamicTurn as Turn, DynamicGraphElement as GraphElement
 from .graphs import SPP
 from .graphs import KPathList
-from .loaders import BaseLoader
-from .writers import BaseWriter
+from .connectors import Loader
+from .connectors import Writer
 from .utils.util import min2hhmm
 from . import BaseSimulator
 from .utils import save_dict, load_dict, getsize
@@ -28,8 +28,8 @@ class MSA:
 
     def __init__(
         self,
-        loader: BaseLoader = None,
-        writer: BaseWriter = None,
+        loader: Loader = None,
+        writer: Writer = None,
         max_k: int = 3,
         max_ite: int = 10,
         max_rel_gap: float = 0,
@@ -45,9 +45,9 @@ class MSA:
         load_state_paths: bool = False,
         save_state_paths: bool = False
     ):
-        self.log = Logger.getLogger("MSA", execution_id=loader.dparams.get("execution_id"))
-        self.loader: BaseLoader = loader
-        self.writer: BaseWriter = writer
+        self.log = Logger.getLogger("MSA", execution_id=loader.parser.get("execution_id"))
+        self.loader: Loader = loader
+        self.writer: Writer = writer
         self.max_k: int = max_k
         self.max_ite: int = max_ite
         self.max_rel_gap: float = max_rel_gap
@@ -69,7 +69,7 @@ class MSA:
 
         self.save_paths = save_paths and self.writer.has_write_paths()
         self.save_agg_results = save_agg_results and self.writer.has_write_agg_results() and self.simulator is not None
-        self.state_manager = StateManager(params=loader.dparams, settings=loader.ini, loader=loader)
+        self.state_manager = StateManager(self.loader.parser)
         self.save_state_graph = save_state_graph and self.state_manager.has_write_state()
         self.load_state_graph = load_state_graph and self.state_manager.has_write_state()
         self.save_state_paths = save_state_paths and self.state_manager.has_write_state()
@@ -169,13 +169,19 @@ class MSA:
         try:
             if self.save_paths:
                 self.log.info("Saving paths...")
+                saved = True
                 for t in range(self.real_time_start,self.real_time_end,self.delta_t):
                     paths = self.get_paths_dataframe(t=t)
                     if paths is None:
                         continue
-                    self.writer.write_paths(paths, mode="w", partition=f"t={t}")
-                paths = None                            
-                self.log.info("Saved paths")
+                    saved = self.writer.write_paths(paths, mode="w", partition=f"t={t}")
+                    if not saved:                        
+                        break
+                paths = None   
+                if saved:
+                    self.log.info("Saved paths")
+                else:
+                    self.log.warning("Failed to save paths")                                         
         except Exception as e:
             self.log.error("Failed to save paths:", exc_info=e, stack_info=True)        
 
@@ -196,12 +202,18 @@ class MSA:
         try:                
             if self.save_agg_results:
                 self.log.info("Saving aggregated results...")
+                saved = True
                 df=self.get_aggregated_results_dataframe()
                 ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400 ) / 60
                 for t in range(self.real_time_start,self.real_time_end,self.delta_t):
                     tmp = df[ds_t.between(t,t+self.delta_t)]
-                    self.writer.write_agg_results(tmp, mode="W", partition=f"t={t}")
-                self.log.info("Saved aggregated results")
+                    saved=self.writer.write_agg_results(tmp, mode="W", partition=f"t={t}")
+                    if not saved:
+                        break
+                if saved:                    
+                    self.log.info("Saved aggregated results")
+                else:
+                    self.log.warning("Failed to save aggregated results")
         except Exception as e:
             self.log.error("Failed to save aggregated results:", exc_info=e, stack_info=True)
 
@@ -349,7 +361,7 @@ class MSA:
         
         
     def calculate_paths(self, k):
-        n_cpu = self.loader.ini.NUMCPU
+        n_cpu = self.loader.ini.PARALLEL_NUMCPU
         SPP.parallel_engine = self.loader.ini.PARALLEL_ENGINE
         SPP.initialize_parallel(num_cpus=n_cpu)
 

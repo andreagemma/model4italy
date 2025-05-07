@@ -7,22 +7,22 @@ with open("params.json") as f:
 params = json.loads(params)
 response = requests.post(url, json=params)
 
-ret = response.json()
+resp = response.json()
 if response.status_code == 200:    
-    print("Success:", ret)
-    execution_id = ret["execution_id"]
+    print("Success:", resp)
+    execution_id = resp["execution_id"]
 else:
-    print("Error:", ret)
+    print("Error:", resp)
 
 
 url = f"http://localhost:5000/status/{execution_id}"
 while True:
     time.sleep(1)
     response = requests.get(url)
-    ret = response.json()
+    resp = response.json()
     if response.status_code == 200:    
         #print("Success:", ret)
-        status = ret["status"]
+        status = resp["status"]
         print(f"Status: {status}")
         if status in (Status.SIM_PENDING,):
             continue
@@ -30,10 +30,10 @@ while True:
             print(f"Completed")
             break
         elif status in (Status.SIM_FAILED, ):
-            print(f"Failed", ret["result"] )
+            print(f"Failed", resp["result"] )
             break
     else:
-        print("Error:", ret)
+        print("Error:", resp)
         break
 
 import json

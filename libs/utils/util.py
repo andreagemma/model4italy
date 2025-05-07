@@ -51,6 +51,24 @@ def save_dict(data: dict, file_name: str, compression=None) -> None:
     :param file_name: file name
     :return: None
     """
+    if compression is None:
+        if file_name.endswith(".gz"):
+            compression = "gzip"
+        elif file_name.endswith(".bz2"):
+            compression = "bz2"
+        elif file_name.endswith(".zip"):
+            compression = "zip"
+        elif file_name.endswith(".xz"):
+            compression = "lzma"
+        elif file_name.endswith(".lz4"):        
+            compression = "lz4"        
+        elif file_name.endswith(".blz"):        
+            compression = "blosclz"            
+        elif file_name.endswith(".fast"):        
+            compression = "blosclz"            
+        elif file_name.endswith(".pickle"):        
+            compression = None
+                
     if compression == "gzip":
         import gzip
 
@@ -75,6 +93,11 @@ def save_dict(data: dict, file_name: str, compression=None) -> None:
         with lzma.open(file_name, "wb") as f:
             pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
         return
+    elif compression in ("lz4", "blosclz"):
+        import blosc
+        with open(file_name, "wb") as f:
+            f.write(blosc.compress(pickle.dumps(data, pickle.HIGHEST_PROTOCOL), typesize=8, cname=compression))
+        return
     else:
         with open(file_name, "wb") as f:
             pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
@@ -86,6 +109,24 @@ def load_dict(file_name: str, compression=None) -> dict:
     :param file_name:
     :return:
     """
+    if compression is None:
+        if file_name.endswith(".gz"):
+            compression = "gzip"
+        elif file_name.endswith(".bz2"):
+            compression = "bz2"
+        elif file_name.endswith(".zip"):
+            compression = "zip"
+        elif file_name.endswith(".xz"):
+            compression = "lzma"
+        elif file_name.endswith(".lz4"):        
+            compression = "lz4"        
+        elif file_name.endswith(".blz"):        
+            compression = "blosclz"            
+        elif file_name.endswith(".fast"):        
+            compression = "blosclz"            
+
+        elif file_name.endswith(".pickle"):        
+            compression = None
     if compression == "gzip":
         import gzip
 
@@ -107,6 +148,10 @@ def load_dict(file_name: str, compression=None) -> dict:
 
         with lzma.open(file_name, "rb") as f:
             return pickle.load(f)
+    elif compression in ("lz4", "blosclz"):
+        import blosc
+        with open(file_name, "rb") as f:
+            return pickle.loads(blosc.decompress(f.read()))                    
     else:
         with open(file_name, "rb") as f:
             return pickle.load(f)
@@ -117,6 +162,33 @@ def create_unique_name(prefix: Optional[str] = None) -> str:
         "".join([str(x) for x in uuid4().fields])
     )
 
+
+def serialize(obj: Any, compression: str=None, clevel=5) -> bytes:
+    """
+    compression = ‘blosclz’, ‘lz4’, ‘lz4hc’, ‘snappy’, ‘zlib’, ‘zstd'
+    """
+    import dill
+    if compression is None:
+        return pickle.dumps(obj, pickle.HIGHEST_PROTOCOL)
+    if compression in ("blosclz", "lz4", "lz4hc", "snappy", "zlib", "zstd"):
+        import blosc
+        ser = pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
+        data = blosc.compress(ser, typesize=8, cname=compression, clevel=clevel)
+        return pickle.dumps(data, pickle.HIGHEST_PROTOCOL)
+
+def deserialize(data: bytes, compression: str = None) -> Any:
+    import dill
+    """
+    compression = ‘blosclz’, ‘lz4’, ‘lz4hc’, ‘snappy’, ‘zlib’, ‘zstd'
+    """
+    
+    data = pickle.loads(data)
+    if compression is None:
+        return data
+    if compression in ("blosclz", "lz4", "lz4hc", "snappy", "zlib", "zstd"):
+        import blosc
+        obj = dill.loads(blosc.decompress(data))
+    return obj
 
 def json_serialize(obj: Any, file_name: str):
     import jsonpickle
@@ -478,8 +550,8 @@ def export_dataframe(df, file_path, mode="w", **kwargs):
         ValueError: If the extension is not supported.
     """
     # Determina l'estensione del file
-    file_path = file_path.lower()
-    extension = file_path.split('.')[-1].lower()
+    #file_path = file_path.lower()
+    extension = file_path.split('.')[-1]#.lower()
     extension = f".{extension}"  # Aggiunge il punto
 
     append = mode == "a" 
@@ -487,17 +559,17 @@ def export_dataframe(df, file_path, mode="w", **kwargs):
     
 
     not_appendable = False
-    if append and extension in (".excel", ".xls", ".xlsx"):
+    if append and extension.lower() in (".excel", ".xls", ".xlsx"):
         logging.error("Append mode is not supported for Excel files.")
         not_appendable = True
-    if append and extension in (".html"):
+    if append and extension.lower() in (".html"):
         logging.error("Append mode is not supported for HTML files.")
         not_appendable = True
 
-    if append and extension in (".feather"):
+    if append and extension.lower() in (".feather"):
         logging.error("Append mode is not supported for Feather files.")
         not_appendable = True
-    if append and extension in (".pickle"):
+    if append and extension.lower() in (".pickle"):
         logging.error("Append mode is not supported for Feather files.")
         not_appendable = True        
     if not_appendable:
@@ -511,23 +583,23 @@ def export_dataframe(df, file_path, mode="w", **kwargs):
     
     # Mappa estensioni a metodi di esportazione
     export_methods_gpd = {
-        '.shp': lambda x: df.to_file(x, index=index, mode=mode)  if hasattr(df,"to_file") else None,
-        '.parquet': lambda x: df.to_parquet(x, index=index) if hasattr(df,"to_parquet") else None,
-        '.geoparquet': lambda x: df.to_parquet(x, index=index) if hasattr(df,"to_parquet") else None,        
-        '.gpkg': lambda x: df.to_file(x, driver="GPKG", layer=os.path.basename(x), index=index, mode=mode) if hasattr(df,"to_file") else None,        
+        '.shp': lambda x,**kwargs: df.to_file(x, index=index, mode=mode)  if hasattr(df,"to_file") else None,
+        '.parquet': lambda x,**kwargs: df.to_parquet(x, index=index) if hasattr(df,"to_parquet") else None,
+        '.geoparquet': lambda x,**kwargs: df.to_parquet(x, index=index) if hasattr(df,"to_parquet") else None,        
+        '.gpkg': lambda x,**kwargs: df.to_file(x, driver="GPKG", layer=kwargs.get("layer",os.path.basename(x)), index=index, mode=mode) if hasattr(df,"to_file") else None,        
     }
     
 
     export_methods_pd= {
-        '.csv': lambda x: df.to_csv(x,mode=mode, index=index) if hasattr(df,"to_csv") else None,
-        '.excel': lambda x: df.to_excel(x, index=index) if hasattr(df,"to_excel") else None,
-        '.xls': lambda x: df.to_excel(x, index=index) if hasattr(df,"to_excel") else None,
-        '.xlsx': lambda x: df.to_excel(x, index=index) if hasattr(df,"to_excel") else None,
-        '.parquet': lambda x: df.to_parquet(x, engine="fastparquet", append=append, index=index) if hasattr(df,"to_parquet") else None,
-        '.json': lambda x: df.to_json(x, mode=mode) if hasattr(df,"to_json") else None,
-        '.html': lambda x: df.to_html(x, index=index, **kwargs) if hasattr(df,"to_html") else None,
-        '.feather': lambda x: df.to_feather(x, index=index, **kwargs) if hasattr(df,"to_feather") else None,
-        '.pickle': df.to_pickle if hasattr(df,"to_pickle") else None,
+        '.csv': lambda x,**kwargs: df.to_csv(x,mode=mode, index=index) if hasattr(df,"to_csv") else None,
+        '.excel': lambda x,**kwargs: df.to_excel(x, index=index) if hasattr(df,"to_excel") else None,
+        '.xls': lambda x,**kwargs: df.to_excel(x, index=index) if hasattr(df,"to_excel") else None,
+        '.xlsx': lambda x,**kwargs: df.to_excel(x, index=index) if hasattr(df,"to_excel") else None,
+        '.parquet': lambda x,**kwargs: df.to_parquet(x, engine="fastparquet", append=append, index=index) if hasattr(df,"to_parquet") else None,
+        '.json': lambda x,**kwargs: df.to_json(x, mode=mode) if hasattr(df,"to_json") else None,
+        '.html': lambda x,**kwargs: df.to_html(x, index=index, **kwargs) if hasattr(df,"to_html") else None,
+        '.feather': lambda x,**kwargs: df.to_feather(x, index=index, **kwargs) if hasattr(df,"to_feather") else None,
+        '.pickle': lambda x, **kwargs: x.to_pickle if hasattr(df,"to_pickle") else None,
     }
 
     try:
@@ -555,47 +627,82 @@ def export_dataframe(df, file_path, mode="w", **kwargs):
     export_methods_pd['.csv'](file_path+".csv", **kwargs)
     return False
 
-def inner_filter_to_query_expression(filters):
+def inner_filter_to_query_expression(filters, rename=None, quoting='"',  op_boolean_symbols=False):
     expressions = []
     if isinstance(filters, (tuple,list)): 
         if len(filters) == 3 and isinstance(filters[0], str) and isinstance(filters[1], str):
-            column, operator, value = filters
-            expressions.append(f"({column} {operator} {value})")
+            column, operator, value = filters            
+            if isinstance(value, str):
+                value = f"'{value}'"                
+            expressions.append(f"({quoting}{column}{quoting} {operator} {value})")
         else:
             for filter in filters:
                 if len(filter) == 3 and isinstance(filter[0], str) and isinstance(filter[1], str):
                     column, operator, value = filter
-                    expressions.append(f"({column} {operator} {value})")
+                    if isinstance(value, str):
+                        value = f"'{value}'"
+                    expressions.append(f"({quoting}{column}{quoting} {operator} {value})")
                 else:
                     raise ValueError("Invalid filter format. The inner filter must be a list of tuple with 3 elements (column,operator,value).")
     else:
         raise ValueError("Invalid filter format. The inner filter must be a tuple with 3 elements (column,operator,value).")
-    return " and ".join(expressions)
+    if op_boolean_symbols:
+        return " | ".join(expressions)
+    else:
+        return " OR ".join(expressions)
     
-def filters_to_query_expression(filters):
+def filters_to_query_expression(filters, quoting='"',  op_boolean_symbols=False):
+    if isinstance(filters, str):
+        return filters
     # Altrimenti, filters è una lista di gruppi, e bisogna trattarla ricorsivamente
     group_expressions = []
     
     for group in filters:
-        group_expressions.append(inner_filter_to_query_expression(group))  # Chiamata ricorsiva per gestire gruppi e tuple
+        group_expressions.append(inner_filter_to_query_expression(group, quoting=quoting, op_boolean_symbols=op_boolean_symbols))  # Chiamata ricorsiva per gestire gruppi e tuple
 
     # Unisci i gruppi con 'or'
-    return ' or '.join(group_expressions)
+    if op_boolean_symbols:
+        return ' & '.join(group_expressions)
+    else:
+        return ' AND '.join(group_expressions)
 
-
+def rename_filters(filters, rename):
+    for i, group in enumerate(filters):
+        if isinstance(group, (tuple,list)) and len(group)>0:
+            if isinstance(group[0], str):                
+                column, operator, value = group
+                if column in rename:
+                    filters[i] = (rename[column], operator, value)
+            else:
+                filters[i] = rename_filters(group, rename)                
+        else:
+            raise ValueError("Invalid filter format. The inner filter must be a list of tuple with 3 elements (column,operator,value).")
+    return filters
+    
 def import_dataframe(file_path, filters=None, dtype={}, **kwargs):
     import_methods = {}
     where = None
+    # Determina l'estensione del file
+    extension = file_path.split('.')[-1].lower()
+    extension = f".{extension}"  # Aggiunge il punto
+
+    if filters is not None:
+        if isinstance(filters, str):
+            where = filters
+            filters = None
+        elif isinstance(filters, (tuple,list)):
+            if extension not in ("parquet","geoparquet"):
+                where = filters_to_query_expression(filters, quoting="", op_boolean_symbols=True) 
 
     try:
         import pandas
         import_methods.update({
-            '.csv': lambda x: pandas.read_csv(x, dtype=dtype),
-            '.excel': lambda x: pandas.read_excel(x, dtype=dtype),
-            '.xls': lambda x: pandas.read_excel(x, dtype=dtype),
-            '.xlsx': lambda x: pandas.read_excel(x, dtype=dtype),
+            '.csv': lambda x: pandas.read_csv(x),
+            '.excel': lambda x: pandas.read_excel(x),
+            '.xls': lambda x: pandas.read_excel(x),
+            '.xlsx': lambda x: pandas.read_excel(x),
             '.parquet': lambda x: pandas.read_parquet(x, filters=filters),
-            '.json': lambda x: pandas.read_json(x, dtype=dtype),
+            '.json': lambda x: pandas.read_json(x),
             '.html': lambda x: pandas.read_html(x),
             '.feather': lambda x: pandas.read_feather(x),
             '.pickle': lambda x: pandas.read_pickle(x),
@@ -612,23 +719,22 @@ def import_dataframe(file_path, filters=None, dtype={}, **kwargs):
     except:
         pass
         
-    # Determina l'estensione del file
-    extension = file_path.split('.')[-1].lower()
-    extension = f".{extension}"  # Aggiunge il punto
+
     
-    if filters is not None and extension not in ("parquet","geoparquet"):
-        where = filters_to_query_expression(filters)   
+  
     # Cerca il metodo corrispondente
     if extension in import_methods:
         df = import_methods[extension](file_path, **kwargs) 
         if dtype:
-            df = df.astype(dtype, copy=False)       
+            dtype = {k: v for k, v in dtype.items() if k in df.columns}
+            df = df.astype(dtype, copy=True)       
         if where:
             df = df.query(where)
         return df
     else:
         df = import_methods['.csv'](file_path, **kwargs)
         if dtype:
+            dtype = {k: v for k, v in dtype.items() if k in df.columns}
             df.astype(dtype, copy=False)
         if where is not None:
             df = df.query(where)

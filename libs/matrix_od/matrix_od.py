@@ -39,11 +39,12 @@ class MatrixOD:
             elif isinstance(init, List):
                 self.mat = np.array(init)
             elif isinstance(init, (int, float)):
-                self.mat += init
+                self.mat += init                
             elif isinstance(init, np.ndarray):
                 self.mat = init.copy() if copy else init
             elif isinstance(init, MatrixOD):
                 self.mat = init.mat.copy() if copy else init.mat
+        np.fill_diagonal(self.mat,0)
         self.mode = mode 
         
 
@@ -208,11 +209,17 @@ class MatrixOD:
             raise ValueError("Axis must be 0, 1, or None.")
 
     @staticmethod
-    def read_df(rows: List, cols: List, df: pd.DataFrame, o_field="o", d_field="d", value_field="value") -> "MatrixOD":
+    def read_df(rows: List, cols: List, df: pd.DataFrame, o_field="o", d_field="d", value_field="value", od: "MatrixOD" = None) -> "MatrixOD":
 
         # Grouping and transforming data into the desired nested dictionary format
         grouped = df[[o_field,d_field,value_field]].rename(columns={o_field: "o", d_field: "d", value_field: "value"}).groupby("o", group_keys=False).apply(lambda x: dict(zip(x["d"], x["value"])), include_groups=False).to_dict()
-        return MatrixOD(rows=rows, cols=cols, init=grouped)
+        if od is not None:
+            for o, list_d in grouped.items():
+                for d, v in list_d.items():
+                    od[o, d] = v
+            return od
+        else:       
+            return MatrixOD(rows=rows, cols=cols, init=grouped)
 
     @staticmethod
     def read_csv(rows: List, cols: List, file: str, o_field="o", d_field="d", value_field="value") -> "MatrixOD":

@@ -53,7 +53,7 @@ def main():
         if args.command == 'run':
             # Load the configuration
             config = IniClass(ini_file=args.config)
-            Logger.initLogger(dir_log=config.DIR_LOG)
+            Logger.initLogger(dir_log=config.LOG_DIR)
             DB.open_db(config.DATABASE_URL)
             Logger.initLogger(session=DB.get_session())
             
@@ -62,7 +62,7 @@ def main():
         elif args.command == 'server':
             # Load the configuration
             config = IniClass(ini_file=args.config)
-            Logger.initLogger(dir_log=config.DIR_LOG)
+            Logger.initLogger(dir_log=config.LOG_DIR)
             DB.open_db(config.DATABASE_URL)
             Logger.initLogger(session=DB.get_session())
 
@@ -72,7 +72,7 @@ def main():
             start_server(host=host, port=port, debug=debug, config=config)
         elif args.command == 'init_db':
             config = IniClass(ini_file=args.config)
-            Logger.initLogger(dir_log=config.DIR_LOG)
+            Logger.initLogger(dir_log=config.LOG_DIR)
             url_dict = {}
             if config.DATABASE_URL:
                 url = config.DATABASE_URL

@@ -40,15 +40,15 @@ class Path(dict):
         prev_l = None
         for i, l_idx in enumerate(self.get_links()):
             t = self["t"] + cost
-            l = self.G.get_link(l_idx)
+            l = G.get_link(l_idx)
             if update_turns and i > 0:
                 turn = G.get_turn(prev_l["idx"], l["idx"])
                 if turn:
-                    cost += turn.get_value(turns_cost, t=t, delta_t=self.delta_t, graph=G, default=0)
+                    cost += turn.get_value(turns_cost, t=t, graph=G, default=0)
             if update_nodes:
                 cost += G.get_node(l["i"]).get_value(name=nodes_cost, t=t, in_link=prev_l, out_link=l, graph=G, default=0)
             if update_links:
-                cost += l.get_value(name=links_cost, t=t, delta_t=self.delta_t, in_link=prev_l, graph=G, default=0)
+                cost += l.get_value(name=links_cost, t=t, in_link=prev_l, graph=G, default=0)
             yield cost
             prev_l = l
 

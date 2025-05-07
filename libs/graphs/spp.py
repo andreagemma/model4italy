@@ -16,19 +16,6 @@ from multiprocessing import get_context, reduction
 
 from . import *
 
-try:
-    import ray
-    ray.util.register_serializer(dict, serializer=dill.dumps, deserializer=dill.loads)
-except Exception as ex:
-    print(ex)
-    pass
-
-try:
-    import dask
-    from dask.distributed import Client
-except Exception as ex:
-    print(ex)
-    pass
 
 class SPP:
 
@@ -190,6 +177,7 @@ class SPP:
 
     @staticmethod
     def initialize_parallel(num_cpus: Optional[int] = None, engine: Optional[str] = None):
+        #TODO: Usare la classe Parallel
         n = SPP.num_cpus if num_cpus is None else num_cpus
         if engine is not None:
             SPP.parallel_engine = engine
@@ -202,6 +190,12 @@ class SPP:
         if num_cpus==1:
             return num_cpus
         if SPP.parallel_engine == SPP.ENGINE_RAY and num_cpus>1:
+            try:
+                import ray
+                ray.util.register_serializer(dict, serializer=dill.dumps, deserializer=dill.loads)
+            except Exception as ex:
+                print(ex)
+                pass            
             if not SPP.ray_initialized:
                 try:
                     ray.init(num_cpus=num_cpus)
@@ -213,6 +207,13 @@ class SPP:
                 return ray.available_resources()["CPU"]
         elif SPP.parallel_engine == SPP.ENGINE_DASK and num_cpus>1:
             if not SPP.dask_initialized:
+                try:
+                    import dask
+                    from dask.distributed import Client
+                except Exception as ex:
+                    print(ex)
+                    pass
+
                 SPP.dask_client = Client(n_workers=num_cpus)
                 SPP.dask_initialized = True
                 return num_cpus
@@ -220,6 +221,12 @@ class SPP:
                 return len(SPP.dask_client.nthreads())
         elif SPP.parallel_engine == SPP.ENGINE_DASK_MULTITHREADING and num_cpus>1:
             if not SPP.dask_initialized:
+                try:
+                    import dask
+                    from dask.distributed import Client
+                except Exception as ex:
+                    print(ex)
+                    pass
                 SPP.dask_client = Client(processes=False, threads_per_worker=num_cpus, n_workers=1)
                 SPP.dask_initialized = True
                 return num_cpus
@@ -235,6 +242,7 @@ class SPP:
         if SPP.parallel_engine == SPP.ENGINE_RAY and SPP.ray_initialized:
             try:
                 if SPP.ray_initialized:
+                    import ray
                     ray.shutdown()
                 SPP.ray_initialized = False
             except Exception as ex:
@@ -304,6 +312,7 @@ class SPP:
         engine = engine or SPP.parallel_engine
         num_cpus = SPP.initialize_parallel(n_workers, engine=engine)            
         if engine == SPP.ENGINE_RAY and num_cpus>1:    
+            import ray
             pair_chunks_refs = [ray.put(chunk) for chunk in pair_chunks]
 
             @ray.remote
@@ -326,6 +335,12 @@ class SPP:
                     yield paths
 
         elif engine in [SPP.ENGINE_DASK, SPP.ENGINE_DASK_MULTITHREADING]:
+            try:
+                import dask
+                from dask.distributed import Client
+            except Exception as ex:
+                print(ex)
+                pass
 
             @dask.delayed
             def calculate(*args, **kwargs):
@@ -363,11 +378,11 @@ class SPP:
         engine = engine or SPP.parallel_engine
         num_cpus = SPP.initialize_parallel(n_workers, engine=engine)            
         if engine == SPP.ENGINE_RAY and num_cpus>1:
-
+            import ray
             chunk_size = int(max(1, len(tasks) // (num_cpus) ))  # cerca di dividere in quattro compiti per CPU
             pair_chunks = [tasks[i : i + chunk_size] for i in range(0, len(tasks), chunk_size)]
             pair_chunks_refs = [ray.put(chunk) for chunk in pair_chunks]
-
+            
             @ray.remote
             def calculate_for_chunk_ray(*args, **kwargs):
                 return SPP.__multiple_tasks_single_processor(*args, **kwargs)
@@ -381,6 +396,8 @@ class SPP:
                     paths = ray.get(done_id)
                     ret.merge(paths)
         elif engine in [SPP.ENGINE_DASK, SPP.ENGINE_DASK_MULTITHREADING]:
+            import dask
+            from dask.distributed import Client
             chunk_size = int(max(1, len(tasks) // (num_cpus)))  # cerca di dividere in quattro compiti per CPU
             pair_chunks = [tasks[i : i + chunk_size] for i in range(0, len(tasks), chunk_size)]
 
@@ -435,6 +452,7 @@ class SPP:
         engine = engine or SPP.parallel_engine
         num_cpus = SPP.initialize_parallel(n_workers, engine=engine)            
         if engine == SPP.ENGINE_RAY and num_cpus>1:
+            import ray
             #ray.util.register_serializer(graph, serializer=dill.dumps, deserializer=dill.loads)
             graph_ref = ray.put(graph)
             targets_ref = ray.put(targets)
@@ -469,6 +487,9 @@ class SPP:
                     paths = ray.get(done_id)
                     ret.merge(paths)
         elif engine in [SPP.ENGINE_DASK, SPP.ENGINE_DASK_MULTITHREADING] and num_cpus>1:
+            import dask
+            from dask.distributed import Client
+
             chunk_size = int(max(1, len(sources) // num_cpus))
             sources_chunks = [sources[i : i + chunk_size] for i in range(0, len(sources), chunk_size)]
 

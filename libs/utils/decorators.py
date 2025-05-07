@@ -74,7 +74,7 @@ def run_in_thread(func):
     return wrapper
 
 
-def log_execution(logger, log_args=False, log_result=False):
+def log_execution(logger=None, log_args=False, log_result=False):
     """
     The `log_execution` function is a decorator that logs the execution of a function, including its
     arguments and result, if specified.
@@ -92,18 +92,19 @@ def log_execution(logger, log_args=False, log_result=False):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
+            log = logger or logging.getLogger()
             wrapper.id += 1
             t, pt = time(), process_time()
             if log_args:
-                logger.debug(f"Executing {getmodule(func).__name__}.{func.__name__} (id:{wrapper.id}) with args: {args} and kwargs: {kwargs}")
+                log.debug(f"Executing {getmodule(func).__name__}.{func.__name__} (id:{wrapper.id}) with args: {args} and kwargs: {kwargs}")
             else:
-                logger.debug(f"Executing {getmodule(func).__name__}.{func.__name__} (id:{wrapper.id})")
+                log.debug(f"Executing {getmodule(func).__name__}.{func.__name__} (id:{wrapper.id})")
             results = func(*args, **kwargs)
             if log_result:
-                logger.debug(
+                log.debug(
                     f"Execution of {getmodule(func).__name__}.{func.__name__} (id:{wrapper.id}) completed in {time() - t} s (process_time = {process_time() - pt} s) - results = {results}")
             else:
-                logger.debug(f"Execution of {getmodule(func).__name__}.{func.__name__} (id:{wrapper.id}) completed in {time() - t} s (process_time = {process_time() - pt} s)")
+                log.debug(f"Execution of {getmodule(func).__name__}.{func.__name__} (id:{wrapper.id}) completed in {time() - t} s (process_time = {process_time() - pt} s)")
             return results
 
         wrapper.id = 0

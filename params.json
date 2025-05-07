@@ -1,97 +1,145 @@
 {
     "simulation_id": 22,
-    "description": "CAV_24h-offline2",
-    "start": "00:00",
-    "end": "23:59",
+    "description": "Eur - Test",
+    "date": "2024-05-07",
+    "start": "07:00",
+    "end": "07:30",
     "op": "assignment",
     "settings": {
-        "MSA_MAX_ITE": 6,
+        "MSA_MAX_ITE": 1,
         "MSA_MAX_TIMESLICE": 180,
         "NUMCPU": 4,
         "MSA_K": 3,
-        "LOAD_PATHS": false,
+        "LOAD_PATHS": true,
         "SAVE_PATHS": true,
-        "LOAD_GRAPH": false,
+        "LOAD_GRAPH": true,
         "SAVE_GRAPH": true
     },
     "params": {
         "input": {
-            "loader": "FileLoader"
+            "connector": "FileLoader",
+            "location": "./dati/GrafoEur"
         },
         "output": {
-            "writer": "FileWriter",
-            "location": "./dati/output/{description}",
-            "state": "./dati/output/cav2/state",
-            "aggregated_results": null,
-            "sim_results": null,            
-            "paths": null,
-            "aggregated_results_old": "{simulation_id}_aggregated_results.parquet",
-            "sim_results_old": "{simulation_id}_sim_results.parquet",
-            "stat_results_old": "{simulation_id}_stat_results.parquet",
-            "paths_old": "{simulation_id}_paths.parquet"
+            "connector": "FileWriter",
+            "location": "./dati/output/{description}"            
         },
-        "heavy_vehicles_ban": false,
         "modes": [
             {
                 "id": "c",
                 "description": "car",
                 "eq_factor": 1
+            },
+            {
+                "id": "h",
+                "description": "heavy",
+                "eq_factor": 2
             }
         ],
         "demand": [
             {
                 "mode": "c",
                 "matrices": [
+                    "mat_car.parquet",
                     {
-                        "src": "dati/GrafoCAVEsteso2021-12/mat_car.parquet",
-                        "mapping": {
-                            "o": "o",
-                            "d": "d",
-                            "value": "value",
-                            "timestamp": "timestamp"
-                        }
+                        "location":"./dati/GrafoEur",
+                        "src":"mat_heavy.csv",
+                        "op": "+"
+                    },
+                    { 
+                        "scalar": 1.1,
+                        "op": "*"
+                    }
+                ]
+            },
+            {
+                "mode": "h",
+                "matrices": [
+                    {
+                        "scalar": 1.1
                     }
                 ]
             }
         ],
         "zones": {
-            "src": "dati/GrafoCAVEsteso2021-12/zones.csv",
+            "connector": "FileLoader",
+            "location": "",
+            "src": "dati/GrafoEur/zones.shp",
             "mapping": {
-                "id": "id_zone"
+                "id": "id"
             }
         },
         "supply": [
             {
-                "links_src": "dati/GrafoCAVEsteso2021-12/cav_links.shp",
-                "nodes_src": "dati/GrafoCAVEsteso2021-12/cav_nodes.shp",
-                "turns_src": "dati/GrafoCAVEsteso2021-12/turns_proh.csv",
-                "mapping": {
-                    "nodes": {
-                        "id": "id"
-                    },
-                    "links": {
+                "links": {
+                    "src":  "eur_links.shp",
+                    "mapping": {
                         "id": "id",
                         "from_node": "from_node",
                         "to_node": "to_node",
                         "v0": "v0",
-                        "connector": "connector",
-                        "lanes": "lanes",
-                        "alpha": "alpha",
-                        "rcr": "rcr",
-                        "capacity": "capacity",
-                        "length": "length",
-                        "geometry": "geometry"
-                    },
-                    "turns": {
-                        "from_node": "from_node",
-                        "via_node": "via_node",
-                        "to_node": "to_node"
+                        "connector": "connect",
+                        "lanes": "n_lanes"
+                    }
+                },
+                "nodes": "eur_nodes.shp",
+                "turns": {
+                    "src": "turns_proh.csv",
+                    "mapping": {
+                        "from_node": "fromnodeno",
+                        "to_node": "tonodeno",
+                        "via_node": "vianodeno"
                     }
                 }
             }
         ],
-        "links_sets": [],
-        "events": [],
-        "traffic_lights": []
+        "links_sets": [ {
+            "location": "./dati",
+            "src": "GrafoEur/links_sets.csv",
+            "mapping": {
+                "set": "id_set",
+                "id_link": "id_link"
+            }
+        }],
+        "events_no": [{
+            "src": "events.csv",
+            "mapping": {
+                "id_link_set": "id",
+                "type": "type",
+                "start": "start",
+                "end": "end",
+                "params": "params"
+            }
+        }],
+        "traffic_lights": [ 
+            {
+                "location": "",
+                "src": "dati/GrafoEur/sign_nodes.json",
+                "mapping": {
+                    "id": "id",
+                    "type": "type",
+                    "phases": "phases"
+                }
+            }
+        ],
+        "aggregated_results": "{simulation_id}_aggregated_results.parquet",
+        "paths": "{simulation_id}_paths.parquet",
+        "state": "./dati/output/{description}/state",
+        "fcd": {
+            "connector": "DBLoader",
+            "location": "postgresql+psycopg://postgres:lDvdc15dcd5@192.168.133.80:5432/fcd_mobito",
+            "src": "eur.fcdmm_240507",
+            "mapping": {
+                "id_fcd": "id_fcd",
+                "id_trip": "id_trip",
+                "heading": "heading",
+                "timestamp": "dt",
+                "engine": "engine",
+                "speed": "speed",
+                "lon": "lon",
+                "lat": "lat",
+                "geometry": "geometry"
+            }
+        }
     }
 }

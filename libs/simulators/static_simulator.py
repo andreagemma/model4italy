@@ -2,7 +2,7 @@ import pandas as pd
 
 from libs.utils.parallel import Parallel
 from .. import Logger
-from ..loaders import BaseLoader
+from ..connectors import Loader
 from . import BaseSimulator
 from ..graphs import *
 from ..graphs import DynamicGraph as Graph, DynamicLink as Link
@@ -12,8 +12,8 @@ class StaticSimulator(BaseSimulator):
 
     log = Logger.getLogger("SIM")
     
-    def __init__(self,loader: BaseLoader, links_vdf: str = "vdf") -> None:
-        self.loader: BaseLoader = loader   
+    def __init__(self,loader: Loader, links_vdf: str = "vdf") -> None:
+        self.loader: Loader = loader   
         self.paths:KPathContainer = None     
         self.G: Graph = loader.G
         self.links_vdf: str = links_vdf

@@ -9,7 +9,7 @@ import typing
 from .particle import car
 from ...graphs import AbstractGraph
 from .. import BaseSimulator
-from ...loaders import BaseLoader
+from ...connectors import Loader #UPDATE: Gemma 
 from ...utils import min2hhmm
 
 import math
@@ -67,7 +67,7 @@ class SigNode:
             else:
                 self.res.append([phase["from_link"], phase["to_link"], t, self.G["signalized_turns"][phase["from_link"], phase["to_link"]], phase["type"]])
 
-    def update_graph(self, new_graph): #UPDATE: Gemma aggiunto per caricare il nuovo grafo (preload)
+    def update_graph(self, new_graph): #UPDATE: Gemma 
         for k,v in self.G["signalized_turns"].items():
             new_graph["signalized_turns"][k] = v
         self.G = new_graph
@@ -106,7 +106,7 @@ class YieldNode:
 
 class MicroSimulator(BaseSimulator):
 
-    def __init__(self, loader: BaseLoader, monitored_links=None, yield_nodes=None):
+    def __init__(self, loader: Loader, monitored_links=None, yield_nodes=None): #UPDATE: Gemma 
         super().__init__(loader=loader)
         self.simustep = self.loader.ini.SIMU_STEP  # [s] simulation step in seconds
         self.G: AbstractGraph = self.loader.G
@@ -572,7 +572,7 @@ class MicroSimulator(BaseSimulator):
         if self.signalized_nodes:
             [node.update_cap(t, t1) for node in self.signalized_nodes]  # update yield nodes
         # ts_cap() #update signalized nodes
-    """ #UPDATE: GEMMA: non serve più
+
     def yield_cap(self, yield_nodes, G):
         "Yeild capacity model"
         for node in yield_nodes:
@@ -587,7 +587,7 @@ class MicroSimulator(BaseSimulator):
             if p > 0.3:
                 for link in node["main_links"]:
                     G.get_link(link)["inflow_cap"] = G.get_link(link)["cap_dt"] * 0.85
-    """ #UPDATE: GEMMA: non serve più
+
     def order_positions(self, t, vehs):
         "FIFO rule ensured"
         # vehs = [veh for veh in vehs if veh.status!="arrived"]

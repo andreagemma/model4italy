@@ -33,8 +33,8 @@ class MatrixAss:
             self.mat[l, idx] = value
 
     def __init__(self, loader=None, n_intervals=None, links_detected=None, G=None, pre_intervals=None):
-        from ..loaders import BaseLoader
-        loader: BaseLoader = loader
+        from ..connectors import Loader
+        loader: Loader = loader
         self.G = loader.G if G is None else G
         self.origins = loader.origins
         self.destinations = loader.destinations
