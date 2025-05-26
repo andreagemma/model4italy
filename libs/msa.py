@@ -1,5 +1,4 @@
 from __future__ import annotations
-from libs import Logger
 import multiprocessing as mp
 import time
 from operator import itemgetter
@@ -9,10 +8,9 @@ import itertools
 import pdb
 import pandas as pd
 
+from .utils.parallel import Parallel
 from .connectors import StateManager
-from libs.matrix_od.matrix_ass import MatrixAss
-from libs.simulators.micro_sim.sim import Simulator
-from libs.simulators.micro_sim.micro_simulator import MicroSimulator
+from .simulators.micro_sim.micro_simulator import MicroSimulator
 from .matrix_od import MatrixOD, MatrixODT, MatrixAss
 from .graphs import DynamicGraph as Graph, DynamicLink as Link, DynamicNode as Node, DynamicTurn as Turn, DynamicGraphElement as GraphElement
 from .graphs import SPP
@@ -21,7 +19,10 @@ from .connectors import Loader
 from .connectors import Writer
 from .utils.util import min2hhmm
 from . import BaseSimulator
+from .log.logger import Logger
 from .utils import save_dict, load_dict, getsize
+from .utils.ipc import IPC
+from .database import Execution
 
 
 class MSA:
@@ -43,11 +44,15 @@ class MSA:
         save_state_graph: bool = False,
         load_state_graph: bool = False,
         load_state_paths: bool = False,
-        save_state_paths: bool = False
-    ):
-        self.log = Logger.getLogger("MSA", execution_id=loader.parser.get("execution_id"))
+        save_state_paths: bool = False,
+        log: Logger = None,
+        ipc: IPC = None,
+        ):
+        self.log = log or Logger.getLogger(self.__class__.__name__, execution_id=loader.parser.get("execution_id"))
+        self.ipc = ipc
         self.loader: Loader = loader
         self.writer: Writer = writer
+        self.loader.load_from_ipc(ipc=self.ipc)
         self.max_k: int = max_k
         self.max_ite: int = max_ite
         self.max_rel_gap: float = max_rel_gap
@@ -102,11 +107,19 @@ class MSA:
         self.current_i_start: int = None
         self.current_i_end: int = None
         self.current_t_starts: List[int] = None
+        self.inc_progress: float = 1
+        self.progress:float = 0    
+        self.interval:int = None    
+        self.iteration:int = None
         
 
     def run(self):
         # self.log.info(f"occupazione graph: {getsize(self.G)/1024/1024}MB")
         # self.log.info(f"occupazione od: {getsize(self.od)/1024/1024}MB")
+        n_steps = 2 + (len(self.global_intervals)*5) + len(self.global_intervals) * self.max_k * 2 + len(self.global_intervals) * max(0,self.max_ite-self.max_k) * 1
+        self.inc_progress = 100.0 / n_steps
+
+        self.update_progress("Loading parameters")
         if self.save_state_graph:
             self.log.info("Saving state (Graph)...")
             self.state_manager.write_state(self.G, "graph", mode="w")
@@ -121,7 +134,8 @@ class MSA:
         if len(self.global_intervals) > 1:
             self.log.info(f"Simulation will be splitted into {len(self.global_intervals)} intervals: {self.global_intervals}")
         
-        for interval, time_start in enumerate(self.global_intervals):
+
+        for self.interval, time_start in enumerate(self.global_intervals):
             self.current_time_start = time_start
             self.real_time_start = self.current_time_start
             if self.global_num_intervals > 1:
@@ -143,38 +157,46 @@ class MSA:
             gs = min2hhmm(self.global_t_start)
             ge = min2hhmm(self.global_t_end)
             
+            self.update_progress(f"{cs}-{ce} - Starting simulation")
 
             if self.global_num_intervals > 1:     
-                self.log.info(f"Simulating ({interval+1}/{self.global_num_intervals}) {rs}-{re} (Original: {cs}-{ce} Global {gs}-{ge}) ...")
+                self.log.info(f"Simulating ({self.interval+1}/{self.global_num_intervals}) {rs}-{re} (Original: {cs}-{ce} Global {gs}-{ge}) ...")
             else:
                 self.log.info(f"Simulating {rs}-{re} (Original: {cs}-{ce} Global {gs}-{ge}) ...")
                 self.log.info(f"Simulating {cs}-{ce} ...")           
             
+            self.update_progress(f"{cs}-{ce} - Initialize simulation")
             if self.simulator:
                 self.simulator.initialize_assignment(self.current_time_start, self.current_time_end)
 
+            self.update_progress(f"{cs}-{ce} - Running simulation")
             self.run_msa()
 
-            if interval < self.global_num_intervals - 1 or self.save_agg_results or self.save_paths:
+            self.update_progress(f"{cs}-{ce} - Finalizing simulation")
+            if self.interval < self.global_num_intervals - 1 or self.save_agg_results or self.save_paths:
                 self.log.info("Finalizing assignment...")
                 self.simulator.finalize_assignment(self.current_time_start, self.current_time_end)
             
+            self.update_progress(f"{cs}-{ce} - Saving results")
             self._save_state_paths()
             self._save_paths()            
             self._save_agg_results()
-            self.G = self.G_copy.copy()
             
+            self.G = self.G_copy.copy()
+        self.update_progress("Finish")
 
     def _save_paths(self):
         try:
             if self.save_paths:
                 self.log.info("Saving paths...")
                 saved = True
+                mode="w"
                 for t in range(self.real_time_start,self.real_time_end,self.delta_t):
                     paths = self.get_paths_dataframe(t=t)
                     if paths is None:
                         continue
-                    saved = self.writer.write_paths(paths, mode="w", partition=f"t={t}")
+                    saved = self.writer.write_paths(paths, mode=mode, partition=f"t={t}")
+                    mode = "a"
                     if not saved:                        
                         break
                 paths = None   
@@ -207,6 +229,7 @@ class MSA:
                 ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400 ) / 60
                 for t in range(self.real_time_start,self.real_time_end,self.delta_t):
                     tmp = df[ds_t.between(t,t+self.delta_t)]
+                    tmp["t"] = t
                     saved=self.writer.write_agg_results(tmp, mode="W", partition=f"t={t}")
                     if not saved:
                         break
@@ -217,8 +240,13 @@ class MSA:
         except Exception as e:
             self.log.error("Failed to save aggregated results:", exc_info=e, stack_info=True)
 
-    def run_msa(self):
+    def update_progress(self, message:str = None):        
+        self.progress += self.inc_progress
+        #message = f"{self.interval}.{self.iteration} - {message}"
+        Execution.set_progress(self.loader.execution_id, self.progress, message=message)
+        self.log.info(f"({self.progress:.1f}%) {message}")
 
+    def run_msa(self):
         self.current_i_start = int(self.current_time_start / self.delta_t)
         self.current_i_end = int(self.current_time_end / self.delta_t)
         self.current_num_intervals = self.current_i_end - self.current_i_start
@@ -243,7 +271,6 @@ class MSA:
                         self.m_paths.add_path(path)
             self.log.info("Loaded state (Paths)")
             
-        
         if self.simulator:
             self.simulator.set_paths(self.m_paths)
 
@@ -254,6 +281,7 @@ class MSA:
         
         calc_paths = (True and not self.load_state_graph) or self.m_paths.is_empty()
         k_calculated = self.m_paths.k_paths()
+        
 
         # %
         self.log.info("Initialization")
@@ -267,6 +295,7 @@ class MSA:
 
         rgap = 1e308
         file_mode = "w"
+        
         for iteration in range(0, self.max_ite):
             self.iteration = iteration
             info = {"ite": iteration}
@@ -275,13 +304,12 @@ class MSA:
             self.log.info("Ite: %s - Start of Iteration", iteration)
             
             tempi_od = []
-
             # precarico i percorsi con 1/k di flusso ciascuno con k pari al numero di percorsi dell'od            
             if calc_paths:
                 if k_calculated < self.max_k:
                     self.log.info("Ite: %s - Calculating paths (k=%d)...", iteration, k_calculated + 1)
-                    self.calculate_paths(k_calculated)
-                    k_calculated += 1
+                    self.calculate_paths(k_calculated)                    
+                    k_calculated += 1                
                 if iteration < self.max_k:
                     self.log.info("Ite: %s - Preloading (k=%d)...", iteration, k_calculated)
                     for (o, d, t_start, mode), k_paths in self.m_paths.all_kpaths():
@@ -295,7 +323,6 @@ class MSA:
                     continue
                 else:
                     calc_paths = False
-
             elif iteration == 0:
                 self.log.info("Ite: %s - Preloading...", iteration)
                 for (o, d, t_start, mode), k_paths in self.m_paths.all_kpaths():
@@ -304,9 +331,10 @@ class MSA:
                     for path in k_paths:
                         path["path_flow"] = f / k
                 self.log.info("Ite: %s - Updating network performance...", iteration)
-                self.update_performance(k_calculated)
+                self.update_performance(k_calculated)                
                 self.calc_stats()
                 continue
+
 
             self.log.info("Ite: %s - MSA flow redistribution...", iteration)
 
@@ -333,6 +361,7 @@ class MSA:
                     best["path_flow"] += f / k
                     tempi_od.append(best["tot_cost"])
                     tot_tt_current += f * best["tot_cost"]
+
 
             info["rgap_time"] = None
             if iteration > 1:
@@ -361,9 +390,8 @@ class MSA:
         
         
     def calculate_paths(self, k):
-        n_cpu = self.loader.ini.PARALLEL_NUMCPU
-        SPP.parallel_engine = self.loader.ini.PARALLEL_ENGINE
-        SPP.initialize_parallel(num_cpus=n_cpu)
+        self.update_progress(f"{min2hhmm(self.current_time_start)}-{min2hhmm(self.current_time_end)} - Iteration: {self.iteration}/{self.max_ite} - Calculating paths")
+        n_cpu = self.loader.ini.PARALLEL_NUMCPU        
 
         ret = KPathList()
 
@@ -378,12 +406,14 @@ class MSA:
             self.modes
             ))
         ret = SPP.multiple_paths(self.G, tasks=tasks, link_cost=self.links_cost, turn_cost=self.turns_cost, node_cost=self.nodes_cost)
-        SPP.shutdown_parallel()
+
         self.log.info("Ite: %s - Paths calculated", self.iteration)        
         self.m_paths.merge(ret, k)
+        
         #print(getsize(self.m_paths)/1024/1024,len(self.m_paths["paths"]),len(self.m_paths["ull"]))
 
     def update_performance(self, k: int):
+        self.update_progress(f"{min2hhmm(self.current_time_start)}-{min2hhmm(self.current_time_end)} - Iteration: {self.iteration}/{self.max_ite} - Updating performance")
         def reset(l: Link):
             l.reset_attribute(name="flow", value=0)
 
@@ -407,6 +437,7 @@ class MSA:
         else:
             if update_costs:
                 self.update_paths_costs(update_nodes=self.nodes_cost is not None, update_links=self.links_cost is not None, update_turns=self.turns_cost is not None)
+        
 
     def update_paths_costs(self, update_nodes=True, update_links=True, update_turns=True):
         self.log.info("Ite: %s - Updating costs...", self.iteration)
@@ -484,7 +515,7 @@ class MSA:
         id_links = results["id_link"].unique()
         df_geometry = pd.DataFrame([[id_link,ST_Multi(G.get_link(id_link).get_value("geometry"))] for id_link in id_links], columns=["id_link","geometry"])
         results = results.merge(df_geometry, on="id_link")
-        results = gpd.GeoDataFrame(results, geometry="geometry" ,crs="EPSG:4326")
+        results = gpd.GeoDataFrame(results, geometry="geometry" ,crs=self.loader.ini.CRS)
         return results
         
     def get_paths_dataframe(self, t=None):
@@ -502,7 +533,7 @@ class MSA:
         for geom in ("geom","geometry"):
             if geom in l:
                 results[geom]=[MultiLineString([multi_line_to_line(G.get_link(l_idx).get_value(geom)) for l_idx in links]) for links in results["links"]]
-                results = gpd.GeoDataFrame(results, geometry=geom ,crs="EPSG:4326")
+                results = gpd.GeoDataFrame(results, geometry=geom ,crs=self.loader.ini.CRS)
                 break
 
         return results

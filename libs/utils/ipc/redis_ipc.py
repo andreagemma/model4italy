@@ -3,6 +3,7 @@ import threading
 import logging
 from collections import defaultdict
 import redis
+import socket
 
 try:
     import dill as pickle
@@ -60,12 +61,29 @@ class RedisIPC:
         else:
             self.logger.debug(f"Publishing: {{'message': 'blob'}}")
 
-    def start(self):
+    def start(self, blocking=True):
         """Avvia l'ascolto in un thread separato (compatibilità interfaccia)."""
         self.logger.debug(f"Starting Redis IPC on server {self.host}:{self.port}")
-        import time
-        while True:
-            time.sleep(1)
+        if blocking:
+            import time
+            while True:
+                time.sleep(1)
+                
+    def running(self) -> bool:
+        try:
+            client = redis.Redis(host=self.host, port=self.port, db=self.db, socket_connect_timeout=1)
+            return client.ping()
+        except (redis.ConnectionError, redis.TimeoutError):
+            return False
+        
+    def init(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(1.0)
+            ret = s.connect_ex((self.host, self.port)) == 0
+        if not ret:
+            self.logger.error(f"Port {self.port} is not available. Please check if Redis is running.")
+            return False
+
 
 # === Esempio di esecuzione ===
 if __name__ == "__main__":

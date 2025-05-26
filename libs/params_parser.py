@@ -16,8 +16,8 @@ class ParamsParser:
     """
     A class to parse parameters from a string.
     """
-
-    def __init__(self, params: Union[str,dict], settings: IniClass=None):
+    @staticmethod
+    def params_to_dict(params: Union[str,dict, list,tuple]) -> dict:
         if isinstance(params, str):
             try:
                 if os.path.exists(params):
@@ -27,9 +27,17 @@ class ParamsParser:
                     params = json.loads(params)
             except Exception as ex:
                 raise ValueError(f"Invalid parameters: {params}") from ex
+        elif isinstance(params, (list,tuple)):
+            ret = {}
+            for p in params:
+                if p:
+                    ret.update(ParamsParser.params_to_dict(p))
+            params = ret
         if not isinstance(params, dict):    
             raise ValueError("Invalid parameters: %s" % params)        
-        self.params:dict = params
+        return params
+    def __init__(self, params: Union[str,dict, list,tuple], settings: IniClass=None):
+        self.params:dict = ParamsParser.params_to_dict(params)
         self.fields:dict = self.init_fields()
         self.ini:IniClass = settings
         self.update_params()

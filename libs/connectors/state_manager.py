@@ -26,7 +26,7 @@ from ..utils import save_dict, load_dict
 
 
 class StateManager(object):
-    def __init__(self, parser: ParamsParser, default_ext=".pickle.gzip", compression:str=None):
+    def __init__(self, parser: ParamsParser, default_ext=".pickle.lz4", compression:str="lz4"):
         self.parser = parser
         self.execution_id = self.parser.get("execution_id")
         self.log = Logger.getLogger(self.__class__.__name__, execution_id=self.execution_id)

@@ -44,64 +44,38 @@ def chunks(lst: Union[List, Tuple], chunk_size: int = None, bins: int = 1) -> Ge
         yield i, lst[i : i + chunk_size]
 
 
-def save_dict(data: dict, file_name: str, compression=None) -> None:
+def save_dict(data: dict, file_name: str, compression=None, clevel: int=5) -> None:
     """
     Save a dictionary in a pickle file name
     :param data: data to save
     :param file_name: file name
     :return: None
     """
+    from .serializer import Serializer
+
     if compression is None:
-        if file_name.endswith(".gz"):
-            compression = "gzip"
+        if file_name.endswith(".gz") or file_name.endswith(".gzip"):
+            compression = Serializer.CNAME_GZIP
         elif file_name.endswith(".bz2"):
-            compression = "bz2"
+            compression = Serializer.CNAME_BZ2
         elif file_name.endswith(".zip"):
-            compression = "zip"
+            compression = Serializer.CNAME_ZIP
         elif file_name.endswith(".xz"):
-            compression = "lzma"
+            compression = Serializer.CNAME_LZMA
         elif file_name.endswith(".lz4"):        
-            compression = "lz4"        
+            compression = Serializer.CNAME_LZ4
         elif file_name.endswith(".blz"):        
-            compression = "blosclz"            
+            compression = Serializer.CNAME_BLOSCLZ            
         elif file_name.endswith(".fast"):        
-            compression = "blosclz"            
+            compression = Serializer.CNAME_BLOSCLZ           
+        elif file_name.endswith(".snappy"):        
+            compression = Serializer.CNAME_SNAPPY
         elif file_name.endswith(".pickle"):        
             compression = None
-                
-    if compression == "gzip":
-        import gzip
-
-        with gzip.open(file_name, "wb") as f:
-            pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
-        return
-    elif compression == "bz2":
-        import bz2
-
-        with bz2.BZ2File(file_name, "wb") as f:
-            pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
-        return
-    elif compression == "zip":
-        import zipfile
-
-        with zipfile.ZipFile(file_name, "w") as zf:
-            zf.writestr(file_name, pickle.dumps(data, pickle.HIGHEST_PROTOCOL))
-        return
-    elif compression == "lzma":
-        import lzma
-
-        with lzma.open(file_name, "wb") as f:
-            pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
-        return
-    elif compression in ("lz4", "blosclz"):
-        import blosc
-        with open(file_name, "wb") as f:
-            f.write(blosc.compress(pickle.dumps(data, pickle.HIGHEST_PROTOCOL), typesize=8, cname=compression))
-        return
-    else:
-        with open(file_name, "wb") as f:
-            pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
-
+    pickled = Serializer.serialize(data, compression=compression, clevel=clevel)
+    with open(file_name, "wb") as f:
+        f.write(pickled)
+    
 
 def load_dict(file_name: str, compression=None) -> dict:
     """
@@ -109,52 +83,30 @@ def load_dict(file_name: str, compression=None) -> dict:
     :param file_name:
     :return:
     """
+    from .serializer import Serializer
     if compression is None:
-        if file_name.endswith(".gz"):
-            compression = "gzip"
+        if file_name.endswith(".gz") or file_name.endswith(".gzip"):
+            compression = Serializer.CNAME_GZIP
         elif file_name.endswith(".bz2"):
-            compression = "bz2"
+            compression = Serializer.CNAME_BZ2
         elif file_name.endswith(".zip"):
-            compression = "zip"
+            compression = Serializer.CNAME_ZIP
         elif file_name.endswith(".xz"):
-            compression = "lzma"
+            compression = Serializer.CNAME_LZMA
         elif file_name.endswith(".lz4"):        
-            compression = "lz4"        
+            compression = Serializer.CNAME_LZ4
         elif file_name.endswith(".blz"):        
-            compression = "blosclz"            
+            compression = Serializer.CNAME_BLOSCLZ            
         elif file_name.endswith(".fast"):        
-            compression = "blosclz"            
-
+            compression = Serializer.CNAME_BLOSCLZ           
+        elif file_name.endswith(".snappy"):        
+            compression = Serializer.CNAME_SNAPPY
         elif file_name.endswith(".pickle"):        
             compression = None
-    if compression == "gzip":
-        import gzip
-
-        with gzip.open(file_name, "rb") as f:
-            return pickle.load(f)
-    elif compression == "bz2":
-        import bz2
-
-        with bz2.BZ2File(file_name, "rb") as f:
-            return pickle.load(f)
-    elif compression == "zip":
-        import zipfile
-
-        with zipfile.ZipFile(file_name, "r") as zf:
-            with zf.open(file_name) as f:
-                return pickle.loads(f.read())
-    elif compression == "lzma":
-        import lzma
-
-        with lzma.open(file_name, "rb") as f:
-            return pickle.load(f)
-    elif compression in ("lz4", "blosclz"):
-        import blosc
-        with open(file_name, "rb") as f:
-            return pickle.loads(blosc.decompress(f.read()))                    
-    else:
-        with open(file_name, "rb") as f:
-            return pickle.load(f)
+    with open(file_name, "rb") as f:
+        data = f.read()
+        data = Serializer.deserialize(data, compression=compression)
+    return data
 
 
 def create_unique_name(prefix: Optional[str] = None) -> str:
@@ -412,7 +364,7 @@ def run_in_thread(fn):
     return run
 
 def min2hhmm(m):
-    return "%s:%s" % (str(int(m / 60)).zfill(2), str(m % 60).zfill(2))
+    return "%s:%s" % (str(int(m / 60)).zfill(2), str(int(m % 60)).zfill(2))
 
 def hhmm2min(timestr):
     h1, m1 = timestr.split(":")
@@ -423,6 +375,8 @@ def hhmm2min(timestr):
 import psutil
 import re
 from typing import Optional, Union, Iterable
+
+
 
 
 def memory_usage(
@@ -580,32 +534,89 @@ def export_dataframe(df, file_path, mode="w", **kwargs):
                 file_path = new_file_path
                 break
 
-    
+    partition_cols=kwargs.pop("partition_cols", None)
+
+    def to_parquet(df, base_dir, partition_cols=None, append=False, index=None):
+        import pyarrow as pa
+        import pyarrow.dataset as ds
+
+        table = pa.Table.from_pandas(df, preserve_index=index)
+        # genrete unuique name for the partition
+        uid = str(int(datetime.now().timestamp())) + "_" + str(uuid4()) + "_" + str(getpid())+"_{i}" + extension
+        existing_data_behavior = "delete_matching" if not append else "overwrite_or_ignore"
+        schema = pa.Schema.from_pandas(df[partition_cols], preserve_index=index) if partition_cols else None
+        ds.write_dataset(
+            table,
+            base_dir=base_dir,
+            format="parquet",
+            basename_template=uid,
+            partitioning=ds.partitioning(schema = schema, flavor="hive") if partition_cols else None,
+            existing_data_behavior=existing_data_behavior
+        )
+
+
+    def to_geoparquet(df, base_dir, partition_cols=None, append=False, index=False, crs=None):
+        import pyarrow as pa
+        import pyarrow.dataset as ds
+        """
+        df.to_parquet(base_dir,
+                       engine="auto",
+                       index=index, 
+                       partition_cols=partition_cols, 
+                       dataset=True,
+                       append=append, **kwargs)"""
+
+        # Salva metadato CRS se specificato
+        df = df.copy()
+        df["geometry"] = df.geometry.apply(lambda geom: geom.wkb if geom else None)
+        table = pa.Table.from_pandas(df, preserve_index=index)
+
+        existing_data_behavior = "delete_matching" if not append else "overwrite_or_ignore"
+        uid = str(int(datetime.now().timestamp())) + "_" + str(uuid4()) + "_" + str(getpid())+"_{i}" + extension
+        schema = pa.Schema.from_pandas(df[partition_cols], preserve_index=index) if partition_cols else None
+        ds.write_dataset(
+            table,
+            base_dir=base_dir,
+            format="parquet",
+            basename_template=uid,
+            partitioning=ds.partitioning(schema = schema, flavor="hive") if partition_cols else None,
+            existing_data_behavior=existing_data_behavior
+        )
+
+        if crs:
+            import json, os
+            metadata_path = os.path.join(base_dir, "_metadata_crs.json")
+            with open(metadata_path, "w") as f:
+                json.dump({"crs": crs}, f)
+
     # Mappa estensioni a metodi di esportazione
     export_methods_gpd = {
-        '.shp': lambda x,**kwargs: df.to_file(x, index=index, mode=mode)  if hasattr(df,"to_file") else None,
-        '.parquet': lambda x,**kwargs: df.to_parquet(x, index=index) if hasattr(df,"to_parquet") else None,
-        '.geoparquet': lambda x,**kwargs: df.to_parquet(x, index=index) if hasattr(df,"to_parquet") else None,        
-        '.gpkg': lambda x,**kwargs: df.to_file(x, driver="GPKG", layer=kwargs.get("layer",os.path.basename(x)), index=index, mode=mode) if hasattr(df,"to_file") else None,        
+        '.shp': lambda df, x,**kwargs: df.to_file(x, index=index, mode=mode)  if hasattr(df,"to_file") else None,
+        '.parquet': lambda df, x,**kwargs: to_geoparquet(df, x, partition_cols=partition_cols, append=append, index=index),
+        '.geoparquet': lambda df, x,**kwargs: to_geoparquet(df, x, partition_cols=partition_cols, append=append, index=index),
+        '.gpkg': lambda df, x,**kwargs: df.to_file(x, driver="GPKG", layer=kwargs.get("layer",os.path.basename(x)), index=index, mode=mode) if hasattr(df,"to_file") else None,        
     }
     
 
     export_methods_pd= {
-        '.csv': lambda x,**kwargs: df.to_csv(x,mode=mode, index=index) if hasattr(df,"to_csv") else None,
-        '.excel': lambda x,**kwargs: df.to_excel(x, index=index) if hasattr(df,"to_excel") else None,
-        '.xls': lambda x,**kwargs: df.to_excel(x, index=index) if hasattr(df,"to_excel") else None,
-        '.xlsx': lambda x,**kwargs: df.to_excel(x, index=index) if hasattr(df,"to_excel") else None,
-        '.parquet': lambda x,**kwargs: df.to_parquet(x, engine="fastparquet", append=append, index=index) if hasattr(df,"to_parquet") else None,
-        '.json': lambda x,**kwargs: df.to_json(x, mode=mode) if hasattr(df,"to_json") else None,
-        '.html': lambda x,**kwargs: df.to_html(x, index=index, **kwargs) if hasattr(df,"to_html") else None,
-        '.feather': lambda x,**kwargs: df.to_feather(x, index=index, **kwargs) if hasattr(df,"to_feather") else None,
-        '.pickle': lambda x, **kwargs: x.to_pickle if hasattr(df,"to_pickle") else None,
+        '.csv': lambda df, x,**kwargs: df.to_csv(x,mode=mode, index=index) if hasattr(df,"to_csv") else None,
+        '.excel': lambda df, x,**kwargs: df.to_excel(x, index=index) if hasattr(df,"to_excel") else None,
+        '.xls': lambda df, x,**kwargs: df.to_excel(x, index=index) if hasattr(df,"to_excel") else None,
+        '.xlsx': lambda df, x,**kwargs: df.to_excel(x, index=index) if hasattr(df,"to_excel") else None,
+        '.parquet': lambda df, x,**kwargs: to_parquet(df, x, partition_cols=partition_cols, append=append, index=index),
+        '.json': lambda df, x,**kwargs: df.to_json(x, mode=mode) if hasattr(df,"to_json") else None,
+        '.html': lambda df, x,**kwargs: df.to_html(x, index=index, **kwargs) if hasattr(df,"to_html") else None,
+        '.feather': lambda df, x,**kwargs: df.to_feather(x, index=index, **kwargs) if hasattr(df,"to_feather") else None,
+        '.pickle': lambda df, x, **kwargs: x.to_pickle if hasattr(df,"to_pickle") else None,
     }
 
     try:
         import geopandas as gpd
         if extension in export_methods_gpd and "geometry" in df.columns:
-            export_methods_gpd[extension](file_path, **kwargs)
+            crs = kwargs.pop("crs", None)
+            if crs is not None:
+                df = df.to_crs(crs, inplace=True)
+            export_methods_gpd[extension](df, file_path, **kwargs)
             return True
     except:
         pass
@@ -616,15 +627,18 @@ def export_dataframe(df, file_path, mode="w", **kwargs):
             df = pd.DataFrame(df)
         try:
             if isinstance(df, gpd.GeoDataFrame):
+                crs = kwargs.pop("crs", None)
+                if crs is not None:
+                    df.to_crs(crs, inplace=True)
                 df = pd.DataFrame(df.to_wkt())
         except:
             pass
         if isinstance(df, pd.DataFrame):
-            export_methods_pd[extension](file_path, **kwargs)
+            export_methods_pd[extension](df, file_path, **kwargs)
             return True
 
     
-    export_methods_pd['.csv'](file_path+".csv", **kwargs)
+    export_methods_pd['.csv'](df, file_path+".csv", **kwargs)
     return False
 
 def inner_filter_to_query_expression(filters, rename=None, quoting='"',  op_boolean_symbols=False):
@@ -679,12 +693,16 @@ def rename_filters(filters, rename):
             raise ValueError("Invalid filter format. The inner filter must be a list of tuple with 3 elements (column,operator,value).")
     return filters
     
-def import_dataframe(file_path, filters=None, dtype={}, **kwargs):
-    import_methods = {}
+def import_dataframe(file_path, filters=None, dtype={}, driver=None,**kwargs):    
     where = None
     # Determina l'estensione del file
-    extension = file_path.split('.')[-1].lower()
-    extension = f".{extension}"  # Aggiunge il punto
+    if driver is not None:
+        extension = driver
+        if not extension.startswith("."):
+            extension = f".{extension}"
+    else:
+        extension = file_path.split('.')[-1].lower()
+        extension = f".{extension}"  # Aggiunge il punto
 
     if filters is not None:
         if isinstance(filters, str):
@@ -693,10 +711,11 @@ def import_dataframe(file_path, filters=None, dtype={}, **kwargs):
         elif isinstance(filters, (tuple,list)):
             if extension not in ("parquet","geoparquet"):
                 where = filters_to_query_expression(filters, quoting="", op_boolean_symbols=True) 
-
+    import_methods_pd = {}
+    import_methods_gpd = {}
     try:
         import pandas
-        import_methods.update({
+        import_methods_pd.update({
             '.csv': lambda x: pandas.read_csv(x),
             '.excel': lambda x: pandas.read_excel(x),
             '.xls': lambda x: pandas.read_excel(x),
@@ -711,7 +730,7 @@ def import_dataframe(file_path, filters=None, dtype={}, **kwargs):
         pass
     try:
         import geopandas
-        import_methods.update({
+        import_methods_gpd.update({
             '.shp': lambda x: geopandas.read_file(x),
             '.gpkg': lambda x: geopandas.read_file(x, driver="GPKG", layer=geopandas.list_layers(x)["name"].iloc[0]),
             '.geoparquet': lambda x: geopandas.read_parquet(x, filters=filters),
@@ -723,22 +742,19 @@ def import_dataframe(file_path, filters=None, dtype={}, **kwargs):
     
   
     # Cerca il metodo corrispondente
-    if extension in import_methods:
-        df = import_methods[extension](file_path, **kwargs) 
-        if dtype:
-            dtype = {k: v for k, v in dtype.items() if k in df.columns}
-            df = df.astype(dtype, copy=True)       
-        if where:
-            df = df.query(where)
-        return df
+    if extension in import_methods_pd:
+        df = import_methods_pd[extension](file_path, **kwargs) 
+    elif extension in import_methods_gpd:
+        df = import_methods_gpd[extension](file_path, **kwargs) 
     else:
-        df = import_methods['.csv'](file_path, **kwargs)
-        if dtype:
-            dtype = {k: v for k, v in dtype.items() if k in df.columns}
-            df.astype(dtype, copy=False)
-        if where is not None:
-            df = df.query(where)
-        return df        
+        df = import_methods_pd['.csv'](file_path, **kwargs)
+
+    if dtype:
+        dtype = {k: v for k, v in dtype.items() if k in df.columns}
+        df = df.astype(dtype, copy=True)       
+    if where:
+        df = df.query(where)
+    return df
 
 
 def generate_sqlalchemy_url(db_host=None, db_port=None, db_user=None, db_password=None, db_name=None, db_type='sqlite', db_driver=None, query=None):

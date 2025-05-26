@@ -211,19 +211,19 @@ def nearest_point_row(df_links: gpd.GeoDataFrame, fcd: gpd.GeoDataFrame,pt: Poin
 
 class BuildPaths:
 
-    def __init__(self, parser:ParamsParser, loader:Loader=None, crs_calc="EPSG:6875", crs_data="EPSG:4326", n_workers_mm=-1, n_workers_pm=-1, max_distance=50, max_angle=45):
-        self.log = Logger.getLogger("M4I")
+    def __init__(self, parser:ParamsParser, loader:Loader=None, crs_calc="EPSG:6875", crs_data="EPSG:4326", n_workers_mm=-1, n_workers_pm=-1, max_distance=50, max_angle=45, logger=None):
+        self.log = logger or Logger.getLogger(self.__class__.__name__)
         self.parser: ParamsParser = parser
         self.loader:Loader = loader if loader else Loader(parser=self.parser)
         self.crs_calc = crs_calc
         self.crs_data = crs_data
-        self.n_workers_mm = Parallel.get_num_cpus(n_workers_mm)
-        self.n_workers_pm = Parallel.get_num_cpus(n_workers_pm)
+        self.n_workers_mm = Parallel.get_num_min_cpus(n_workers_mm)
+        self.n_workers_pm = Parallel.get_num_min_cpus(n_workers_pm)
         self.max_distance = max_distance
         self.max_angle = max_angle
         self.n_cpus = max(self.n_workers_mm, self.n_workers_pm)
         self.log.info(f"Initializing Parallel...")
-        Parallel.initialize_parallel(engine=self.parser.ini.PARALLEL_ENGINE, num_cpus=self.n_cpus, address=self.parser.ini.PARALLEL_CLUSTER_ADDRESS)#self.parser.ini.NUMCPU)
+        Parallel.initialize_parallel(engine=self.parser.ini.PARALLEL_ENGINE, num_cpus=self.n_cpus, address=self.parser.ini.PARALLEL_CLUSTER_ADDRESS)
         self.log.info(f"Parallel initialized with {Parallel.num_cpus} workers")
 
 
@@ -368,6 +368,7 @@ class BuildPaths:
                         trip=trip.geometry)
                     for path in paths.all_paths():
                         path["id_trip"] = trip.id_trip
+                        path["t"] = int(int(trip.dt_o.timestamp()) - datetime.timestamp(trip.dt_o.replace(hour=0,minute=0,second=0, microsecond=0)) /60)
                     tot_paths.merge(paths)
                 except Exception as ex:
                     print(f"Error: {ex}")

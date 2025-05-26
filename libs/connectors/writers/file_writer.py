@@ -26,7 +26,7 @@ class FileWriter(BaseWriter):
     def __init__(self):
         super().__init__()
 
-    def write_dataset(self, df: Union[pd.DataFrame, gpd.GeoDataFrame], parameters, mode=None, partition=None, **kwargs) -> bool:
+    def write_dataset(self, df: Union[pd.DataFrame, gpd.GeoDataFrame], parameters, mode=None, partition=None, partition_cols=None, crs: str= None, **kwargs) -> bool:
         if df is None:
             self.log.warning(f"No dataset to write for {parameters}")
             return False
@@ -35,8 +35,11 @@ class FileWriter(BaseWriter):
         src = parameters.get("src")
         
         kwargs.setdefault("index",False)
-        filename = os.path.normpath(join(location,src))        
-        if partition is not None:
+        filename = os.path.normpath(join(location,src))  
+        extension = filename.split('.')[-1]#.lower()
+        extension = f".{extension}"  # Aggiunge il punto
+
+        if partition is not None and extension.lower() not in (".parquet",".geoparquet"):
             location = join(filename,partition)
             filename = os.path.basename(filename)
             filename = join(location,filename)
@@ -45,8 +48,8 @@ class FileWriter(BaseWriter):
             
         if os.path.exists(location) and os.path.isfile(location):
             os.remove(location)
-        os.makedirs(location, exist_ok=True)
-        export_dataframe(df, filename, mode=mode, **kwargs)
+        os.makedirs(location, exist_ok=True)        
+        export_dataframe(df, filename, mode=mode, crs=crs, partition=partition, partition_cols=partition_cols, **kwargs)
         return True
         
 

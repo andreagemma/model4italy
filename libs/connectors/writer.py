@@ -10,6 +10,7 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 import geopandas as gpd
+import shapely.ops
 from typing import Union, Any
 from collections import namedtuple, defaultdict
 import json
@@ -32,7 +33,7 @@ class Writer(ABC):
     def __init__(self, parser: ParamsParser):
         self.parser = parser
         self.execution_id = self.parser.get("execution_id")
-        self.log = Logger.getLogger("Writer", execution_id=self.execution_id)
+        self.log = Logger.getLogger(self.__class__.__name__, execution_id=self.execution_id)
         self.ini: IniClass = self.parser.ini
 
     def _write_dataset(self, df: Union[pd.DataFrame, gpd.GeoDataFrame], parameters, mode=None, dtype=None, partition=None, **kwargs) -> bool:
@@ -68,8 +69,14 @@ class Writer(ABC):
             mapping = parameters.get("mapping")
             
             self.parser.apply_mapping(df=df, mapping=mapping, reverse=True)
-            
-            ret = writer.write_dataset(df,parameters=parameters, mode=mode, partition=partition, **kwargs)
+            if isinstance(df, gpd.GeoDataFrame):
+                crs = parameters.get("crs", self.ini.CRS)
+                if crs is not None:
+                    if df.crs is None:
+                        df.set_crs(crs, inplace=True)
+                    elif df.crs != crs:
+                        df.to_crs(crs, inplace=True)
+            ret = writer.write_dataset(df,parameters=parameters, mode=mode, partition=partition, ini=self.ini, **kwargs)
             if ret == False:
                 self.log.warning(f"Failed to write dataset for {parameters}")
                 return False
@@ -100,6 +107,10 @@ class Writer(ABC):
         kwargs["parameters"] = self.parser.get_output_parameters("params.aggregated_results")
         kwargs["mode"] = mode
         kwargs["partition"] = partition
+        try:
+            kwargs["partition_cols"] = [s.split("=")[0] for s in partition.split(",")] if partition is not None else None
+        except Exception as e:
+            kwargs["partition_cols"] = None
         return self._write_dataset(**kwargs)
 
     
@@ -109,6 +120,10 @@ class Writer(ABC):
         kwargs["parameters"] = self.parser.get_output_parameters("params.paths")
         kwargs["mode"] = mode
         kwargs["partition"] = partition
+        try:
+            kwargs["partition_cols"] = [s.split("=")[0] for s in partition.split(",")] if partition is not None else None
+        except Exception as e:
+            kwargs["partition_cols"] = None
         return self._write_dataset(**kwargs)
 
     def write(self, results: gpd.GeoDataFrame, path:str=None, parameters:dict=None, mode=None, partition=None, **kwargs):
@@ -137,11 +152,23 @@ class Writer(ABC):
         """                
         if parameters is None:
             if path:
-                parameters = self.parser.get_input_parameters(path)
+                parameters = self.parser.get_output_parameters(path)
             else:
                 raise KeyError("key 'parameters' not found in execution parameters")        
         kwargs["df"] = results
-        kwargs["parameters"] = self.parser.get_output_parameters(path)
+        kwargs["parameters"] = parameters
         kwargs["mode"] = mode
-        kwargs["partition"] = partition
+        if partition is not None:
+            if isinstance(partition, str):
+                kwargs["partition"] = partition
+                try:
+                    kwargs["partition_cols"] = [s.split("=")[0] for s in partition.split(",")] if partition is not None else None
+                except Exception as e:
+                    kwargs["partition_cols"] = None
+            elif isinstance(partition, list):
+                kwargs["partition"] = ",".join(partition)
+                try:
+                    kwargs["partition_cols"] = [s.split("=")[0] for s in partition] if partition is not None else None
+                except Exception as e:
+                    kwargs["partition_cols"] = None
         return self._write_dataset(**kwargs)

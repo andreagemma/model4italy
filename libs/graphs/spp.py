@@ -198,7 +198,7 @@ class SPP:
                 pass            
             if not SPP.ray_initialized:
                 try:
-                    ray.init(num_cpus=num_cpus)
+                    ray.init(num_cpus=num_cpus, ignore_reinit_error=True)
                     SPP.ray_initialized = True
                 except:
                     SPP.ray_initialized = False

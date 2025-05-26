@@ -6,6 +6,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import dill
 import os
+
 class Parallel:
     ENGINE_RAY = "ray"
     ENGINE_DASK = "dask"
@@ -20,6 +21,7 @@ class Parallel:
     parallel_engine = ENGINE_NONE  # Class variable to trace the parallel engine
     initialzations = 0  # Class variable to trace the initialization of the parallel engine
     dask_cluster = None  # Class variable to trace the Dask cluster
+    log = None
 
     @staticmethod
     def get_num_cpus(num_cpus) -> int:
@@ -27,17 +29,41 @@ class Parallel:
             return Parallel.num_cpus
         if num_cpus is None:
             num_cpus = multiprocessing.cpu_count() - 1
-        elif num_cpus < 0:  # If <0 then leaves the number of processors free
+        elif num_cpus <= 0:  # If <0 then leaves the number of processors free
             num_cpus = max(1, multiprocessing.cpu_count() + num_cpus)
         else:  # If> 0 then use the number of processors indicated
             num_cpus = max(1, min(multiprocessing.cpu_count(), num_cpus))        
         return num_cpus
     
     @staticmethod
+    def get_num_min_cpus(num_cpus) -> int:
+        if num_cpus is None:
+            num_cpus = multiprocessing.cpu_count() - 1
+        elif num_cpus <= 0:  # If <0 then leaves the number of processors free
+            num_cpus = max(1, multiprocessing.cpu_count() + num_cpus)
+        else:  # If> 0 then use the number of processors indicated
+            num_cpus = max(1, min(multiprocessing.cpu_count(), num_cpus))  
+        if Parallel.initialzations > 0:
+            return min(Parallel.num_cpus, num_cpus)        
+        return num_cpus
+    
+    @staticmethod
     def initialize_parallel(num_cpus: Optional[int] = None, engine: Optional[str] = None,
                             **kwargs) -> int:
+        if Parallel.log is None:
+            try:
+                from ..log import Logger
+                Parallel.log = Logger.getLogger(Parallel.__class__.__name__)
+            except ImportError:
+                Parallel.log = logging.log.getLogger(Parallel.__class__.__name__)
+                Parallel.log.setLevel(logging.log.INFO)
+                ch = logging.log.StreamHandler()
+                ch.setLevel(logging.log.INFO)
+                formatter = logging.log.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                ch.setFormatter(formatter)
+                logging.log.addHandler(ch)
         if Parallel.initialzations > 0:
-            logging.warning(f"Parallel engine already initialized ({Parallel.num_cpus} CPUs available with {Parallel.parallel_engine} engine).")
+            Parallel.log.warning(f"Parallel engine already initialized ({Parallel.num_cpus} CPUs available with {Parallel.parallel_engine} engine).")
             Parallel.initialzations += 1
             return Parallel.num_cpus
         num_cpus = Parallel.get_num_cpus(num_cpus)  # Get the number of CPUs
@@ -55,9 +81,9 @@ class Parallel:
             except ImportError:
                 pass
             if importlib.util.find_spec("ray") is None:
-                logging.warning("Ray is not installed. Please install it using 'pip install ray'")
+                Parallel.log.warning("Ray is not installed. Please install it using 'pip install ray'")
                 engine = Parallel.ENGINE_MULTITHREADING
-                logging.warning("Switching to multi-threaded mode.")
+                Parallel.log.warning("Switching to multi-threaded mode.")
         if engine in (Parallel.ENGINE_DASK, Parallel.ENGINE_DASK_MULTITHREADING):
             try:
                 import dask
@@ -65,9 +91,9 @@ class Parallel:
             except ImportError:
                 pass
             if importlib.util.find_spec("dask") is None:
-                logging.warning("Dask is not installed. Please install it using 'pip install dask'")
+                Parallel.log.warning("Dask is not installed. Please install it using 'pip install dask'")
                 engine = Parallel.ENGINE_MULTITHREADING
-                logging.warning("Switching to multi-threaded mode.")
+                Parallel.log.warning("Switching to multi-threaded mode.")
         Parallel.parallel_engine = engine or "none"  # Parameter to select the parallel engine ('Ray' O 'dask', 'dask_treahding', 'none')
         
         
@@ -82,23 +108,24 @@ class Parallel:
                     import ray
                     ray.util.register_serializer(dict, serializer=dill.dumps, deserializer=dill.loads)
                     kwargs["ignore_reinit_error"] = True
-                    if "address" in kwargs:
+                    address = kwargs.pop("address", None)
+                    if address:
                         try:
-                            ray.init(**kwargs) 
+                            ray.init(address=address,**kwargs) 
                         except ConnectionError:
-                            logging.error("Ray is not initialized. Please check the address and try again.")
+                            Parallel.log.error("Ray is not initialized. Please check the address and try again.")
                             kwargs.pop("address")
-                            ray.init(num_cpus=num_cpus, **kwargs)
-                            logging.warning("Ray is initialized with default settings.")
+                            ray.init(address="local", num_cpus=num_cpus, **kwargs)
+                            Parallel.log.warning("Ray is initialized with default settings.")
                     else:
-                        ray.init(num_cpus=num_cpus, **kwargs)
+                        ray.init(address="local", num_cpus=num_cpus)
                     Parallel.num_cpus = int(ray.cluster_resources()["CPU"])
                     Parallel.ray_initialized = True
                     Parallel.initialzed = True
                 except Exception as ex:
                     Parallel.parallel_engine = Parallel.ENGINE_MULTITHREADING
-                    logging.error("Error during ray initialization. {ex}", exc_info=True)
-                    logging.warning("Ray is not initialized. Switching to multi-threaded mode.")
+                    Parallel.log.error("Error during ray initialization. {ex}", exc_info=True)
+                    Parallel.log.warning("Ray is not initialized. Switching to multi-threaded mode.")
                     Parallel.ray_initialized = False
                 return Parallel.num_cpus
             else:
@@ -115,8 +142,8 @@ class Parallel:
                     Parallel.dask_initialized = True
                 except:
                     Parallel.parallel_engine = Parallel.ENGINE_MULTITHREADING
-                    logging.error("Error during dask initialization.", exc_info=True)
-                    logging.warning("Dask is not initialized. Switching to multi-threaded mode.")
+                    Parallel.log.error("Error during dask initialization.", exc_info=True)
+                    Parallel.log.warning("Dask is not initialized. Switching to multi-threaded mode.")
                     Parallel.dask_initialized = False
                 return Parallel.num_cpus
             else:
@@ -132,8 +159,8 @@ class Parallel:
                     Parallel.dask_initialized = True
                 except:
                     Parallel.parallel_engine = Parallel.ENGINE_MULTITHREADING
-                    logging.error("Error during dask initialization.", exc_info=True)
-                    logging.warning("Dask is not initialized. Switching to multi-threaded mode.")
+                    Parallel.log.error("Error during dask initialization.", exc_info=True)
+                    Parallel.log.warning("Dask is not initialized. Switching to multi-threaded mode.")
                     Parallel.dask_initialized = False
                 return Parallel.num_cpus
             else:
@@ -148,7 +175,7 @@ class Parallel:
     def shutdown_parallel(force=False):
         Parallel.initialzations -= 1
         if Parallel.initialzations > 0 and not force:
-            logging.warning("Parallel engine not shutdown. Parallel engine is still in use.")
+            Parallel.log.warning("Parallel engine not shutdown. Parallel engine is still in use.")
             return
         if Parallel.parallel_engine == Parallel.ENGINE_RAY and Parallel.ray_initialized:
             try:
@@ -157,14 +184,14 @@ class Parallel:
                     ray.shutdown()
                 Parallel.ray_initialized = False
             except Exception as ex:
-                pass#logging.error("Error during ray shutdown.")
+                pass#Parallel.log.error("Error during ray shutdown.")
 
         elif Parallel.parallel_engine in [Parallel.ENGINE_DASK, Parallel.ENGINE_DASK_MULTITHREADING] and Parallel.dask_initialized:
             try:
                 Parallel.dask_client.close()
                 Parallel.dask_initialized = False
             except Exception as ex:
-                pass#logging.error("Error during dask shutdown.", exc_info=True)
+                pass#Parallel.log.error("Error during dask shutdown.", exc_info=True)
 
     @staticmethod
     def execute(fn:Callable, tasks: Iterable[dict], engine: Optional[str] = None, n_workers: Optional[int]=None, chunk_size:Optional[int]=None, **kwargs) ->Generator:
@@ -181,9 +208,9 @@ class Parallel:
         if n_workers is not None:
             num_cpus = n_workers
             if num_cpus == 1:
-                logging.warning("n_workers = 1. Using single CPU in a single thread mode.")
+                Parallel.log.warning("n_workers = 1. Using single CPU in a single thread mode.")
             else:
-                logging.debug(f"Using {num_cpus} workers with {Parallel.parallel_engine} engine.")
+                Parallel.log.debug(f"Using {num_cpus} workers with {Parallel.parallel_engine} engine.")
         else:
             num_cpus = Parallel.num_cpus
         
@@ -243,3 +270,7 @@ class Parallel:
             ret = fn(tasks=tasks, **kwargs)
             yield ret
   
+    @staticmethod
+    def run(fn:Callable, params: dict, engine: Optional[str] = None, **kwargs) ->Generator:
+        tasks = [params]
+        Parallel.execute(fn, tasks, engine=engine, n_workers=None, chunk_size=1, **kwargs)

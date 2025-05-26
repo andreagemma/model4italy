@@ -1,5 +1,7 @@
 from __future__ import annotations
 import dill
+import logging
+import os
 from typing import *
 from types import FunctionType
 from numbers import Number
@@ -49,13 +51,13 @@ class PathList(PathContainer):
     def n_paths(self, **kwargs) -> int:
         return len(self["paths"])
     
-    def filter(self, filter: Callable[[Path], bool] = None, inplace=True, **kwargs) -> None:
+    def filter(self, filter: Callable[[Path], bool] = None, inplace=False, **kwargs) -> None:
         if inplace:
             if filter is None:
                 self["paths"] = {}
             else:
                 for key in list(self["paths"].keys()):
-                    if filter(self["paths"][key]):
+                    if not filter(self["paths"][key]):
                         del self["paths"][key]
             return self
         else:
@@ -68,4 +70,15 @@ class PathList(PathContainer):
                         new_paths.add_path(self["paths"][key])
                 return new_paths
         
+    def delete(self, path: Path, raise_error = False, **kwargs) -> None:
+        key = path.key() if self["key"] is None else self["key"](path)
+        if key in self["paths"]:
+            del self["paths"][key]
+        else:
+            if raise_error:
+                raise KeyError(f"Path not found in PathList.")
+            else:
+                logging.warning(f"Path not found in PathList. Key: {key}.")
+            
+    
     

@@ -14,8 +14,15 @@ class IniClass:
             db_query="SELECT value FROM settings WHERE name = :name"
         )
 
+        self.LOG_NAME = config_reader.get("LOG_NAME", 'LOGGING', "M4I")
         self.LOG_USE = config_reader.getboolean("LOG_USE", 'LOGGING', True)
         self.LOG_DIR = config_reader.get("LOG_DIR", 'LOGGING', True)
+        self.LOG_ON_DATABASE = config_reader.getboolean("LOG_ON_DATABASE", 'LOGGING', False)
+        self.LOG_ON_CONSOLE = config_reader.getboolean("LOG_ON_CONSOLE", 'LOGGING', True)
+        self.LOG_ON_FILE = config_reader.getboolean("LOG_ON_FILE", 'LOGGING', False)
+        self.LOG_LEVEL = config_reader.get("LOG_LEVEL", 'LOGGING', "DEBUG")
+        self.LOG_EXECUTION_FORMAT = config_reader.get("LOG_EXECUTION_FORMAT", 'LOGGING', "%(execution_id)s - %(asctime)s | %(last_elapsed).2f/%(elapsed).2fs | %(levelname)s | %(name)s | %(message)s")
+        self.LOG_FORMAT = config_reader.get("LOG_FORMAT", 'LOGGING', "%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 
         self.DB_SETTINGS_USE = config_reader.getboolean("DB_SETTINGS_USE","DATABASE_SETTINGS", False)
         if self.DB_SETTINGS_USE:
@@ -51,6 +58,8 @@ class IniClass:
         self.SRC_COEFS = config_reader.get("SRC_COEFS", 'GENERAL', r'coefficients.json')
         self.SRC_CONV_TBL = config_reader.get("SRC_CONV_TBL", 'GENERAL', None)
         self.DEBUG = config_reader.getboolean("DEBUG", 'GENERAL', False)
+        self.CRS = config_reader.get("CRS", 'GENERAL', "EPSG:4326")  # Coordinate Reference System
+        self.CRS_CALC = config_reader.get("CRS_CALC", 'GENERAL', "EPSG:6875")  # Coordinate Reference System for calculation
 
 
         # SIMULATOR
@@ -95,6 +104,7 @@ class IniClass:
         self.FCD_CRS_CALC = config_reader.get("FCD_CRS_CALC", 'FCD', "EPSG:6875") # CRS dei dati FCD
         self.FCD_PATH_START_FROM_ZONE = config_reader.getboolean("FCD_PATH_START_FROM_ZONE", 'FCD', False) # se True il path inizia dalla zona di partenza
         self.FCD_PATH_END_TO_ZONE = config_reader.getboolean("FCD_PATH_END_TO_ZONE", 'FCD', False) # se True il path termina nella zona di arrivo
+        self.FCD_PATH_AGGRATION_INTERVAL = config_reader.getint("FCD_PATH_AGGRATION_INTERVAL", 'FCD', 15) # intervallo di aggregazione in secondi
         
         # OUPTUT
         self.OUTPUT_AGG_INT = config_reader.getfloat("OUTPUT_AGG_INT", 'OUTPUT', 15)
@@ -109,6 +119,8 @@ class IniClass:
         self.DATABASE_URL = config_reader.get("DATABASE_URL", 'DATABASE', 'sqlite:///executions.db')
 
         # IPC
+        self.IPC_USE = config_reader.getboolean("IPC_USE", 'IPC', True) # True or False
+        self.IPC_BUCKET = config_reader.get("IPC_BUCKET", 'IPC', "m4i")
         self.IPC_BACKEND = config_reader.get("IPC_BACKEND", 'IPC', "local") # local or redis
         self.IPC_HOST = config_reader.get("IPC_HOST", 'IPC', "localhost") # localhost or redis server address
         self.IPC_PORT = config_reader.getint("IPC_PORT", 'IPC', 6379) # redis server port or free port for local
@@ -117,7 +129,8 @@ class IniClass:
         self.IPC_COMPRESSION_LEVEL = config_reader.getint("IPC_COMPRESSION_LEVEL", 'IPC', 5) # compression level for data tranfer (1-9) (default 5)
         
         # PARALLEL
-        self.PARALLEL_NUMCPU = config_reader.getint("NUMCPU", 'PARALLEL', 1)
+        self.PARALLEL_USE = config_reader.getboolean("PARALLEL_USE", 'PARALLEL', False)
+        self.PARALLEL_NUMCPU = config_reader.getint("PARALLEL_NUMCPU", 'PARALLEL', 1)
         self.PARALLEL_ENGINE = config_reader.get("PARALLEL_ENGINE", 'PARALLEL', "ray")
         self.PARALLEL_CLUSTER_ADDRESS = config_reader.get("PARALLEL_CLUSTER_ADDRESS", 'PARALLEL', None)
 

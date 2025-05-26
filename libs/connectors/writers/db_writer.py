@@ -62,7 +62,7 @@ class DBWriter(BaseWriter):
             elif isinstance(results, pd.DataFrame):
                 if geom in results.columns:
                     results[geom] = results[geom].apply(lambda x: wkt.loads(x) if isinstance(x, str) else x)
-                    results = gpd.GeoDataFrame(results, geometry=geom, crs="EPSG:4326")                
+                    results = gpd.GeoDataFrame(results, geometry=geom, crs=self.loader)                
             
 
             schema_table = table.split(".")

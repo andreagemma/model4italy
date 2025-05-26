@@ -6,11 +6,11 @@ from abc import ABC, abstractmethod
 from .. import Logger
 
 class BaseSimulator():
-
-    log = Logger.getLogger("SIM")
+    
     
     def __init__(self,loader: Loader) -> None:
         self.loader: Loader = loader        
+        self.log: Logger = Logger.getLogger("SIM", execution_id=self.loader.execution_id)
     
     @abstractmethod
     def update_performance(self, k: int, tstart: int, tend: int):

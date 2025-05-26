@@ -39,6 +39,10 @@ class _SharedKVStore:
         """Restituisce il numero di chiavi presenti."""
         return len(self._store)
 
+# Definizione dinamica del manager
+class KVManager(SyncManager): 
+    pass
+KVManager.register("SharedKVStore", _SharedKVStore)
 
 class SharedMemory:
     """
@@ -62,9 +66,7 @@ class SharedMemory:
         self.bucket = bucket
         self.prefix = f"{bucket}:" if bucket else ""        
 
-        # Definizione dinamica del manager
-        class KVManager(SyncManager): 
-            pass
+
         # Registrazione del tipo condiviso
         KVManager.register("SharedKVStore", _SharedKVStore)
         # Avvio del manager

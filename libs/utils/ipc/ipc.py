@@ -1,4 +1,6 @@
 import operator
+from monitor import run_from_command_line
+import pickle
 from .shared_memory import SharedMemory
 from .redis_ipc import RedisIPC
 from .redis_shared_memory import RedisSharedMemory
@@ -104,7 +106,63 @@ class IPC:
         """
         for k in keys:
             self.delete(k)
-
+    def init(self) -> None:
+        """
+        Inizializza il client Redis.
+        """
+        self.ipc.init()
+    def running(self) -> bool:
+        """
+        Verifica se il client Redis è in esecuzione.
+        """
+        return self.ipc.running()
+    def run_client(self):
+        import ast
+        while True:
+            try:
+                command = input("Inserisci il comando (set/get/delete/keys/publish/subscribe/exit): ")
+                if command == "exit":
+                    break
+                elif command.startswith("set"):
+                    key = input("Inserisci chiave: ").strip()                
+                    value = input("Inserisci valore: ").strip()
+                    value = ast.literal_eval(value) if value.startswith("{") else value
+                    self.set(key, value)
+                elif command.startswith("get"):
+                    key = input("Inserisci chiave: ").strip()
+                    value = self.get(key)
+                    print(f"Valore di {key}: {value}")
+                elif command.startswith("delete"):
+                    key = input("Inserisci chiave o 'all': ").strip()
+                    if key == "all":
+                        self.clear()
+                        print("Tutte le chiavi eliminate.")
+                    else:
+                        self.delete(key)
+                        print(f"Chiave {key} eliminata.")
+                elif command == "keys":
+                    keys = self.keys()
+                    print(f"Chiavi: {keys}")
+                elif command.startswith("publish"):
+                    channel = input("Inserisci canale: ").strip()
+                    message = input("Inserisci messaggio: ").strip()
+                    message = ast.literal_eval(message) if message.startswith("{") else message
+                    self.publish(channel, message)
+                elif command.startswith("subscribe"):
+                    channel = input("Inserisci canale: ").strip()
+                    def callback(message):
+                        print(f"Messaggio ricevuto: {message}")
+                    self.subscribe(channel, callback)
+                    print(f"Sottoscritto al canale {channel}.")
+                elif command.startswith("ping"):
+                    if self.ipc.running():
+                        print("Ping OK")
+                    else:
+                        print("Ping KO")
+                else:
+                    print("Comando non valido.")
+            except Exception as e:
+                print(f"Errore: {e}")
 if __name__ == "__main__":
     import sys
     if len(sys.argv) > 1:

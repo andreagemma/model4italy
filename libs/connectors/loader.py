@@ -22,23 +22,24 @@ from itertools import product
 from importlib import import_module
 from os.path import join
 
-from libs.params_parser import ParamsParser
-from libs.utils.util import filters_to_query_expression
 from ..matrix_od import MatrixODT, MatrixOD
 from ..graphs import DynamicGraph, TimeArrayAttribute, CallableAttribute, KPathList, Path, KPathContainer
 from ..utils import util
 from .. import IniClass
 from .. import Logger
 from ..utils import import_dataframe, filters_to_query_expression, rename_filters
+from ..utils.ipc.ipc import IPC
 from ..params_parser import ParamsParser
 from .loaders.base_loader import BaseLoader
+from shapely import from_wkb, from_wkt, from_geojson
+
 import copy
 
 class Loader(BaseLoader):
 
-    def __init__(self, parser: ParamsParser):
+    def __init__(self, parser: ParamsParser, logger: Logger = None):
         self.execution_id = parser.get("execution_id")
-        self.log = Logger.getLogger("Loader", execution_id=self.execution_id)
+        self.log = logger or Logger.getLogger(self.__class__.__name__, execution_id=self.execution_id)
 
         self._origins: list[int] = None
         self._destinations: list[int] = None
@@ -57,6 +58,9 @@ class Loader(BaseLoader):
         self._m_paths:KPathContainer = None
         self._bounds: shapely.geometry.Polygon = None
         self._zonization: gpd.GeoDataFrame = None
+        self._df_links: pd.DataFrame = None
+        self._df_nodes: pd.DataFrame = None
+        self._df_turns: pd.DataFrame = None
         
         self.ini: IniClass = parser.ini
         self.params: namedtuple
@@ -65,7 +69,15 @@ class Loader(BaseLoader):
         self.conv_tbl: pd.DataFrame = None
         self.parser = parser
         self.update_params()
-        self.timestamps = list(np.arange(self.start, self.end, self.delta_t))
+        if self.start is not None and self.end is not None and self.delta_t is not None:
+            self.timestamps = list(np.arange(self.start, self.end, self.delta_t))
+        else:
+            self.timestamps = None
+        self.attr_to_share = ["_origins", "_destinations", "_zones", "_sign_nodes", "_OD", "_ODs",
+                              "_detectors", "_counts", "_G", "_links_sets", "_perc", "_events", "_coefficients", "_modes", "_m_paths", "_bounds", "_zonization",
+                              "_df_links", "_df_nodes", "_df_turns",
+                              "dparams", "delta_t", "conv_tbl", "timestamps"]
+        
         
         
     def filters_to_query_expression(filters: list[list[tuple[str, str, Any]]]) -> str:
@@ -90,6 +102,7 @@ class Loader(BaseLoader):
             filters = rename_filters(filters=filters, rename=mapping)
         if dtype is not None:
             dtype_inverse = {mapping.get(k, k): v for k, v in dtype.items()}
+
         df = loader.load_dataset(parameters=parameters, filters=filters, dtype=dtype_inverse)
         if df is None:
             return None
@@ -97,10 +110,14 @@ class Loader(BaseLoader):
             df = self.parser.apply_mapping(df=df, mapping=mapping)
 
         if isinstance(df, gpd.GeoDataFrame): # se geodataframe trasforma o setta CRS e rinomina geometria
+            crs = parameters.get("crs", None)
+            if crs is not None:
+                if df.crs is None:
+                    df.set_crs(crs, inplace=True)                    
             if df.crs is not None:
-                df.to_crs("EPSG:4326", inplace=True)
+                df.to_crs(self.ini.CRS, inplace=True)
             else:
-                df.set_crs("EPSG:4326", inplace=True)
+                df.set_crs(self.ini.CRS, inplace=True)
             if geometry:
                 if geometry != df.geometry.name:
                     df.rename_geometry(geometry, inplace=True)
@@ -110,7 +127,7 @@ class Loader(BaseLoader):
             if geometry:
                 if pd.api.types.is_string_dtype(df[geometry]):
                     df[geometry]=from_wkb(df[geometry])
-                df = gpd.GeoDataFrame(df, geometry=geometry, crs="EPSG:4326")
+                df = gpd.GeoDataFrame(df, geometry=geometry, crs=self.ini.CRS)
             else:
                 return pd.DataFrame(df)
 
@@ -278,13 +295,17 @@ class Loader(BaseLoader):
 
     @property
     def start(self) -> int:
-        "returns the start parameter in minutes since hh:mm format"
-        return util.hhmm2min(self.params.start)
+        if "start" in self.params:
+            "returns the start parameter in minutes since hh:mm format"
+            return util.hhmm2min(self.params.start)
+        return None
 
     @property
     def end(self) -> int:
-        "returns the end parameter in minutes since hh:mm format"
-        return util.hhmm2min(self.params.end)
+        if "end" in self.params:
+            "returns the end parameter in minutes since hh:mm format"
+            return util.hhmm2min(self.params.end)
+        return None
     
     def get_od(self, cls) -> MatrixODT:
         if cls in self.ODs:
@@ -308,7 +329,27 @@ class Loader(BaseLoader):
     def get_events(self, event_type: str) -> list[dict]:
         return self.events.get(event_type, [])
 
+    def save_to_ipc(self, ipc: IPC):        
+        if ipc is None:
+            return
+        key_to_save = {}
+        for att in self.attr_to_share:
+            if hasattr(self, att):
+                v = getattr(self, att)
+                key_to_save[att] = v
 
+        for k,v in key_to_save.items():
+            if v is not None:
+                ipc.set(k, v)
+
+    def load_from_ipc(self, ipc: IPC):        
+        if ipc is None:
+            return
+        ipc_keys =set(ipc.keys())
+        for k in self.attr_to_share:
+            if k in ipc_keys:
+                setattr(self, k, ipc.get(k))
+    
     @property
     def origins(self) -> list[int]:
         if self._origins is None:
@@ -416,6 +457,24 @@ class Loader(BaseLoader):
         if self._zonization is None:
             self._zonization = self._load_zonization()
         return self._zonization
+
+    @property
+    def df_links(self) -> pd.DataFrame:
+        if self._df_links is None:
+            self._df_links, self._df_nodes, self._df_turns = self.load_df_graph()
+        return self._df_links
+
+    @property
+    def df_nodes(self) -> pd.DataFrame:
+        if self._df_nodes is None:
+            self._df_links, self._df_nodes, self._df_turns = self.load_df_graph()
+        return self._df_nodes
+    
+    @property
+    def df_turns(self) -> pd.DataFrame:
+        if self._df_turns is None:
+            self._df_links, self._df_nodes, self._df_turns = self.load_df_graph()
+        return self._df_turns
 
     def load_df_graph(self, name="params.supply"):
         self.log.info("Loading Data Graph...")
@@ -810,7 +869,7 @@ class Loader(BaseLoader):
                 self.log.info("State not found (Graph)")
                 self._G = None
         if df_links is None or df_nodes is None:
-            df_links, df_nodes, df_turns = self.load_df_graph()
+            df_links, df_nodes, df_turns = self.df_links, self.df_nodes, self.df_turns
 
 
         assert df_nodes is not None, "nodes not loaded"

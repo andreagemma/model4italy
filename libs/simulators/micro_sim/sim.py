@@ -10,12 +10,12 @@ import matplotlib.pyplot as plt
 import logging
 import pandas as pd
 from datetime import timedelta
-
+from ...log import Logger
 
 class Simulator:
 
     def __init__(self):
-        log = logging.getLogger("SIM")
+        log = Logger.getLogger("SIM")
         log.info("Simulatore Inizializzato: modello del secondo ordine di deflusso autostradale")
         np.random.seed(0)
 

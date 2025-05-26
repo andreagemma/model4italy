@@ -425,7 +425,7 @@ class MicroSimulator(BaseSimulator):
             sign_res.t.map(dic)
 
         agg_int = agg_int or str(self.agg_int) + "min"
-        agg_int = str(6) + "s"
+        #agg_int = str(6) + "s" # UPDATE: GEMMA
 
         df_aggregated = pd.DataFrame()
         if self.ass_results:
@@ -441,10 +441,10 @@ class MicroSimulator(BaseSimulator):
             avg_speed = "avg_speed"
             avg_tt = "avg_tt"
 
-            if self.agg_int >= 1:
-                times = pd.date_range(start=min2hhmm(tstart + self.agg_int), end=min2hhmm(tend), freq=str(self.agg_int) + "min")  # range(0, self.simint)
-            else:
-                times = pd.date_range(start=min2hhmm(tstart), end=min2hhmm(tend), freq=str(int(self.agg_int * 60)) + "s")  # range(0, self.simint)
+            #if self.agg_int >= 1: # UPDATE: GEMMA Fix per >=1
+            #    times = pd.date_range(start=min2hhmm(tstart + self.agg_int), end=min2hhmm(tend), freq=str(self.agg_int) + "min")  # range(0, self.simint)
+            #else:
+            #times = pd.date_range(start=min2hhmm(tstart), end=min2hhmm(tend), freq=str(int(self.agg_int * 60)) + "s")  # range(0, self.simint)
 
             col = ["time", id_link, light_flow_in, light_flow_out, heavy_flow_in, heavy_flow_out, max_q, avg_mov_vehs, avg_que_vehs, avg_speed, avg_density, avg_tt, "n_updates"]
             df_aggregated = pd.DataFrame(data=self.ass_results, columns=col)
@@ -454,9 +454,10 @@ class MicroSimulator(BaseSimulator):
             #dic = {i: time for (i, time) in zip(range(self.ints_agg, int((tend - tstart) / self.deltat) + 1, self.ints_agg), times)}
             # dic = {i: time for (i, time) in zip(range(tstart, tend, 1), times)}
             # UPDATE: GEMMA
-            dic = {i: time for (i, time) in zip(range(int((tstart * self.agg_int)*60-self.ints_agg), int(((tend-self.G["delta_t"]) * self.agg_int)*60-self.ints_agg) , self.ints_agg), times)}
+            #dic = {i: time for (i, time) in zip(range(self.t_i, self.t_f , self.ints_agg), times)}
 
-            df_aggregated["time"] = df_aggregated.time.map(dic)
+            #df_aggregated["time"] = df_aggregated.time.map(dic)
+            df_aggregated["time"] = pd.to_timedelta(df_aggregated["time"], unit='min')+pd.to_datetime(self.loader.parser.get("date_simulation"))
             df_aggregated[[light_flow_in, heavy_flow_in, light_flow_out, heavy_flow_out]] = df_aggregated[[light_flow_in, heavy_flow_in, light_flow_out, heavy_flow_out]] * (60 / self.agg_int)
 
             df_aggregated = df_aggregated.astype(
@@ -487,7 +488,21 @@ class MicroSimulator(BaseSimulator):
                 result = df_aggregated[col[:-1]]
                 result = result[~result["time"].isna()]
 
-        return result
+        result["mode"] = "all"
+        result.rename(columns={avg_mov_vehs: "mov_vehs",avg_que_vehs:"que_vehs",avg_speed: "speed", avg_density: "density", avg_tt: "tt"}, inplace=True)
+        result_light = result[["time", "mode", id_link, light_flow_in, light_flow_out, max_q, "mov_vehs", "que_vehs", "speed", "density", "tt"]].copy()
+        result_light["mode"] = "c"
+        result_light.rename(columns={light_flow_in: "flow_in", light_flow_out: "flow_out"}, inplace=True)
+
+        result_heavy = result[["time", "mode", id_link, heavy_flow_in, heavy_flow_out, max_q, "mov_vehs", "que_vehs", "speed", "density", "tt"]].copy()
+        result_heavy["mode"] = "h"
+        result_heavy.rename(columns={heavy_flow_in: "flow_in", heavy_flow_out: "flow_out"}, inplace=True)
+
+        result["flow_in"]=result["light_flow_in"]+result["heavy_flow_in"]
+        result["flow_out"]=result["light_flow_out"]+result["heavy_flow_out"]        
+        result.drop(columns=['light_flow_in', 'heavy_flow_in', 'light_flow_out', 'heavy_flow_out'], inplace=True)
+        result_all = pd.concat([result,result_light, result_heavy], ignore_index=True)
+        return result_all[["time", "mode", id_link, "flow_in", "flow_out", max_q, "mov_vehs", "que_vehs", "speed", "density", "tt"]]
 
     def emission_model(self, od, heavy_perc, k, tstart, tend):
 
@@ -546,19 +561,33 @@ class MicroSimulator(BaseSimulator):
             self.update_network(t1)
             self.vehs = self.sim_step(t1, self.vehs)
 
-            if (t+1) % self.ints_agg == 0: #UPDATE: GEMMA: ottimizzato
-                self.update_res(t - 1)
+            if t > ini_t and (t-ini_t) % self.ints_agg == 0: #UPDATE: GEMMA: ottimizzato
+                self.update_res(t1) # UPDATE: GEMMA: modificato
                 self.G.apply_links(self.reset_flags)
 
-            if (t+1) % int_update == 0: #UPDATE: GEMMA ottimizzato
+            if t > ini_t and (t-ini_t) % int_update == 0: #UPDATE: GEMMA ottimizzato
                 #print("moving vehicles %d" % (len(self.vehs)))
                 self.G.apply_links(self.t_compute)
 
                 self.inx_update += 1
                 self.emission_model(self.OD, self.heavy_perc, k, tstart, tend)
-                self.log.info("%s risultati scritti sul grafo", t)
+                self.log.info("updated time for t=%s", min2hhmm(t1))
 
             self.update_ta(t, t1)
+        t = fin_t
+        t1 = tstart + (t - ini_t) * self.deltat
+        if t > ini_t and (t-ini_t) % self.ints_agg == 0: #UPDATE: GEMMA: per salvare ultimi risultati            
+            self.update_res(t1)
+            self.G.apply_links(self.reset_flags)
+
+        if t > ini_t and (t-ini_t) % int_update == 0: #UPDATE: GEMMA per salvare ultimi risultati
+            #print("moving vehicles %d" % (len(self.vehs)))
+            self.G.apply_links(self.t_compute)
+
+            self.inx_update += 1
+            self.emission_model(self.OD, self.heavy_perc, k, tstart, tend)
+            self.log.info("update timed for t=%s", min2hhmm(t1))
+
 
         elapsed = time.time() - time_
 

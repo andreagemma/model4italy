@@ -28,7 +28,7 @@ class FileLoader(BaseLoader):
             with open(src,'r') as f:
                 content = json.load(f)
             return pd.DataFrame(content)
-        df = BaseLoader.import_dataframe_from_file(src, filters=filters, dtype=dtype)
+        df = BaseLoader.import_dataframe_from_file(src, filters=filters, dtype=dtype, **kwargs)
         return df
     
     

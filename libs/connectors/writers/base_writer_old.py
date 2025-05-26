@@ -28,7 +28,7 @@ from ... import Logger
 class BaseWriter(ABC):
 
     def __init__(self, params: Union[str, dict], settings: IniClass=None, loader: Loader=None, default_ext=".dat"):
-        self.log = Logger.getLogger("Writer", execution_id=params.get("execution_id"))
+        self.log = Logger.getLogger(self.__class__.__name__, execution_id=params.get("execution_id"))
         self.ini: IniClass = settings
         self.loader: Loader = loader
         self.default_ext = default_ext
