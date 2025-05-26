@@ -116,7 +116,7 @@ class MSA:
     def run(self):
         # self.log.info(f"occupazione graph: {getsize(self.G)/1024/1024}MB")
         # self.log.info(f"occupazione od: {getsize(self.od)/1024/1024}MB")
-        n_steps = 2 + (len(self.global_intervals)*5) + len(self.global_intervals) * self.max_k * 2 + len(self.global_intervals) * max(0,self.max_ite-self.max_k) * 1
+        n_steps = 2 + (len(self.global_intervals)*5) + len(self.global_intervals) * min(self.max_ite,self.max_k) * 2 + len(self.global_intervals) * max(0,self.max_ite-self.max_k) * 1
         self.inc_progress = 100.0 / n_steps
 
         self.update_progress("Loading parameters")
@@ -228,7 +228,7 @@ class MSA:
                 df=self.get_aggregated_results_dataframe()
                 ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400 ) / 60
                 for t in range(self.real_time_start,self.real_time_end,self.delta_t):
-                    tmp = df[ds_t.between(t,t+self.delta_t)]
+                    tmp = df[ds_t.between(t,t+self.delta_t)].copy()
                     tmp["t"] = t
                     saved=self.writer.write_agg_results(tmp, mode="W", partition=f"t={t}")
                     if not saved:
@@ -395,17 +395,15 @@ class MSA:
 
         ret = KPathList()
 
-        def generate_combinations(origins, destinations, t_starts, modes):
-            for o, d, t_start, mode in itertools.product(origins, destinations, t_starts, modes):
-                yield {"source": o, "targets": d, "t_start": t_start, "modes": mode, "t_base": self.current_time_start}
-
-        tasks = list(generate_combinations(
-            self.origins, 
-            [self.destinations], 
-            self.current_t_starts, 
-            self.modes
-            ))
-        ret = SPP.multiple_paths(self.G, tasks=tasks, link_cost=self.links_cost, turn_cost=self.turns_cost, node_cost=self.nodes_cost)
+        ret = SPP.multiple_paths(graph=self.G, 
+                                 origins=self.origins,
+                                 targets=self.destinations,
+                                 t_starts=self.current_t_starts,
+                                 modes=self.modes,
+                                 t_base=self.current_time_start,
+                                 link_cost=self.links_cost, 
+                                 turn_cost=self.turns_cost, 
+                                 node_cost=self.nodes_cost)
 
         self.log.info("Ite: %s - Paths calculated", self.iteration)        
         self.m_paths.merge(ret, k)

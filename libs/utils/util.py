@@ -2,8 +2,6 @@ import ast
 from typing import Union, Optional, List, Generator, Tuple, Any, Callable, Iterable
 from numbers import Number
 from uuid import uuid4
-import re
-import re
 from math import ceil, inf
 from datetime import datetime, timedelta, MAXYEAR
 import sys
@@ -17,6 +15,11 @@ import pkgutil
 import sys
 from urllib.parse import urlparse, parse_qs, urlencode
 import os
+
+from datetime import datetime, date, time
+from dateutil import parser
+import re
+
 try:
     from psutil import Process, NoSuchProcess
 except ImportError:
@@ -367,16 +370,80 @@ def min2hhmm(m):
     return "%s:%s" % (str(int(m / 60)).zfill(2), str(int(m % 60)).zfill(2))
 
 def hhmm2min(timestr):
+    if timestr is None:
+        return None
     h1, m1 = timestr.split(":")
     return int(h1) * 60 + int(m1)
 
+def min_from_midnight(date: Union[datetime, str], date_base: Optional[Union[datetime, str]]=None) -> Optional[int]:
+    """
+    Convert a time string in the format HH:MM to the number of minutes from midnight.
+    
+    :param timestr: A string representing time in the format "HH:MM".
+    :return: The number of minutes from midnight as an integer.
+    """
+    date = to_datetime_auto(date)
+    date_base = to_datetime_auto(date_base) if date_base else date.replace(hour=0, minute=0, second=0, microsecond=0)
+    if date is None or date_base is None:
+        return None
+    return (date - date_base).total_seconds() // 60  # Restituisce i minuti come intero
 
+# Formati noti data e orari
+KNOWN_FORMATS = [
+    "%Y-%m-%d",
+    "%Y/%m/%d",
+    "%Y%m%d",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y/%m/%d %H:%M:%S",
+    "%Y-%m-%dT%H:%M:%S",
+    "%Y/%m/%dT%H:%M:%S",
+    "%Y-%m-%d %H:%M",
+    "%Y/%m/%d %H:%M",
+    "%Y-%m-%dT%H:%M",
+    "%Y/%m/%dT%H:%M",
+    "%H:%M",
+    "%H:%M:%S"
+]
 
 import psutil
 import re
 from typing import Optional, Union, Iterable
+import warnings
 
 
+def to_datetime_auto(date_str, date_default=None, time_default=None) -> Optional[datetime]:
+    if date_default is None:
+        date_default = date.today()
+    if time_default is None:
+        time_default = time(0, 0, 0)
+    if isinstance(date_str, datetime):
+        return date_str
+    if not isinstance(date_str, str) or not date_str.strip():
+        return None
+
+    try:
+        # Prova con dateutil (include anche orari puri)
+        return parser.parse(date_str, fuzzy=True, default=datetime.combine(date_default, time_default))
+    except (ValueError, OverflowError):
+        pass
+
+    # Prova con formati espliciti
+    for fmt in KNOWN_FORMATS:
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+
+    # Tentativo numerico compatto (solo data)
+    digits = re.sub(r"[^\d]", "", date_str)
+    if len(digits) == 8:
+        for fmt in ("%Y%m%d", "%d%m%Y", "%m%d%Y"):
+            try:
+                return datetime.strptime(digits, fmt)
+            except ValueError:
+                continue
+
+    return None
 
 
 def memory_usage(
@@ -558,6 +625,7 @@ def export_dataframe(df, file_path, mode="w", **kwargs):
     def to_geoparquet(df, base_dir, partition_cols=None, append=False, index=False, crs=None):
         import pyarrow as pa
         import pyarrow.dataset as ds
+        import pandas as pd
         """
         df.to_parquet(base_dir,
                        engine="auto",
@@ -568,7 +636,11 @@ def export_dataframe(df, file_path, mode="w", **kwargs):
 
         # Salva metadato CRS se specificato
         df = df.copy()
-        df["geometry"] = df.geometry.apply(lambda geom: geom.wkb if geom else None)
+        warnings.filterwarnings("ignore", category=UserWarning, module="geopandas")
+        s = df.geometry.apply(lambda geom: geom.wkb if geom else None)   
+        df = pd.DataFrame(df.drop(columns=["geometry"]))     
+        df.loc[:, "geometry"] = s
+        warnings.filterwarnings("default", category=UserWarning, module="geopandas")        
         table = pa.Table.from_pandas(df, preserve_index=index)
 
         existing_data_behavior = "delete_matching" if not append else "overwrite_or_ignore"

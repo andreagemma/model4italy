@@ -10,7 +10,7 @@ from time import strftime
 from time import time
 import string
 from itertools import product
-from libs.utils.util import serialize
+
 """
 Di seguito sono descritte una serie di classi per monitotare il tempo di esecuzione degli script.
 

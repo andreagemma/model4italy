@@ -22,6 +22,7 @@ from itertools import product
 from importlib import import_module
 from os.path import join
 
+from libs.utils.util import to_datetime_auto
 from ..matrix_od import MatrixODT, MatrixOD
 from ..graphs import DynamicGraph, TimeArrayAttribute, CallableAttribute, KPathList, Path, KPathContainer
 from ..utils import util
@@ -155,6 +156,13 @@ class Loader(BaseLoader):
             self.conv_tbl = pd.read_csv(self.ini.SRC_CONV_TBL)
         else:
             self.conv_tbl = None
+        date_default = util.to_datetime_auto(self.parser.params.get("date_simulation", None))
+        start = util.to_datetime_auto(self.parser.params.get("start", None), date_default=date_default)
+        end = util.to_datetime_auto(self.parser.params.get("end", None), date_default=date_default)
+        if end<start:
+            start += datetime.timedelta(days=1)
+        self.start = int(util.min_from_midnight(start))
+        self.end = int(util.min_from_midnight(end))
         
 
 
@@ -208,7 +216,10 @@ class Loader(BaseLoader):
         return df
 
     def load_counts(self, parameters: dict, **kwargs) -> pd.DataFrame:
-        filters = [("timestamp",">=",self.start),("timestamp","<",self.end)]
+        if self.end%1440<self.start%1440:
+            filters = [(("timestamp","<",self.end%1440),("timestamp",">=",self.start%1440))]
+        else:
+            filters = [("timestamp",">=",self.start%1440),("timestamp","<",self.end%1440)]
         dtype = self.parser.get_dtype("counts")
         df = self._load_dataset(parameters=parameters, filters = filters, dtype=dtype, **kwargs)
         if df is None:
@@ -218,7 +229,10 @@ class Loader(BaseLoader):
         return df
     
     def load_matrix(self, parameters: dict, **kwargs) -> pd.DataFrame:
-        filters = [("timestamp",">=",self.start),("timestamp","<",self.end)]
+        if self.end%1440<self.start%1440:
+            filters = [(("timestamp","<",self.end%1440),("timestamp",">=",self.start%1440))]
+        else:
+            filters = [("timestamp",">=",self.start%1440),("timestamp","<",self.end%1440)]
         dtype = self.parser.get_dtype("matrices")
         df = self._load_dataset(parameters=parameters, filters = filters, dtype=dtype, **kwargs)
         if df is None:
@@ -293,19 +307,6 @@ class Loader(BaseLoader):
         df = pd.DataFrame(df)
         return df
 
-    @property
-    def start(self) -> int:
-        if "start" in self.params:
-            "returns the start parameter in minutes since hh:mm format"
-            return util.hhmm2min(self.params.start)
-        return None
-
-    @property
-    def end(self) -> int:
-        if "end" in self.params:
-            "returns the end parameter in minutes since hh:mm format"
-            return util.hhmm2min(self.params.end)
-        return None
     
     def get_od(self, cls) -> MatrixODT:
         if cls in self.ODs:
@@ -908,6 +909,7 @@ class Loader(BaseLoader):
             #[kwargs.pop(k,None) for k in set(mapping_nodes.values())]
             G.add_node(**kwargs)
 
+        """
         t = df_links[df_links.duplicated(["from_node", "to_node"])][["from_node", "to_node"]]
         t = t.astype(int)
         if t.shape[0] > 0:
@@ -918,7 +920,7 @@ class Loader(BaseLoader):
                 self.log.debug(f"| {' | '.join(map(str, row))} |")
             self.log.warning(f"Drop {len(t.values)} duplicated links")
             df_links = df_links.sort_values(by="length").drop_duplicates(subset=["from_node", "to_node"], keep="first")
-
+        """
         self.log.debug("Adding links to graph...")
         for _, row in df_links.iterrows():
 

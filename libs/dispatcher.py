@@ -1,5 +1,4 @@
 import time
-from libs.utils.parallel import Parallel
 from .simulators import BaseSimulator, MicroSimulator, StaticSimulator
 from .connectors import Loader, Writer
 from . import Logger
@@ -9,6 +8,7 @@ from datetime import datetime
 from .params_parser import ParamsParser
 from .utils.ipc import IPC
 from .fcd.rt_server import RTServer
+from .utils import Parallel
 
 class Dispatcher():
     
@@ -39,18 +39,7 @@ class Dispatcher():
         self.parser.set_default("time_simulation",datetime.now().strftime("%H:%M:%S"))
 
         self.op = self.parser.get("op")
-        if self.parser.ini.IPC_USE:
-            self.ipc: IPC = IPC(bucket=self.parser.ini.IPC_BUCKET, 
-                backend=self.parser.ini.IPC_BACKEND,
-                host=self.parser.ini.IPC_HOST, 
-                port=self.parser.ini.IPC_PORT, 
-                db=self.parser.ini.IPC_DB, 
-                compression=self.parser.ini.IPC_COMPRESSION, 
-                clevel=self.parser.ini.IPC_COMPRESSION_LEVEL            
-            )
-            self.ipc.init()
-        else:
-            self.ipc = None
+        self._ipc = None
         if self.parser.ini.PARALLEL_USE:
             Parallel.initialize_parallel(
                 engine=self.parser.ini.PARALLEL_ENGINE,
@@ -65,7 +54,23 @@ class Dispatcher():
             )
         self.loader: Loader = Loader(parser=self.parser)
         self.writer: Writer = Writer(parser=self.parser)
-
+    @property
+    def ipc(self) -> IPC:
+        if self._ipc is None:
+            if self.parser.ini.IPC_USE:
+                self._ipc = IPC(
+                    bucket=self.parser.ini.IPC_BUCKET,
+                    backend=self.parser.ini.IPC_BACKEND,
+                    host=self.parser.ini.IPC_HOST,
+                    port=self.parser.ini.IPC_PORT,
+                    db=self.parser.ini.IPC_DB,
+                    compression=self.parser.ini.IPC_COMPRESSION,
+                    compression_level=self.parser.ini.IPC_COMPRESSION_LEVEL
+                )
+            else:
+                self._ipc = None
+        return self._ipc
+    
     def run(self):
         try:
             if self.execution_id is None:
