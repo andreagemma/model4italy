@@ -1,14 +1,14 @@
 import pandas as pd
 from .. import Logger
-from ..loaders import BaseLoader
+from ..connectors import Loader
 from ..graphs import KPathContainer, DynamicGraph as Graph, TimeArrayAttribute, DynamicLink as Link, DynamicNode as Node, DynamicTurn as Turn
 from . import BaseSimulator
 class QuasiDynamicSimulator(BaseSimulator):
 
     log = Logger.getLogger("SIM")
 
-    def __init__(self,loader: BaseLoader, links_vdf: str,nodes_vdf: str,turns_vdf: str) -> None:
-        self.loader: BaseLoader = loader
+    def __init__(self,loader: Loader, links_vdf: str,nodes_vdf: str,turns_vdf: str) -> None:
+        self.loader: Loader = loader
         self.paths:KPathContainer = None
         self.G: Graph = loader.G
         self.links_vdf: str = links_vdf

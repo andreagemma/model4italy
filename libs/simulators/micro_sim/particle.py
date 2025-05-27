@@ -19,7 +19,7 @@ class car:
     def __init__(self, id_n, t, path, G, deltat,heavy = None):
         self.deltat = deltat
         self.ID = id_n  # vehicle ID
-        self.path = path  # path of vehicle
+        self.path_links = path["links"]  # path of vehicle
         self.ent_time = t  # [m] entrance on the network
         self.status = 'sleeping'  # status of vehicle
         self.G = G  # graph
@@ -37,12 +37,12 @@ class car:
         self.trace = []
         
 
-        self.current_link = self.G.get_link(self.path["links"][self.c_l])
+        self.current_link = self.G.get_link(self.path_links[self.c_l])
         try:
-            self.next_link = self.G.get_link(self.path["links"][self.n_l])
+            self.next_link = self.G.get_link(self.path_links[self.n_l])
         except:
             pdb.set_trace()
-        self.last_link = self.G.get_link(self.path["links"][-1])
+        self.last_link = self.G.get_link(self.path_links[-1])
 
         self.current_link["mov_vehs"] += 1  # add one vehicle on the current link link
         
@@ -65,11 +65,11 @@ class car:
     def update_graph(self, graph):
         self.G = graph
         #new_path = [] #UPDATE: GEMMA inutile perchè il cammino rimane in memoria e associato al veicolo
-        #for link in self.path["links"]:
+        #for link in self.path_links:
         #   new_path.append(self.G.get_link(link["idx"]))
-        #self.path["links"] = new_path
-        self.current_link = self.G.get_link(self.path["links"][self.c_l])
-        self.last_link = self.G.get_link(self.path["links"][-1])
+        #self.path_links = new_path
+        self.current_link = self.G.get_link(self.path_links[self.c_l])
+        self.last_link = self.G.get_link(self.path_links[-1])
         if self.status == "sleeping":
             self.current_link["mov_vehs"] += 1  # add one vehicle on the current link link
             self.current_link[self.field_ent] += 1
@@ -126,14 +126,14 @@ class car:
                 self.current_link["storage_cap"] += 1
 
             else:
-                self.next_link = self.G.get_link(self.path["links"][self.n_l])  # assign new next link
+                self.next_link = self.G.get_link(self.path_links[self.n_l])  # assign new next link
             
                 l = self.current_link["idx"]                    
                 nl = self.next_link["idx"]
 
                 try:
-                    if len(self.path["links"])<self.n_l+1:
-                        nnl = self.path["links"][self.n_l+1]
+                    if len(self.path_links)<self.n_l+1:
+                        nnl = self.path_links[self.n_l+1]
                         turn_state = self.signalized_turns.get((l, nl, nnl))
                         if turn_state is not None:
                             permitted_turn = turn_state == "green"
@@ -167,7 +167,7 @@ class car:
 
                     self.c_l += 1
                     self.n_l += 1
-                    self.current_link = self.G.get_link(self.path["links"][self.c_l])
+                    self.current_link = self.G.get_link(self.path_links[self.c_l])
                     
 
                 else:

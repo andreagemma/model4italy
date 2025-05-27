@@ -1,122 +1,18 @@
 {
     "simulation_id": 22,
-    "description": "Eur_1h-simulation",
+    "description": "Eur - Test",
+    "date": "2024-05-07",
     "start": "07:00",
-    "end": "08:00",
+    "end": "07:30",
     "op": "assignment",
     "settings": {
         "MSA_MAX_ITE": 1,
-        "MSA_MAX_TIMESLICE": 360,
-        "NUMCPU": 4,
+        "MSA_MAX_TIMESLICE": 180,
+        "PARALLEL_NUMCPU": 0,
         "MSA_K": 3,
         "LOAD_PATHS": false,
         "SAVE_PATHS": false,
         "LOAD_GRAPH": false,
         "SAVE_GRAPH": false
-    },
-    "params": {
-        "input": {
-            "loader": "FileLoader"
-        },
-        "output": {
-            "writer": "FileWriter",
-            "location": "./dati/output/{description}",
-            "state": "./dati/output/eur/state",
-
-            "aggregated_results_old": "{simulation_id}_aggregated_results.parquet",
-            "sim_results_old": "{simulation_id}_sim_results.csv",
-            "stat_results_old": "{simulation_id}_stat_results.csv",
-            "paths_old": "{simulation_id}_paths.parquet"
-        },
-        "heavy_vehicles_ban": false,
-        "modes": [
-            {
-                "id": "c",
-                "description": "car",
-                "eq_factor": 1
-            }
-        ],
-        "demand": [
-            {
-                "mode": "c",
-                "matrices": [
-                    {
-                        "src": "dati/GrafoEur/mat_car.parquet",
-                        "mapping": {
-                            "o": "o",
-                            "d": "d",
-                            "value": "value",
-                            "timestamp": "timestamp"
-                        }
-                    }
-                ]
-            }
-        ],
-        "zones": {
-            "src": "dati/GrafoEur/zones.csv",
-            "mapping": {
-                "id": "id_zone"
-            }
-        },
-        "supply": [
-            {
-                "links_src": "dati/GrafoEur/eur_links.shp",
-                "nodes_src": "dati/GrafoEur/eur_nodes.shp",
-                "turns_src": "dati/GrafoEur/turns_proh.csv",
-                "mapping": {
-                    "nodes": {
-                        "id": "id",
-                        "id1": "id"
-                    },
-                    "links": {
-                        "id": "id",
-                        "from_node": "from_node",
-                        "to_node": "to_node",
-                        "v0": "v0",
-                        "connector": "connect",
-                        "lanes": "n_lanes",
-                        "alpha": "alpha",
-                        "rcr": "rcr",
-                        "capacity": "capacity",
-                        "length": "length",
-                        "vdf": "vdf",
-                        "vdf_a": "vdf_a",
-                        "vdf_b": "vdf_b",
-                        "geometry": "geometry"
-                    },
-                    "turns": {
-                        "from_node": "fromnodeno",
-                        "via_node": "vianodeno",
-                        "to_node": "tonodeno"
-                    }
-                }
-            }
-        ],
-        "links_sets": [
-            {
-                "src": "dati/GrafoEur/links_sets.csv",
-                "mapping": {
-                    "set": "id_set",
-                    "id_link": "id_link"
-                }
-            }
-        ],
-        "events1": [
-            {
-                "src": "dati/GrafoEur/events.csv",
-                "mapping": {
-                    "id": "id",
-                    "type": "type",
-                    "start": "start",
-                    "end": "end",
-                    "params": "params"
-                }
-            }
-        ],
-        "traffic_lights": [
-            {
-                "src": "dati/GrafoEur/sign_nodes.json"
-            }
-        ]
     }
 }

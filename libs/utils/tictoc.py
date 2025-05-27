@@ -10,6 +10,7 @@ from time import strftime
 from time import time
 import string
 from itertools import product
+
 """
 Di seguito sono descritte una serie di classi per monitotare il tempo di esecuzione degli script.
 
@@ -416,6 +417,10 @@ class TicToc:
 
         self.log = logging.getLogger() if logger is None else logger
 
+    def get(self, t=None)->TicToc:
+        ret = TicToc(t, logger=self.log)
+        return ret
+    
     def tic(self, name=None) -> Union[int, float]:
         """
         The function `tic` is a method that records the current time and returns it, or stores the time

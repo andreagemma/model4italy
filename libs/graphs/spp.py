@@ -3,11 +3,11 @@ from typing import *
 from numbers import Number
 from heapq import heappush as push
 from heapq import heappop as pop
+from libs.utils.parallel import Parallel
 from .. import Logger
 import copy
 from math import isnan
-from itertools import product
- 
+import itertools 
 
 import multiprocessing, threading
 from concurrent.futures import ThreadPoolExecutor, as_completed, ProcessPoolExecutor
@@ -16,33 +16,8 @@ from multiprocessing import get_context, reduction
 
 from . import *
 
-try:
-    import ray
-    ray.util.register_serializer(dict, serializer=dill.dumps, deserializer=dill.loads)
-except Exception as ex:
-    print(ex)
-    pass
-
-try:
-    import dask
-    from dask.distributed import Client
-except Exception as ex:
-    print(ex)
-    pass
 
 class SPP:
-
-    ENGINE_RAY = "ray"
-    ENGINE_DASK = "dask"
-    ENGINE_DASK_MULTITHREADING = "dask_multithreading"
-    ENGINE_NONE = "none"
-    ENGINE_MULTITHREADING = "threading"
-
-    ray_initialized = False  # Variabile di classe per tracciare l'inizializzazione di Ray
-    dask_initialized = False  # Variabile di classe per tracciare l'inizializzazione di Dask
-    num_cpus = multiprocessing.cpu_count()  # Parametro di classe per il numero di CPU
-    parallel_engine = "none"  # Parametro per selezionare il motore parallelo ('ray' o 'dask','dask_treahding','none')
-
 
     @staticmethod
     def dijkstra(
@@ -184,69 +159,11 @@ class SPP:
                     continue
                 links = paths_links.get(target_link, [])
                 if len(links) > 0:
-                    path = Path(source=source, target=target, t_start=t_start, links=links, costs=[paths_costs[link] for link in links], mode=mode, t_base=t_base)
+                    path = Path(source=source, target=target, t_start=t_start, links=links, tot_cost=paths_costs[links[-1]], mode=mode, t_base=t_base)
                     pl.add_path(path)
         return pl
 
-    @staticmethod
-    def initialize_parallel(num_cpus: Optional[int] = None, engine: Optional[str] = None):
-        n = SPP.num_cpus if num_cpus is None else num_cpus
-        if engine is not None:
-            SPP.parallel_engine = engine
-
-        if n < 0:  # se <0 allora lascia libero il numero di processori indicato
-            num_cpus = max(1, multiprocessing.cpu_count() + n)
-        else:  # se >0 allora usa il numero di processori indicato
-            num_cpus = max(1, min(multiprocessing.cpu_count(), n))
-        SPP.num_cpus = num_cpus
-        if num_cpus==1:
-            return num_cpus
-        if SPP.parallel_engine == SPP.ENGINE_RAY and num_cpus>1:
-            if not SPP.ray_initialized:
-                try:
-                    ray.init(num_cpus=num_cpus)
-                    SPP.ray_initialized = True
-                except:
-                    SPP.ray_initialized = False
-                return num_cpus
-            else:
-                return ray.available_resources()["CPU"]
-        elif SPP.parallel_engine == SPP.ENGINE_DASK and num_cpus>1:
-            if not SPP.dask_initialized:
-                SPP.dask_client = Client(n_workers=num_cpus)
-                SPP.dask_initialized = True
-                return num_cpus
-            else:
-                return len(SPP.dask_client.nthreads())
-        elif SPP.parallel_engine == SPP.ENGINE_DASK_MULTITHREADING and num_cpus>1:
-            if not SPP.dask_initialized:
-                SPP.dask_client = Client(processes=False, threads_per_worker=num_cpus, n_workers=1)
-                SPP.dask_initialized = True
-                return num_cpus
-            else:
-                return len(SPP.dask_client.nthreads())
-        elif SPP.parallel_engine == SPP.ENGINE_MULTITHREADING and num_cpus>1:
-            return num_cpus
-        else:
-            return 1       
-
-    @staticmethod
-    def shutdown_parallel():
-        if SPP.parallel_engine == SPP.ENGINE_RAY and SPP.ray_initialized:
-            try:
-                if SPP.ray_initialized:
-                    ray.shutdown()
-                SPP.ray_initialized = False
-            except Exception as ex:
-                Logger.error("Errore durante lo spegnimento di Ray.", exc_info=True)
-
-        elif SPP.parallel_engine in [SPP.ENGINE_DASK, SPP.ENGINE_DASK_MULTITHREADING] and SPP.dask_initialized:
-            try:
-                SPP.dask_client.close()
-                SPP.dask_initialized = False
-            except Exception as ex:
-                Logger.error("Errore durante lo spegnimento di Dask.", exc_info=True)
-
+    
     @staticmethod
     def __multiple_source_single_processor(
         graph: AbstractGraph,
@@ -295,215 +212,35 @@ class SPP:
 
         return ret
 
-    @staticmethod
-    def execute(fn:Callable, tasks: Iterable[dict], engine: Optional[str] = None, n_workers: Optional[int]=None, chunk_size:Optional[int]=None, **kwargs) ->Generator:
-        tasks = list(tasks)
-        chunk_size = int(max(1, len(tasks) // (num_cpus) ))  if chunk_size is None else chunk_size # divide sulle CPU
-        pair_chunks = [tasks[i : i + chunk_size] for i in range(0, len(tasks), chunk_size)]
-
-        engine = engine or SPP.parallel_engine
-        num_cpus = SPP.initialize_parallel(n_workers, engine=engine)            
-        if engine == SPP.ENGINE_RAY and num_cpus>1:    
-            pair_chunks_refs = [ray.put(chunk) for chunk in pair_chunks]
-
-            @ray.remote
-            def calculate(*args, **kwargs):
-                return fn(*args, **kwargs)
-
-            ref_kwargs = {}
-            for k, v in kwargs.items():
-                if isinstance(v, (float, int, str, bool, complex)):
-                    ref_kwargs[k] = v
-                else:                
-                    ref_kwargs[k] = ray.put(v)
-
-            result_ids = [calculate.remote(tasks=chunk_ref, **ref_kwargs) for chunk_ref in pair_chunks_refs]
-
-            while result_ids:
-                done_ids, result_ids = ray.wait(result_ids)
-                for done_id in done_ids:
-                    paths = ray.get(done_id)
-                    yield paths
-
-        elif engine in [SPP.ENGINE_DASK, SPP.ENGINE_DASK_MULTITHREADING]:
-
-            @dask.delayed
-            def calculate(*args, **kwargs):
-                return fn(*args, **kwargs)
-
-            delayed_results = [calculate(tasks=chunk,  **kwargs) for chunk in pair_chunks]
-            results = dask.compute(*delayed_results)
-            for paths in results:
-                yield paths
-
-        elif engine == SPP.ENGINE_MULTITHREADING and num_cpus>1:
-
-            def calculate(*args, **kwargs):
-                return fn(*args, **kwargs)
-            
-            with ThreadPoolExecutor(max_workers=num_cpus) as executor:
-                futures = {executor.submit(calculate, tasks=chunk, **kwargs): chunk for chunk in pair_chunks}
-
-                # Attendi i risultati
-                for future in as_completed(futures):
-                    yield future.result()
-        
-        else:
-            ret = fn(tasks=tasks, **kwargs)
-            yield ret
-        
 
     @staticmethod
-    def multiple_paths(graph: AbstractGraph, tasks: Iterable[dict], engine: Optional[str] = None, n_workers: Optional[int]=None, **kwargs) -> PathList:
-
-        ret = PathList()
-        tasks = list(tasks)
-
-        ret = PathList()
-        engine = engine or SPP.parallel_engine
-        num_cpus = SPP.initialize_parallel(n_workers, engine=engine)            
-        if engine == SPP.ENGINE_RAY and num_cpus>1:
-
-            chunk_size = int(max(1, len(tasks) // (num_cpus) ))  # cerca di dividere in quattro compiti per CPU
-            pair_chunks = [tasks[i : i + chunk_size] for i in range(0, len(tasks), chunk_size)]
-            pair_chunks_refs = [ray.put(chunk) for chunk in pair_chunks]
-
-            @ray.remote
-            def calculate_for_chunk_ray(*args, **kwargs):
-                return SPP.__multiple_tasks_single_processor(*args, **kwargs)
-
-            graph_ref = ray.put(graph)
-            result_ids = [calculate_for_chunk_ray.remote(graph=graph_ref, tasks=chunk_ref, **kwargs) for chunk_ref in pair_chunks_refs]
-
-            while result_ids:
-                done_ids, result_ids = ray.wait(result_ids)
-                for done_id in done_ids:
-                    paths = ray.get(done_id)
-                    ret.merge(paths)
-        elif engine in [SPP.ENGINE_DASK, SPP.ENGINE_DASK_MULTITHREADING]:
-            chunk_size = int(max(1, len(tasks) // (num_cpus)))  # cerca di dividere in quattro compiti per CPU
-            pair_chunks = [tasks[i : i + chunk_size] for i in range(0, len(tasks), chunk_size)]
-
-            @dask.delayed
-            def calculate_for_chunk_dask(*args, **kwargs):
-                return SPP.__multiple_tasks_single_processor(*args, **kwargs)
-
-            delayed_results = [calculate_for_chunk_dask(graph=graph, tasks=chunk,  **kwargs) for chunk in pair_chunks]
-            results = dask.compute(*delayed_results)
-            for paths in results:
-                ret.merge(paths)
-        elif engine == SPP.ENGINE_MULTITHREADING and num_cpus>1:
-            chunk_size = int(max(1, len(tasks) // (num_cpus)))  # cerca di dividere in quattro compiti per CPU
-            pair_chunks = [tasks[i : i + chunk_size] for i in range(0, len(tasks), chunk_size)]
-
-            def calculate_for_chunk_mt(*args, **kwargs):
-                return SPP.__multiple_tasks_single_processor(*args, **kwargs)
-            
-            with ThreadPoolExecutor(max_workers=num_cpus) as executor:
-                futures = {executor.submit(calculate_for_chunk_mt, 
-                                           graph=graph, tasks=chunk, **kwargs): chunk for chunk in pair_chunks}
-
-                # Attendi i risultati
-                for future in as_completed(futures):
-                    ret.merge(future.result())
+    def multiple_paths(graph: AbstractGraph, 
+                       origins: List[Hashable],
+                       targets: List[Hashable],
+                       t_starts: Iterable[Number],
+                       modes: Union[str, set[str]] = None,
+                       n_workers: Optional[int]=None, 
+                       t_base: Number = 0,
+                       **kwargs) -> PathList:
         
-        else:
-            ret = SPP.__multiple_tasks_single_processor(graph=graph, tasks=tasks, **kwargs)
+        def generate_combinations(origins, destinations, t_starts, modes):
+            for o, d, t_start, mode in itertools.product(origins, destinations, t_starts, modes):
+                yield {"source": o, "targets": d, "t_start": t_start, "modes": mode, "t_base": t_base}
+
+        tasks = list(generate_combinations(
+            origins, 
+            [targets], 
+            t_starts, 
+            modes
+            ))
+        ret = PathList()
+
+        for paths in Parallel.execute(
+            SPP.__multiple_tasks_single_processor,
+            tasks=tasks,
+            n_workers=n_workers,
+            graph=graph,
+            **kwargs):
+            ret.merge(paths)
         return ret
-
-    @staticmethod
-    def multiple_sources_multiple_targets(
-        graph: AbstractGraph,
-        sources: List[Hashable],
-        targets: List[Hashable],
-        t_start: Number=0,
-        t_base: Number = 0,
-        engine: Optional[str] = None,
-        n_workers: Optional[int] = None,
-        **kwargs,
-    ) -> PathList:
-        """
-        Calculate a PathForest using Dijkstra's algorithm for each source-target pair in parallel.
-
-        :param graph: The graph to run the algorithm on
-        :param sources: List of source nodes
-        :param targets: List of target nodes
-        :param kwargs: Additional arguments for the dijkstra method
-        :return: PathForest object containing all paths from sources to targets
-        """
-        ret = PathList()
-        engine = engine or SPP.parallel_engine
-        num_cpus = SPP.initialize_parallel(n_workers, engine=engine)            
-        if engine == SPP.ENGINE_RAY and num_cpus>1:
-            #ray.util.register_serializer(graph, serializer=dill.dumps, deserializer=dill.loads)
-            graph_ref = ray.put(graph)
-            targets_ref = ray.put(targets)
-
-            # Use ray.put to optimize the passing of large objects
-
-            @ray.remote
-            def calculate_for_chunk_ray(*args, **kwargs):
-                return SPP.__multiple_source_single_processor(*args, **kwargs)
-
-            # Put source ids into the object store
-            chunk_size = int(max(1, len(sources) // (num_cpus)))
-
-            sources_chunks = [sources[i : i + chunk_size] for i in range(0, len(sources), chunk_size)]
-            sources_chunks_refs = [ray.put(chunk) for chunk in sources_chunks]
-
-            result_ids = [
-                calculate_for_chunk_ray.remote(
-                    graph=graph_ref,
-                    sources=chunk_ref,
-                    targets=targets_ref,
-                    t_start=t_start,
-                    t_base=t_base,
-                    **kwargs,
-                )
-                for chunk_ref in sources_chunks_refs
-            ]
-
-            while result_ids:
-                done_ids, result_ids = ray.wait(result_ids)
-                for done_id in done_ids:
-                    paths = ray.get(done_id)
-                    ret.merge(paths)
-        elif engine in [SPP.ENGINE_DASK, SPP.ENGINE_DASK_MULTITHREADING] and num_cpus>1:
-            chunk_size = int(max(1, len(sources) // num_cpus))
-            sources_chunks = [sources[i : i + chunk_size] for i in range(0, len(sources), chunk_size)]
-
-            @dask.delayed
-            def calculate_for_chunk_dask(*args, **kwargs):
-                return SPP.__multiple_source_single_processor(*args, **kwargs)
-
-            delayed_results = [calculate_for_chunk_dask(graph=graph, sources=chunk, targets=targets, **kwargs) for chunk in sources_chunks]
-            results = dask.compute(*delayed_results)
-            for paths in results:
-                ret.merge(paths)
-        elif engine == SPP.ENGINE_MULTITHREADING and num_cpus>1:
-            chunk_size = int(max(1, len(sources) // num_cpus))
-            sources_chunks = [sources[i : i + chunk_size] for i in range(0, len(sources), chunk_size)]
-
-            def calculate_for_chunk_mt(*args, **kwargs):
-                return SPP.__multiple_source_single_processor(*args, **kwargs)
-            
-            with ThreadPoolExecutor(max_workers=num_cpus) as executor:
-                # Sottomettiamo i lavori
-
-                futures = {executor.submit(calculate_for_chunk_mt, 
-                                           graph=graph, sources=chunk, targets=targets, **kwargs): chunk for chunk in sources_chunks}
-
-                # Attendi i risultati
-                for future in as_completed(futures):
-                    ret.merge(future.result())
-        
-        else:
-            ret = SPP.__multiple_source_single_processor(
-                graph=graph,
-                sources=sources,
-                targets=targets,
-                t_start=t_start,
-                t_base=t_base,
-                **kwargs,
-            )
-        return ret
+    

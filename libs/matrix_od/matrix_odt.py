@@ -42,7 +42,7 @@ class MatrixODT:
             else:
                 self.ods = {}
                 for t in self.timestamps:
-                    self.ods[t] = MatrixOD(rows=self.rows, cols=self.cols)
+                    self.ods[t] = MatrixOD(rows=self.rows, cols=self.cols, init=init)
     
         self.mode = mode
 
@@ -58,6 +58,16 @@ class MatrixODT:
                 return self.ods[t][o, d]
             else:
                 return 0
+            
+    def get(self, pos: Union[tuple, int], default: Optional[MatrixOD] = None) -> Union[MatrixOD, float]:
+        if isinstance(pos, int):
+            return self.ods.get(pos, default)
+        else:
+            o, d, t = pos
+            if t in self.ods:
+                return self.ods[t][o, d]
+            else:
+                return default if default is not None else 0
 
     def __setitem__(self, pos: Union[tuple, int], value: Union[MatrixOD, float]) -> None:
         if isinstance(pos, int):
@@ -177,15 +187,25 @@ class MatrixODT:
         return self
     
     @staticmethod
-    def read_df(rows: List, cols: List, timestamps:List, df: pd.DataFrame, o_field:str ="o", d_field:str ="d", timestamp_field:str ="timestamp", value_field:str ="value") -> 'MatrixODT':
-        ods = {}
+    def read_df(rows: List, cols: List, timestamps:List, df: pd.DataFrame, o_field:str ="o", d_field:str ="d", timestamp_field:str ="timestamp", value_field:str ="value", od: 'MatrixODT' = None) -> 'MatrixODT':
         grouped = df[[o_field,d_field,value_field,timestamp_field]].rename(columns={o_field: "o", d_field: "d", value_field: "value"}).groupby(timestamp_field,
                                                                                                                                                 group_keys=False,
                                                                                                                                                 observed=False)
+        
+        if od is not None:
+            ods = od.ods
+        else:
+            ods = {}
         for t, group in grouped:
-            od = MatrixOD.read_df(rows, cols, df=group)
-            ods[t] = od
-        return MatrixODT(rows, cols, timestamps=timestamps, init=ods)
+            if od is not None and t in od.ods:
+                new_od = MatrixOD.read_df(rows, cols, df=group, od=od[t])
+            else:
+                new_od = MatrixOD.read_df(rows, cols, df=group)
+            ods[t] = new_od
+        if od is not None:
+            return od
+        else:
+            return MatrixODT(rows, cols, timestamps=timestamps, init=ods)
 
     def nan_to_num(self, copy=True, nan=0.0, posinf=None, neginf=None):
         for mat_od in self.ods.values():

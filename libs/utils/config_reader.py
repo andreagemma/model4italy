@@ -49,11 +49,14 @@ class ConfigReader:
         return os.getenv(name)
 
     def get(self, name, section='DEFAULT', default=None):
-        value = self._get_from_ini(section, name)
-        if self.use_db and value is None:
-            value = self._get_from_db(section, name)
-        if value is None:
-            value = self._get_from_env(name)
+        value_ini = self._get_from_ini(section, name)
+        value_db=None
+        value_env=None
+        if self.use_db:
+            value_db = self._get_from_db(section, name)
+        value_env = self._get_from_env(name)
+        
+        value = (value_env or value_db) or value_ini
         return value.strip() if value is not None else default
 
     def getint(self, name, section='DEFAULT', default=None):

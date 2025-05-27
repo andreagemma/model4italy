@@ -7,6 +7,10 @@ from .. import AbstractGraph
 from .path import Path
 import numpy as np
 from abc import ABC, abstractmethod
+from ...utils import multi_line_to_line
+from shapely.geometry import MultiLineString
+import pandas as pd
+import geopandas as gpd
 
 class PathContainer(ABC, dict):
 
@@ -86,4 +90,17 @@ class PathContainer(ABC, dict):
         with open(filename, "rb") as f:
             d = dill.load(f)  
         return d
+    
+    def to_pandas(self, G, crs_link):        
+        df_paths: pd.DataFrame = pd.DataFrame(self.all_paths())
+        if df_paths.empty:
+            return df_paths
+        l = next(G.get_all_links())
+        for geom in ("geom","geometry"):
+            if geom in l:
+                df_paths[geom]=[MultiLineString([multi_line_to_line(G.get_link(l_idx).get_value(geom)) for l_idx in links]) for links in df_paths["links"]]                
+                df_paths = gpd.GeoDataFrame(df_paths, geometry=geom ,crs=crs_link)
+                return df_paths            
+        return None
+
     
