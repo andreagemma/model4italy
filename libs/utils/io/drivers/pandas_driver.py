@@ -1,7 +1,17 @@
+import geopandas
 import pandas as pd
-import re
+import uuid
+from ... import remove_path
+import os
 from typing import Optional, List, Union
 from ..drivers import BaseDriver
+from datetime import datetime
+from os import getpid
+
+from uuid import uuid4
+from typing import Generator, Any
+from pathlib import Path
+import polars as pl
 
 class PandasDriver(BaseDriver):
 
@@ -13,13 +23,11 @@ class PandasDriver(BaseDriver):
     def pattern(self) -> List[str]:
         return [
             r"\.csv$",
-            r"\.json$",
             r"\.xlsx?$",
-            r"\.html$",
+            r"\.parquet$",
             r"\.feather$",
             r"\.pkl$",
             r"\.pickle$",
-            r"\.parquet$",
         ]
 
     def import_dataframe(
@@ -28,34 +36,35 @@ class PandasDriver(BaseDriver):
         filters: Optional[dict] = None,
         dtype: Optional[dict] = None,
         **kwargs
-    ) -> pd.DataFrame:
-        if path.lower().endswith(".csv"):
-            df = pd.read_csv(path, dtype=dtype, **kwargs)
-            BaseDriver.apply_filters(df, filters)
-        elif path.lower().endswith(".json"):
-            df = pd.read_json(path, dtype=dtype, **kwargs)
-            BaseDriver.apply_filters(df, filters)
+    ) -> pd.DataFrame:        
+        pathg: Path = Path(path)
+        files = pathg.glob("**/*") if pathg.is_dir() else [pathg]
+        files = [file for file in files if file.is_file() and file.suffix.lower() in pathg.suffix.lower()]
+        if pathg.suffix.lower()==".csv":
+            df = pl.scan_csv(files).collect().to_pandas()
+            #df = BaseDriver.reduce_folder(path, lambda x,y: pd.concat([x,y]), lambda path: pd.read_csv(path, dtype=dtype, **kwargs))
+            df = BaseDriver.apply_filters(df, filters)
         elif path.lower().endswith(".xlsx") or path.lower().endswith(".xls"):
-            df = pd.read_excel(path, dtype=dtype, **kwargs)
-            BaseDriver.apply_filters(df, filters)
-        elif path.lower().endswith(".html"):
-            dfs = pd.read_html(path, **kwargs)
-            BaseDriver.adapt_dtype(df, dtype)
-            BaseDriver.apply_filters(df, filters)
-            df = dfs[0] if dfs else pd.DataFrame()
+            df = pl.concat([pl.read_excel(file, engine="openpyxl", **kwargs) for file in files]).to_pandas()
+            #df = BaseDriver.reduce_folder(path, lambda x,y: pd.concat([x,y]), lambda path: pd.read_excel(path, dtype=dtype, **kwargs))
+            df = BaseDriver.apply_filters(df, filters)
         elif path.lower().endswith(".feather"):
-            df = pd.read_feather(path, **kwargs)
-            BaseDriver.adapt_dtype(df, dtype)
-            BaseDriver.apply_filters(df, filters)
+            df = pl.scan_ipc(files).collect().to_pandas()
+            #df = BaseDriver.reduce_folder(path, lambda x,y: pd.concat([x,y]), lambda path: pd.read_feather(path, **kwargs))
+            df = BaseDriver.adapt_dtype(df, dtype)
+            df = BaseDriver.apply_filters(df, filters)
         elif path.lower().endswith(".pkl") or path.lower().endswith(".pickle"):
-            df = pd.read_pickle(path, **kwargs)
-            BaseDriver.adapt_dtype(df, dtype)
-            BaseDriver.apply_filters(df, filters)
+            df = pd.concat([pd.read_pickle(file, **kwargs) for file in files])
+            #df = BaseDriver.reduce_folder(path, lambda x,y: pd.concat([x,y]), lambda path:  pd.read_pickle(path, **kwargs))
+            df = BaseDriver.adapt_dtype(df, dtype)
+            df = BaseDriver.apply_filters(df, filters)
         elif path.lower().endswith(".parquet"):
-            df = pd.read_parquet(path, filters=filters, **kwargs)
-            BaseDriver.adapt_dtype(df, dtype)
+            df = pd.concat([pd.read_parquet(file, filters=filters, **kwargs) for file in files])
+            #df = pd.read_parquet(path, filters=filters, **kwargs)
+            df = BaseDriver.adapt_dtype(df, dtype)
         else:
             raise ValueError(f"Formato file non supportato: {path}")
+        df = BaseDriver.to_dataframe(df)
         return df
 
     def export_dataframe(
@@ -66,22 +75,54 @@ class PandasDriver(BaseDriver):
         partitionby: Optional[List[str]] = None,
         **kwargs
     ):
-        if path.lower().endswith(".parquet"):
-            df.to_parquet(path, partition_cols=partitionby, **kwargs)
-        else:
-            if path.lower().endswith(".csv"):
-                df.to_csv(path, index=False, mode=mode, **kwargs)
-            elif path.lower().endswith(".json"):
-                df.to_json(path, **kwargs)
-            elif path.lower().endswith(".xlsx") or path.lower().endswith(".xls"):
-                df.to_excel(path, index=False, **kwargs)
-            elif path.lower().endswith(".html"):
-                df.to_html(path, index=False, **kwargs)
-            elif path.lower().endswith(".feather"):
-                df.to_feather(path, **kwargs)
-            elif path.lower().endswith(".pkl") or path.lower().endswith(".pickle"):
-                df.to_pickle(path, **kwargs)
-            elif path.lower().endswith(".parquet"):
-                df.to_parquet(path, partition_cols=partitionby, **kwargs)
+        index = kwargs.pop("index", False)
+        if partitionby is None or len(partitionby)==0:
+            if mode in ("wa","aw"):
+                mode = "a"
+        if mode == "w":
+            remove_path(path)
+        if partitionby is None or len(partitionby)==0:
+            if path.lower().endswith(".parquet"):
+                df.to_parquet(path, index=index, **kwargs)
             else:
-                raise ValueError(f"Formato file non supportato: {path}")
+                if path.lower().endswith(".csv"):
+                    df.to_csv(path, index=index, mode=mode, **kwargs)
+                elif path.lower().endswith(".xlsx") or path.lower().endswith(".xls"):
+                    df.to_excel(path, index=index, **kwargs)
+                elif path.lower().endswith(".feather"):
+                    df.to_feather(path, **kwargs)
+                elif path.lower().endswith(".pkl") or path.lower().endswith(".pickle"):
+                    df.to_pickle(path, **kwargs)
+                else:
+                    raise ValueError(f"Formato file non supportato: {path}")
+        else:
+            def fn(grp, path, **kwargs):
+                partition_values, partitionBy, df = grp
+                if path.lower().endswith(".parquet"):
+                    for partition in partitionby:
+                        df.drop(partition, axis=1, inplace=True)            
+                filename = os.path.basename(path)
+                extension = os.path.splitext(filename)[1]
+                partitions_hive = [str(p) + "=" + str(v) for p,v in zip(partitionBy, partition_values)]
+                uid = str(int(datetime.now().timestamp())) + "_" + str(uuid4()) + "_" + str(getpid()) + extension
+                path= os.path.join(path,*partitions_hive)
+                os.makedirs(path, exist_ok=True)
+                new_file = os.path.join(path, uid)
+                self.export_dataframe(
+                    df=df,
+                    path=new_file,
+                    mode="a",
+                    partitionby=None, 
+                    **kwargs
+                )
+            for partition in partitionby:
+                if partition not in df.columns:
+                    raise ValueError(f"Colonna '{partition}' non trovata nel DataFrame.")
+            BaseDriver.map_partitioned_dataframe(
+                df,
+                partitionby,
+                fn,
+                path=path,
+                **kwargs
+            )
+

@@ -1,7 +1,16 @@
 import re
-from typing import Dict, List, Optional, Type, Union, Tuple
+import typing
 import pandas as pd
 import geopandas as gpd
+from typing import Dict, List, Optional, Union, Tuple, Generator, Any, Callable
+from functools import reduce
+import glob
+from pathlib import Path
+import os
+from shapely import wkt
+import shapely.wkb
+from shapely.wkt import dumps as wkt_dumps
+import polars as pl
 
 def inner_filter_to_query_expression(filters, rename=None, quoting='"', op_boolean_symbols=False):
     """
@@ -100,3 +109,104 @@ class BaseDriver:
                 query = filters_to_query_expression(filters)
             df = df.query(query)
         return df
+    
+    @staticmethod
+    def map_partitioned_dataframe(
+        df: Union[pd.DataFrame, gpd.GeoDataFrame],
+        partitionby: List[str],
+        func,
+        *args,
+        **kwargs
+    ) -> Generator[Any, None, None]:
+        """
+        Applica una funzione a ogni partizione del DataFrame.
+        
+        :param df: DataFrame o GeoDataFrame da partizionare.
+        :param partitionby: Colonne su cui partizionare.
+        :param func: Funzione da applicare a ogni partizione.
+        :param args: Argomenti posizionali per la funzione.
+        :param kwargs: Argomenti keyword per la funzione.
+        :return: DataFrame o GeoDataFrame con le partizioni elaborate.
+        """
+        grp = df.groupby(partitionby)
+        for name, group in grp:
+            func((name, partitionby, group), *args, **kwargs)
+
+    @staticmethod            
+    def reduce_folder(
+        path: str,
+        func: Callable,
+        *args,
+        **kwargs
+    ) -> Any:
+        """
+        Applica una funzione di riduzione a ogni partizione del DataFrame e restituisce i risultati.
+        
+        :param df: DataFrame o GeoDataFrame da partizionare.
+        :param partitionby: Colonne su cui partizionare.
+        :param func: Funzione di riduzione da applicare a ogni partizione.
+        :param args: Argomenti posizionali per la funzione.
+        :param kwargs: Argomenti keyword per la funzione.
+        :return: Generatore con i risultati della riduzione.
+        """       
+        if os.path.exists(path):            
+            path = Path(path)
+            if path.is_file():
+                return func(path, *args, **kwargs)
+            else:
+                files = list(path.glob("**/*"))
+                files = [file for file in files if file.is_file() and file.suffix.lower() in os.path.splitext(path)[1].lower()]
+                return pd.concat([func(file, *args, **kwargs) for file in files])
+                
+        else:
+            raise FileNotFoundError(f"Il percorso '{path}' non esiste.")
+    @staticmethod
+    def is_geo(df: Union[pd.DataFrame, gpd.GeoDataFrame]) -> bool:
+        if isinstance(df, gpd.GeoDataFrame):
+            # Verifica che la colonna geometry esista e non sia None
+            return df.geometry.name in df.columns and not df.geometry.isna().all()
+        elif isinstance(df, pd.DataFrame):
+            return any(col in df.columns for col in ['geometry', 'geom'])
+        return False
+    @staticmethod
+    def to_geodataframe(df: Union[pd.DataFrame, gpd.GeoDataFrame], crs: Union[str, int] = "EPSG:4326") -> gpd.GeoDataFrame:
+        if isinstance(df, gpd.GeoDataFrame):
+            if df.geometry.name in df.columns:
+                return df.set_crs(crs, allow_override=True) if df.crs is None else df
+
+        geometry_column = None
+        for col in ['geometry', 'geom']:
+            if col in df.columns:
+                geometry_column = col
+                break
+
+        if geometry_column is None:
+            raise ValueError("DataFrame non contiene una colonna 'geometry' o 'geom'.")
+
+        # Determina il tipo di geometria e converte se necessario
+        sample = df[geometry_column].dropna().iloc[0]
+        if isinstance(sample, (bytes, bytearray)):
+            geometries = df[geometry_column].apply(lambda x: shapely.wkb.loads(x) if pd.notnull(x) else None)
+        elif isinstance(sample, str):
+            geometries = df[geometry_column].apply(lambda x: wkt.loads(x) if pd.notnull(x) else None)
+        else:
+            geometries = df[geometry_column]
+
+        gdf = gpd.GeoDataFrame(df.copy(), geometry=geometries)
+        gdf.set_crs(crs, inplace=True)
+        return gdf    
+    @staticmethod
+    def to_dataframe(df: Union[pd.DataFrame, gpd.GeoDataFrame]) -> pd.DataFrame:
+        """
+        Converte un GeoDataFrame o DataFrame in DataFrame.
+        Se esiste una colonna geometrica, viene convertita in WKT.
+        """
+        if isinstance(df, gpd.GeoDataFrame):
+            df = df.copy()
+            if df.geometry.name in df.columns:
+                df[df.geometry.name] = df.geometry.apply(lambda geom: wkt_dumps(geom) if geom is not None else None)
+            return pd.DataFrame(df)
+        elif isinstance(df, pd.DataFrame):
+            return df
+        else:
+            raise TypeError("Input non valido: atteso pd.DataFrame o gpd.GeoDataFrame")

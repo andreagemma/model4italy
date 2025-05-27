@@ -19,7 +19,12 @@ class IO_DataFrame:
 
         patterns = pattern if isinstance(pattern, list) else [pattern]
         for pat in patterns:
-            if isinstance(pat, tuple):
+            if isinstance(pat, re.Pattern):
+                if pat in self._pattern_to_driver:
+                    warnings.warn(f"Il pattern '{pat}' è già registrato. Il driver precedente verrà sovrascritto.")
+                self._pattern_to_driver[pat] = driver
+                self._patterns[pat] = pat
+            elif isinstance(pat, tuple):
                 regex, pat_kwargs = pat
                 self.register_driver(driver_cls, regex, {**kwargs, **pat_kwargs})
             else:

@@ -19,6 +19,9 @@ import os
 from datetime import datetime, date, time
 from dateutil import parser
 import re
+from pathlib import Path
+import shutil
+
 
 try:
     from psutil import Process, NoSuchProcess
@@ -895,3 +898,11 @@ def parse_postgres_dns(dns):
     components["query"] = {}
     
     return components
+
+def remove_path(path):
+    if os.path.exists(path):            
+        path = Path(path)
+        if path.is_file():
+            path.unlink() # Rimuove un file
+        else:
+            shutil.rmtree(path)
