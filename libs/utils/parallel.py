@@ -36,16 +36,19 @@ class Parallel:
         return num_cpus
     
     @staticmethod
-    def get_num_min_cpus(num_cpus) -> int:
-        if num_cpus is None:
-            num_cpus = multiprocessing.cpu_count() - 1
-        elif num_cpus <= 0:  # If <0 then leaves the number of processors free
-            num_cpus = max(1, multiprocessing.cpu_count() + num_cpus)
-        else:  # If> 0 then use the number of processors indicated
-            num_cpus = max(1, min(multiprocessing.cpu_count(), num_cpus))  
+    def get_num_min_cpus(num_cpus) -> int:        
         if Parallel.initialzations > 0:
-            return min(Parallel.num_cpus, num_cpus)        
-        return num_cpus
+            max_cpus = Parallel.num_cpus
+        else:
+            max_cpus = multiprocessing.cpu_count()
+        if num_cpus is None:
+            num_cpus = max_cpus - 1
+        elif num_cpus <= 0:  # If <0 then leaves the number of processors free
+            num_cpus = max(1, max_cpus + num_cpus)
+        else:  # If> 0 then use the number of processors indicated
+            num_cpus = max(1, min(max_cpus, num_cpus))  
+        return min(max_cpus, num_cpus)        
+        #return num_cpus
     
     @staticmethod
     def initialize_parallel(num_cpus: Optional[int] = None, engine: Optional[str] = None,
@@ -109,7 +112,7 @@ class Parallel:
                     ray.util.register_serializer(dict, serializer=dill.dumps, deserializer=dill.loads)
                     kwargs["ignore_reinit_error"] = True
                     address = kwargs.pop("address", None)
-                    if address:
+                    if address and address.lower() != "local":
                         try:
                             ray.init(address=address,**kwargs) 
                         except ConnectionError:
@@ -206,11 +209,12 @@ class Parallel:
         if engine is None or engine == Parallel.ENGINE_NONE:
             n_workers=None
         if n_workers is not None:
-            num_cpus = n_workers
-            if num_cpus == 1:
-                Parallel.log.warning("n_workers = 1. Using single CPU in a single thread mode.")
-            else:
-                Parallel.log.debug(f"Using {num_cpus} workers with {Parallel.parallel_engine} engine.")
+            num_cpus = Parallel.get_num_min_cpus(n_workers)
+            if num_cpus!= Parallel.num_cpus:
+                if num_cpus == 1:
+                    Parallel.log.warning("n_workers = 1. Using single CPU in a single thread mode.")
+                else:
+                    Parallel.log.debug(f"Using {num_cpus} on {Parallel.num_cpus} workers with {Parallel.parallel_engine} engine.")
         else:
             num_cpus = Parallel.num_cpus
         

@@ -72,10 +72,11 @@ class IniClass:
 
         # ASSIGNMENT
         self.CLASS_EQ_FACT = config_reader.getdict("CLASS_EQ_FACT", 'ASSIGNMENT', {'c': 1, 'h': 2})
-        self.MSA_MAX_ITE = config_reader.getint("MSA_MAX_ITE", 'ASSIGNMENT', 1)
+        self.MSA_MAX_ITE = config_reader.getint("MSA_MAX_ITE", 'ASSIGNMENT', 6)
         self.MSA_RGAP = config_reader.getfloat("MSA_RGAP", 'ASSIGNMENT', 0.01)
         self.MSA_K = config_reader.getint("MSA_K", 'ASSIGNMENT', 3)
         self.MSA_MAX_TIMESLICE = config_reader.getint("MSA_MAX_TIMESLICE", 'ASSIGNMENT', int(3 * 60))
+        self.MSA_SPP_NUMCPUS = config_reader.getint("MSA_SPP_NUMCPUS", 'ASSIGNMENT', 0)
         self.DELTA_T = config_reader.getint("DELTA_T", 'ASSIGNMENT', 15)
         self.MSA_PRELOAD = config_reader.getint("MSA_PRELOAD", 'ASSIGNMENT', 60)
         self.MSA_POSTLOAD = config_reader.getint("MSA_POSTLOAD", 'ASSIGNMENT', 60)
@@ -110,10 +111,10 @@ class IniClass:
         self.OUTPUT_AGG_INT = config_reader.getfloat("OUTPUT_AGG_INT", 'OUTPUT', 15)
         self.OUTPUT_STATE_COMPRESSION = config_reader.getboolean("OUTPUT_STATE_COMPRESSION", 'OUTPUT', "pickle")
 
-        # FLASK
-        self.FLASK_HOST = config_reader.get("FLASK_HOST", 'FLASK', '0.0.0.0')
-        self.FLASK_PORT = config_reader.getint("FLASK_PORT", 'FLASK', 5000)
-        self.FLASK_DEBUG = config_reader.getboolean("FLASK_DEBUG", 'FLASK', True)
+        # WEB_SERVER
+        self.WEB_SERVER_HOST = config_reader.get("WEB_SERVER_HOST", 'WEB_SERVER', '0.0.0.0')
+        self.WEB_SERVER_PORT = config_reader.getint("WEB_SERVER_PORT", 'WEB_SERVER', 5000)
+        self.WEB_SERVER_DEBUG = config_reader.getboolean("WEB_SERVER_DEBUG", 'WEB_SERVER', True)
 
         # INTERNAL DATABASE
         self.DATABASE_URL = config_reader.get("DATABASE_URL", 'DATABASE', 'sqlite:///executions.db')
@@ -130,7 +131,7 @@ class IniClass:
         
         # PARALLEL
         self.PARALLEL_USE = config_reader.getboolean("PARALLEL_USE", 'PARALLEL', False)
-        self.PARALLEL_NUMCPU = config_reader.getint("PARALLEL_NUMCPU", 'PARALLEL', 1)
+        self.PARALLEL_NUMCPUS = config_reader.getint("PARALLEL_NUMCPUS", 'PARALLEL', 1)
         self.PARALLEL_ENGINE = config_reader.get("PARALLEL_ENGINE", 'PARALLEL', "ray")
         self.PARALLEL_CLUSTER_ADDRESS = config_reader.get("PARALLEL_CLUSTER_ADDRESS", 'PARALLEL', None)
 

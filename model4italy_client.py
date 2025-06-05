@@ -2,9 +2,13 @@ import requests, json, time
 from libs.utils import run_in_thread
 from libs.status import Status
 url = "http://localhost:5000/execute"
+
 with open("params.json") as f:
-    params = f.read()
-params = json.loads(params)
+    data = f.read()
+params = json.loads(data)
+with open("params_data.json") as f:
+    data = f.read()
+params.update(json.loads(data))
 response = requests.post(url, json=params)
 
 resp = response.json()
@@ -17,7 +21,7 @@ else:
 
 url = f"http://localhost:5000/status/{execution_id}"
 while True:
-    time.sleep(1)
+    time.sleep(2)
     response = requests.get(url)
     resp = response.json()
     if response.status_code == 200:    
@@ -25,6 +29,7 @@ while True:
         status = resp["status"]
         print(f"Status: {status}")
         if status in (Status.SIM_PENDING,):
+            print(f"Progress {resp.get("progress",0)}% - {resp.get("last_message")}" )
             continue
         elif status in (Status.SIM_COMPLETED, ):
             print(f"Completed")
@@ -36,6 +41,7 @@ while True:
         print("Error:", resp)
         break
 
+"""
 import json
 import time
 import requests
@@ -122,3 +128,4 @@ def rolling_horizon():
 
 if __name__ == "__main__":
     rolling_horizon()
+"""

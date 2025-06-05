@@ -12,7 +12,7 @@ class MatrixAss:
         def __init__(self, origins, destinations, detectors):
             self.origins = origins
             self.destinations = destinations
-            self.detectors = detectors
+            #self.detectors = detectors
             no = len(origins)
             nd = len(destinations)
             nl = len(detectors)
@@ -38,7 +38,8 @@ class MatrixAss:
         self.G = loader.G if G is None else G
         self.origins = loader.origins
         self.destinations = loader.destinations
-        self.detectors = loader.detectors if links_detected is None else links_detected
+        self.detectors = sorted(loader.detectors["id_link"].to_list() if links_detected is None else links_detected)
+
         self.delta_t = loader.delta_t
         self.n_intervals = n_intervals
         self.pre_intervals = int(loader.ini.OD_ESTIMATION_PRELOAD / self.delta_t) if pre_intervals is None else pre_intervals
@@ -97,10 +98,10 @@ class MatrixAss:
     # def _idx(self, tstart, tenter):
     #    return int((tenter+ 1) * tenter / 2 + (tstart + 1) - 1)
 
-    def add(self, o, d, l, tstart, tenter, flow):
+    def add(self, o, d, l, t_start, t_enter, flow):
         if l not in self.detectors:
             return
-        k = (tenter, tstart)
+        k = (t_enter, t_start)
         # print(tstart,tenter)
         if k in self.mats:
             mat: MatrixAss.OD = self.mats[k]
@@ -108,3 +109,19 @@ class MatrixAss:
             id = self.d2i[d]
             il = self.l2i[l]
             mat[io, id, il] += flow
+
+    def get_all_matrix_by_tenter(self):
+        keys = list(self.mats.keys())
+        df = pd.DataFrame(keys, columns=["tenter", "tstart"])
+        grp = df.groupby("tenter")
+        for t_enter, g in grp:
+            ret = []
+            for t_start in g["tstart"].unique():
+                if (t_enter, t_start) not in self.mats:
+                    continue
+            ret.append(((t_enter, t_start), self.mats[(t_enter, t_start)].mat))
+            yield t_enter, ret
+
+    def set_matrix(self, t_enter, t_start, mat):
+        self.mats[(t_enter, t_start)].mat += mat
+

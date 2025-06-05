@@ -1,18 +1,14 @@
 {
-    "simulation_id": 22,
-    "description": "Eur - Test",
+    "simulation_id": 25,
+    "description": "Demo",
     "date": "2024-05-07",
     "start": "07:00",
-    "end": "07:30",
+    "end": "7:30",
     "op": "assignment",
+    "scenario_id": 1,
     "settings": {
-        "MSA_MAX_ITE": 1,
-        "MSA_MAX_TIMESLICE": 180,
-        "PARALLEL_NUMCPU": 0,
-        "MSA_K": 3,
-        "LOAD_PATHS": false,
-        "SAVE_PATHS": false,
-        "LOAD_GRAPH": false,
-        "SAVE_GRAPH": false
+        "MSA_MAX_ITE": 6,
+        "MSA_SPP_NUMCPUS": 0,
+        "MSA_K": 3
     }
 }

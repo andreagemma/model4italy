@@ -18,3 +18,4 @@ from .fcd.map_matching import MapMatching
 from .status import Status
 from . import simulators
 from . import server
+from .task import task

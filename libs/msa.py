@@ -23,8 +23,9 @@ from .log.logger import Logger
 from .utils import save_dict, load_dict, getsize
 from .utils.ipc import IPC
 from .database import Execution
+from .task import task
 
-
+@task
 class MSA:
 
     def __init__(
@@ -45,6 +46,7 @@ class MSA:
         load_state_graph: bool = False,
         load_state_paths: bool = False,
         save_state_paths: bool = False,
+        save_ass_matrix: bool = True,
         log: Logger = None,
         ipc: IPC = None,
         ):
@@ -71,10 +73,14 @@ class MSA:
         self.links_cost = links_cost
         self.turns_cost = turns_cost
         self.nodes_cost = nodes_cost
-
+        
+        self.calc_ass_matrix = od_estimation
+        
         self.save_paths = save_paths and self.writer.has_write_paths()
         self.save_agg_results = save_agg_results and self.writer.has_write_agg_results() and self.simulator is not None
         self.state_manager = StateManager(self.loader.parser)
+
+        self.save_state_ass_matrix = save_ass_matrix and self.state_manager.has_write_state() and self.calc_ass_matrix
         self.save_state_graph = save_state_graph and self.state_manager.has_write_state()
         self.load_state_graph = load_state_graph and self.state_manager.has_write_state()
         self.save_state_paths = save_state_paths and self.state_manager.has_write_state()
@@ -89,7 +95,6 @@ class MSA:
         self.origins: List[int] = self.loader.origins
         self.destinations: List[int] = self.loader.destinations
 
-        self.od_estimation = od_estimation
         self.ass_matrix: MatrixAss = None
 
         self.eq_factors: dict[str, float] = {mode: params.get("eq_factor", 1) for mode, params in self.loader.modes.items()}        
@@ -107,8 +112,6 @@ class MSA:
         self.current_i_start: int = None
         self.current_i_end: int = None
         self.current_t_starts: List[int] = None
-        self.inc_progress: float = 1
-        self.progress:float = 0    
         self.interval:int = None    
         self.iteration:int = None
         
@@ -116,10 +119,11 @@ class MSA:
     def run(self):
         # self.log.info(f"occupazione graph: {getsize(self.G)/1024/1024}MB")
         # self.log.info(f"occupazione od: {getsize(self.od)/1024/1024}MB")
-        n_steps = 2 + (len(self.global_intervals)*5) + len(self.global_intervals) * min(self.max_ite,self.max_k) * 2 + len(self.global_intervals) * max(0,self.max_ite-self.max_k) * 1
-        self.inc_progress = 100.0 / n_steps
+        n_steps = 2 + (len(self.global_intervals)*6) + len(self.global_intervals) * min(self.max_ite,self.max_k) * 2 + len(self.global_intervals) * max(0,self.max_ite-self.max_k) * 1
+        self._task_on_step_done = self.update_progress
+        self.task_set_steps(n_steps)        
 
-        self.update_progress("Loading parameters")
+        self.task_step_done("Loading parameters")
         if self.save_state_graph:
             self.log.info("Saving state (Graph)...")
             self.state_manager.write_state(self.G, "graph", mode="w")
@@ -157,7 +161,7 @@ class MSA:
             gs = min2hhmm(self.global_t_start)
             ge = min2hhmm(self.global_t_end)
             
-            self.update_progress(f"{cs}-{ce} - Starting simulation")
+            self.task_step_done(f"{cs}-{ce} - Starting simulation")
 
             if self.global_num_intervals > 1:     
                 self.log.info(f"Simulating ({self.interval+1}/{self.global_num_intervals}) {rs}-{re} (Original: {cs}-{ce} Global {gs}-{ge}) ...")
@@ -165,25 +169,34 @@ class MSA:
                 self.log.info(f"Simulating {rs}-{re} (Original: {cs}-{ce} Global {gs}-{ge}) ...")
                 self.log.info(f"Simulating {cs}-{ce} ...")           
             
-            self.update_progress(f"{cs}-{ce} - Initialize simulation")
+            self.task_step_done(f"{cs}-{ce} - Initialize simulation")
             if self.simulator:
                 self.simulator.initialize_assignment(self.current_time_start, self.current_time_end)
 
-            self.update_progress(f"{cs}-{ce} - Running simulation")
+            self.task_step_done(f"{cs}-{ce} - Running simulation")
             self.run_msa()
 
-            self.update_progress(f"{cs}-{ce} - Finalizing simulation")
+            self.task_step_done(f"{cs}-{ce} - Finalizing simulation")
             if self.interval < self.global_num_intervals - 1 or self.save_agg_results or self.save_paths:
-                self.log.info("Finalizing assignment...")
                 self.simulator.finalize_assignment(self.current_time_start, self.current_time_end)
-            
-            self.update_progress(f"{cs}-{ce} - Saving results")
+
+            if self.calc_ass_matrix:
+                self.ass_matrix: MatrixAss = MatrixAss(self.loader, self.current_num_intervals)
+                self.task_step_done(f"{cs}-{ce} - Calculating Assignment Matrix...")
+                self.calculate_ass_matrix()
+            else:
+                self.ass_matrix = None
+
+            self.task_step_done(f"{cs}-{ce} - Saving results")
             self._save_state_paths()
+            self._save_state_ass_matrix()
             self._save_paths()            
             self._save_agg_results()
             
+            
             self.G = self.G_copy.copy()
-        self.update_progress("Finish")
+        self.task_step_done("Finish")
+        self.task_finish()
 
     def _save_paths(self):
         try:
@@ -240,11 +253,23 @@ class MSA:
         except Exception as e:
             self.log.error("Failed to save aggregated results:", exc_info=e, stack_info=True)
 
+    def _save_state_ass_matrix(self):
+        try:
+            if self.save_state_ass_matrix:
+                self.log.info("Saving state (Assignment Matrix)...")
+
+                for t_enter, mat in self.ass_matrix.get_all_matrix_by_tenter():
+                    self.state_manager.write_state(mat, "ass_matrix", mode="w", partition=f"t_enter={t_enter}")
+                mat = None                                                        
+                self.log.info("Saved state")
+        except Exception as e:
+            self.log.error("Failed to save state:", exc_info=e, stack_info=True) 
+            
+    @staticmethod
     def update_progress(self, message:str = None):        
-        self.progress += self.inc_progress
         #message = f"{self.interval}.{self.iteration} - {message}"
-        Execution.set_progress(self.loader.execution_id, self.progress, message=message)
-        self.log.info(f"({self.progress:.1f}%) {message}")
+        Execution.set_progress(self.loader.execution_id, self.task_progress, message=message)
+        self.log.info(f"({self.task_progress:.1f}%) {message}")
 
     def run_msa(self):
         self.current_i_start = int(self.current_time_start / self.delta_t)
@@ -274,11 +299,7 @@ class MSA:
         if self.simulator:
             self.simulator.set_paths(self.m_paths)
 
-        if self.od_estimation:
-            self.matrix_ass: MatrixAss = MatrixAss(self.loader, self.current_num_intervals)
-        else:
-            self.matrix_ass = None
-        
+                    
         calc_paths = (True and not self.load_state_graph) or self.m_paths.is_empty()
         k_calculated = self.m_paths.k_paths()
         
@@ -319,7 +340,7 @@ class MSA:
                             path["path_flow"] = f / k
                     self.log.info("Ite: %s - Updating network performance...", iteration)
                     self.update_performance(k_calculated)
-                    self.calc_stats()
+                    self.calculate_stats()
                     continue
                 else:
                     calc_paths = False
@@ -332,7 +353,7 @@ class MSA:
                         path["path_flow"] = f / k
                 self.log.info("Ite: %s - Updating network performance...", iteration)
                 self.update_performance(k_calculated)                
-                self.calc_stats()
+                self.calculate_stats()
                 continue
 
 
@@ -345,7 +366,7 @@ class MSA:
             """
             for (o, d, t_start, mode), k_paths in self.m_paths.all_kpaths():
                 f = self.ODs[mode][o, d, self.current_time_start + t_start] * self.eq_factors.get(mode, 1)
-                k = iteration + 1
+                k = iteration + 1 - (len(k_paths) - 1)
                 for path in k_paths:
                     path["path_flow"] *= (k - 1) / k
 
@@ -357,7 +378,7 @@ class MSA:
                 f = self.ODs[mode][o, d, self.current_time_start + t_start] * self.eq_factors.get(mode, 1)
                 if f > 0:
                     best = min(k_paths, key=lambda path: path["tot_cost"])
-                    k = iteration + 1
+                    k = iteration + 1 - (len(k_paths) - 1)
                     best["path_flow"] += f / k
                     tempi_od.append(best["tot_cost"])
                     tot_tt_current += f * best["tot_cost"]
@@ -377,9 +398,13 @@ class MSA:
             # %
             self.log.info("Ite: %s - Updating network performance...", iteration)
             self.update_performance(k_calculated)
-            self.calc_stats()
+            self.calculate_stats()
             if rgap < self.max_rel_gap:
                 break
+        
+
+
+
         if rgap < self.max_rel_gap:
             self.log.info("Convergence reached")
         else:
@@ -390,8 +415,8 @@ class MSA:
         
         
     def calculate_paths(self, k):
-        self.update_progress(f"{min2hhmm(self.current_time_start)}-{min2hhmm(self.current_time_end)} - Iteration: {self.iteration}/{self.max_ite} - Calculating paths")
-        n_cpu = self.loader.ini.PARALLEL_NUMCPU        
+        self.task_step_done(f"{min2hhmm(self.current_time_start)}-{min2hhmm(self.current_time_end)} - Iteration: {self.iteration}/{self.max_ite} - Calculating paths")
+        n_cpu = self.loader.ini.MSA_SPP_NUMCPUS        
 
         ret = KPathList()
 
@@ -403,7 +428,8 @@ class MSA:
                                  t_base=self.current_time_start,
                                  link_cost=self.links_cost, 
                                  turn_cost=self.turns_cost, 
-                                 node_cost=self.nodes_cost)
+                                 node_cost=self.nodes_cost,
+                                 n_workers=n_cpu)
 
         self.log.info("Ite: %s - Paths calculated", self.iteration)        
         self.m_paths.merge(ret, k)
@@ -411,7 +437,7 @@ class MSA:
         #print(getsize(self.m_paths)/1024/1024,len(self.m_paths["paths"]),len(self.m_paths["ull"]))
 
     def update_performance(self, k: int):
-        self.update_progress(f"{min2hhmm(self.current_time_start)}-{min2hhmm(self.current_time_end)} - Iteration: {self.iteration}/{self.max_ite} - Updating performance")
+        self.task_step_done(f"{min2hhmm(self.current_time_start)}-{min2hhmm(self.current_time_end)} - Iteration: {self.iteration}/{self.max_ite} - Updating performance")
         def reset(l: Link):
             l.reset_attribute(name="flow", value=0)
 
@@ -461,10 +487,7 @@ class MSA:
             path["tot_cost"] = cost
 
 
-
-    
-
-    def calc_stats(self):
+    def calculate_stats(self):
         t_start = self.t_start
         if self.t_end is not None:
             t_start = self.t_end
@@ -483,23 +506,37 @@ class MSA:
                 f"""Ite: {self.iteration} - cpu_time: {int(self.t_end - t_start)}, total_flows: {int(self.tot_dom)}, n_paths: {self.m_paths.n_paths()}, n_unique_paths: {self.m_paths.n_unique_paths()}, k: {self.m_paths.k_paths()}"""
             )
 
-    def calc_matrice_ass(self, time_start, time_end):
+    def calculate_ass_matrix(self):
         self.log.info ("Assignment matrix calculation...")
-        for (source, target, t_start, mode), paths in self.m_paths.all_kpaths():
-            for path in paths:
-                costs = tuple(path.get_costs())
-                self.OD[o, d, self.current_time_start + t_start] * self.eq_factors.get(mode, 1)
-                f = self.od[o, d, time_start + tstart * self.delta_t]
 
-                if f <= 0:
-                    continue
-                idxs = list(map(lambda x: int(x // self.delta_t), costs))
-                links = path["links"]
-                for idx, l in zip(idxs, links):  # [t for t in zip(idxs, links) if t[1] in self.matrix_ass.detectors]:
-                    if self.assegna_flussi_msa:
-                        if idx < (len(l["flow"]) - 1):
-                            l["flow"][idx] += path["path_flow"]
-                    self.matrix_ass.add(o, d, l=l["idx"], t_start=t_start, tenter=idx, flow=path["path_flow"] / f)
+        def fn_calc_mat_ass(tasks, eq_factors, G, links_cost, nodes_cost, turns_cost, current_time_start, OD):
+            ret = []
+            for (source, target, t_start, mode), paths in tasks:
+                for path in paths:
+                    f = OD[source, target, current_time_start + t_start] * eq_factors.get(mode, 1)
+                    if f <= 0:
+                        continue
+                    costs = tuple(path.get_costs(G, links_cost=links_cost, nodes_cost=nodes_cost, turns_cost=turns_cost))
+                    links = path.get_links()
+                    for t, l_idx in zip(costs, links):  # [t for t in zip(idxs, links) if t[1] in self.matrix_ass.detectors]:                
+                        ret.append((source, target, l_idx, t_start, t, path["path_flow"] / f))
+            return ret        
+        tasks = list(self.m_paths.all_kpaths()) 
+        
+        n_workers = 1
+        if n_workers>1:
+            for params in Parallel.execute(fn_calc_mat_ass, tasks, n_workers=n_workers, 
+                                        eq_factors=self.eq_factors, G=self.G, 
+                                        links_cost=self.links_cost, nodes_cost=self.nodes_cost, turns_cost=self.turns_cost,
+                                        current_time_start=self.current_time_start, OD=self.OD):
+                for (source, target, l, t_start, t_enter, flow) in params:
+                    self.ass_matrix.add(source, target, l=l, t_start=t_start, t_enter=t_enter, flow=flow)
+        else:
+            for (source, target, l, t_start, t_enter, flow) in fn_calc_mat_ass(tasks, 
+                                        eq_factors=self.eq_factors, G=self.G, 
+                                        links_cost=self.links_cost, nodes_cost=self.nodes_cost, turns_cost=self.turns_cost,
+                                        current_time_start=self.current_time_start, OD=self.OD):
+                    self.ass_matrix.add(source, target, l=l, t_start=t_start, t_enter=t_enter, flow=flow)
         self.log.info ("Assignment matrix calculated")
 
     
@@ -536,3 +573,4 @@ class MSA:
                 break
 
         return results
+        

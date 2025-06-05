@@ -1,1 +1,265 @@
 # Model4Italy
+
+Model4Italy è uno strumento avanzato per la meso-simulazione e l'analisi del traffico veicolare su scala urbana e regionale. Grazie ai file di configurazione di tipo JSON e INI, è possibile personalizzare parametri come la rete stradale, la domanda di traffico, le regole di circolazione e le strategie di controllo. Model4Italy supporta l'integrazione con dati reali e offre strumenti per la visualizzazione e l'analisi dei risultati, facilitando il processo decisionale per enti pubblici, ricercatori e professionisti del settore.
+
+## Installazione
+Installare la versione di python 3.12.
+Installare le librerie presenti in ```requirements.txt```
+
+Se è la prima volta che viene eseguito il sistema sulla macchina e non è presente il file ```model4italy.db``` necessario come database interno della piattagorma eseguire il comando:
+```sh
+python model4italy.py init_db
+```
+
+## Avvio del programma
+
+Per eseguire il programma principale:
+
+```sh
+python model4italy.py
+```
+il programma in automatico:
+ * leggerà il file ```settings.ini``` per la configurazione dei parametri del software.
+ * leggera il file ```params.json``` per la configurazione dei parametri di simulazione.
+ * leggera il file ```params_data.json``` per la configurazione dei dati di input e output per la simulazione (solo se presente).
+
+i file ```params.json``` e ```params_data.json``` sono complementari e vengono fusi in un unico file di configurazione dal sistema.
+
+
+Più in generale il programma può essere eseguito con i seguenti parametri:
+```sh
+python model4italy.py run -p nome_file_params.json -d nome_file_params_data.json -c nome_file_settings.ini
+```
+
+Per avviare il programma in modalità server eseguire
+```sh
+python model4italy.py server
+```
+
+# Descrizione del file di configurazione unificato (params.json + params_data.json)
+
+Quando Model4Italy viene avviato, i file `params.json` e `params_data.json` vengono uniti in un unico oggetto di configurazione. Questo file risultante contiene sia i parametri generali della simulazione sia tutte le specifiche relative ai dati di input/output, domanda, rete, eventi, ecc.
+
+## Struttura generale
+
+```json
+{
+    "simulation_id": 25,
+    "description": "Demo",
+    "date": "2024-05-07",
+    "start": "07:00",
+    "end": "7:30",
+    "op": "assignment",
+    "scenario_id": 1,
+    "settings": {
+        "MSA_MAX_ITE": 6,
+        "MSA_SPP_NUMCPUS": 0,
+        "MSA_K": 3
+    },
+    "params": {
+        // Tutti i parametri provenienti da params_data.json
+    }
+}
+```
+
+## Descrizione dei principali campi
+
+- **simulation_id**: Identificativo numerico della simulazione (del chiamante).
+- **description**: Descrizione testuale della simulazione (opzinale).
+- **date**: Data di riferimento della simulazione.
+- **start**: Ora di inizio della simulazione (formato HH:MM).
+- **end**: Ora di fine della simulazione (formato HH:MM).
+- **op**: Operazione principale da eseguire (es. `assignment`).
+- **scenario_id**: Identificativo dello scenario di rete/dati da utilizzare.
+- **settings**: Parametri avanzati per la simulazione (es. numero massimo di iterazioni, CPU, ecc.).
+- **params**: Oggetto che contiene tutte le informazioni dettagliate sui dati di input/output, domanda, rete, eventi, risultati, ecc.  
+  La struttura interna di `params` dipende dal tipo di simulazione e dalla sorgente dati (file, database, ecc.).
+
+### Esempio di struttura interna di `params`
+
+```json
+"params": {
+    "input": {
+        "connector": "FileLoader",
+        "location": "./dati/GrafoEur"
+    },
+    "output": {
+        "connector": "FileWriter",
+        "location": "./dati/output/{description}"
+    },
+    "modes": [
+        {
+            "id": "c",
+            "description": "car",
+            "eq_factor": 1
+        },
+        {
+            "id": "h",
+            "description": "heavy",
+            "eq_factor": 2
+        }
+    ],
+    "demand": [
+        {
+            "mode": "c",
+            "matrices": [
+                "mat_car.parquet"
+            ]
+        }
+    ],
+    "zones": {
+        "connector": "FileLoader",
+        "src": "dati/GrafoEur/zones.shp"
+    },
+    "supply": [
+        {
+            "links": "eur_links.shp",
+            "nodes": "eur_nodes.shp",
+            "turns": "turns_proh.csv"
+        }
+    ],
+    "links_sets": [ ... ],
+    "events": [ ... ],
+    "detectors": [ ... ],
+    "traffic_lights": [ ... ],
+    "aggregated_results": "...",
+    "paths": "...",
+    "state": "..."
+}
+```
+
+## Note
+
+- I parametri di `params.json` hanno priorità su quelli di `params_data.json` in caso di conflitto.
+- Il campo `params` può contenere riferimenti a file, query SQL, mapping di colonne, parametri di scenario, ecc.
+- Le variabili tra parentesi graffe (es. `{description}`, `{simulation_id}`) vengono sostituite automaticamente dal sistema in fase di esecuzione.
+
+Per dettagli sulla struttura dei singoli campi di `params`, fare riferimento agli esempi forniti nei file `params_data_*.json` e alla documentazione interna.
+
+
+# Descrizione del file settings.ini
+
+Il file `settings.ini` contiene tutte le impostazioni di configurazione per Model4Italy. Di seguito una panoramica delle sezioni e dei parametri disponibili.
+
+---
+
+## [GENERAL]
+- **SRC_COEFS**: Percorso al file dei coefficienti per la valutazione degli eventi.
+- **SRC_CONV_TBL**: Percorso alla tabella di conversione (opzionale).
+- **DEBUG**: Abilita/disabilita la modalità debug (`True`/`False`).
+- **CRS**: Sistema di riferimento delle coordinate del progetto (es. `EPSG:4326`).
+- **CRS_CALC**: Sistema di riferimento locale delle coordinate per i calcoli.
+
+---
+
+## [OUTPUT]
+- **OUTPUT_AGG_INT**: Intervallo di aggregazione dei risultati (in minuti).
+- **OUTPUT_STATE_COMPRESSION**: Metodo di compressione per la memorizzazione dello stato (es. `"gzip"`).
+
+---
+
+## [WEB_SERVER]
+- **WEB_SERVER_HOST**: Indirizzo host del server web.
+- **WEB_SERVER_PORT**: Porta del server web.
+- **WEB_SERVER_DEBUG**: Abilita/disabilita la modalità debug per il server web.
+
+---
+
+## [DATABASE]
+- **DATABASE_URL**: Stringa di connessione al database interno (es. `sqlite:///model4italy.db`).
+
+---
+
+## [DATABASE_SETTINGS]
+- **DB_SETTINGS_USE**: Abilita/disabilita l’uso database per i dati di settings (in integrazione al presente file).
+- **DB_SETTINGS_TYPE**: Tipo di database (`sqlite`, `postgresql`, ecc.).
+- **DB_SETTINGS_DRIVER**: Driver del database.
+- **DB_SETTINGS_USER**: Nome utente del database.
+- **DB_SETTINGS_PASS**: Password del database.
+- **DB_SETTINGS_HOST**: Host del database.
+- **DB_SETTINGS_PORT**: Porta del database.
+- **DB_SETTINGS_NAME**: Nome del database.
+
+---
+
+## [LOGGING]
+- **LOG_USE**: Abilita/disabilita il logging.
+- **LOG_NAME**: Nome del logger.
+- **LOG_LEVEL**: Livello di logging (`DEBUG`, `INFO`, ecc.).
+- **LOG_EXECUTION_FORMAT**: Formato del log per l’esecuzione.
+- **LOG_FORMAT**: Formato standard del log.
+- **LOG_DIR**: Directory dove salvare i log.
+- **LOG_ON_DATABASE**: Salva i log anche sul database.
+- **LOG_ON_CONSOLE**: Mostra i log sulla console.
+- **LOG_ON_FILE**: Salva i log su file.
+
+---
+
+## [IPC]
+- **IPC_USE**: Abilita/disabilita la comunicazione inter-processo.
+- **IPC_BUKCET**: Nome del bucket IPC.
+- **IPC_BACKEND**: Backend utilizzato (`local` o `redis`).
+- **IPC_HOST**: Host del backend IPC.
+- **IPC_PORT**: Porta del backend IPC.
+- **IPC_DB**: Numero del database Redis (se usato).
+- **IPC_COMPRESSION**: Metodo di compressione per il trasferimento dati.
+- **IPC_COMPRESSION_LEVEL**: Livello di compressione (1-9).
+
+---
+
+## [PARALLEL]
+- **PARALLEL_USE**: Abilita/disabilita l’esecuzione parallela.
+- **PARALLEL_NUMCPUS**: Numero di processi paralleli.
+- **PARALLEL_ENGINE**: Motore di parallelizzazione (`ray` o `None`).
+- **PARALLEL_CLUSTER_ADDRESS**: Indirizzo del cluster di calcolo.
+
+---
+
+## [SIMULATOR]
+- **SIMU_STEP**: Passo di simulazione (in secondi).
+- **CAR_LENGTH**: Lunghezza media dei veicoli (in metri).
+- **MIN_SPEED**: Velocità minima consentita (in km/h).
+- **AGG_INT**: Intervallo di aggregazione (in minuti).
+- **LT1**, **LT2**: Parametri aggiuntivi per la simulazione.
+
+---
+
+## [ASSIGNMENT]
+- **CLASS_EQ_FACT**: Fattori di equivalenza di default per le classi di veicoli.
+- **MSA_MAX_ITE**: Numero massimo di iterazioni MSA.
+- **MSA_RGAP**: RGAP per la convergenza MSA.
+- **MSA_K**: Numero di cammini alternativi.
+- **MSA_MAX_TIMESLICE**: Massima durata di una slice temporale.
+- **MSA_SPP_NUMCPUS**: Numero di CPU per SPP.
+- **DELTA_T**: Intervallo temporale per l’assegnazione.
+- **SAVE_PATHS**, **LOAD_PATHS**: Salva/carica i cammini.
+- **SAVE_GRAPH**, **LOAD_GRAPH**: Salva/carica il grafo.
+- **MSA_PRELOAD**, **MSA_POSTLOAD**: Pre/post-caricamento dati.
+
+---
+
+## [OD_ESIMATION]
+- **OD_ESTIMATION_PRELOAD**: Pre-caricamento dati OD (in minuti).
+- **OD_ESTIMATION_MAX_ITE**: Iterazioni massime per la stima OD.
+- **OD_ESTIMATION_RGAP**: RGAP per la stima OD.
+- **OD_ESTIMATION_MSA_MAX_ITE**: Iterazioni massime MSA per OD.
+- **OD_ESTIMATION_MSA_K**: Numero di cammini MSA per OD.
+- **OD_ESTIMATION_MSA_RGAP**: RGAP MSA per OD.
+- **OD_ESTIMATION_MSA_TIMESLICE**: Timeslice MSA per OD.
+
+---
+
+## [FCD]
+- **FCD_TIMESLICE**: Intervallo di esecuzione della procedura di analisi FCD (in minuti).
+- **FCD_HORIZON**: Orizzonte temporale per la memorizzazione dati FCD (in minuti).
+- **FCD_MAP_MATCHING_CPUS**: CPU per il map matching.
+- **FCD_PATH_MATCHING_CPUS**: CPU per il path matching.
+- **FCD_MAP_MATCHING_MAX_DISTANCE**: Distanza massima per il map matching (in metri).
+- **FCD_MAP_MATCHING_MAX_ANGLE**: Angolo massimo per il map matching (in gradi).
+- **FCD_CRS_DATA**: CRS dei dati FCD.
+- **FCD_CRS_CALC**: CRS per i calcoli FCD.
+- **FCD_PATH_START_FROM_ZONE**: Abilita inizio cammini dal centroide.
+- **FCD_PATH_END_TO_ZONE**: Abilita fine cammini al centoride.
+- **FCD_PATH_AGGRATION_INTERVAL**: Intervallo di aggregazione cammini (in minuti).
+
+---

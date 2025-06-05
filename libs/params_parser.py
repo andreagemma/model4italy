@@ -241,7 +241,7 @@ class ParamsParser:
         def parse_json(series):
             if pd.api.types.is_string_dtype(series):
                 try:
-                    return pd.Series(map(lambda x: json.loads(x) if pd.notna(x) else None,series))
+                    return pd.Series(map(lambda x: json.loads(x) if pd.notna(x) and x else None,series))
                 except json.JSONDecodeError:
                     raise ValueError(f"Invalid JSON string: {series}")
             return series
@@ -288,7 +288,7 @@ class ParamsParser:
                 {"name": "from_node", "type": is_int, "dtype": "Int64", "required": True},
                 {"name": "to_node", "type": is_int, "dtype": "Int64", "required": True},
                 {"name": "v0", "type": is_float, "dtype": "Float32", "required": True},
-                {"name": "connector", "type": is_bool, "dtype": "boolean", "required": True},
+                {"name": "connector", "type": is_bool, "dtype": "bool", "required": True},
                 {"name": "lanes", "type": is_number, "dtype": "Float32", "required": True},
                 {"name": "alpha", "type": is_number, "dtype": "Float32", "required": True, "default": 1.6},
                 {"name": "rcr", "type": is_number, "dtype": "Float32", "required": True, "default": 30},
@@ -310,7 +310,7 @@ class ParamsParser:
                 {"name": "penalty", "type": is_number, "dtype": "Float64", "required": False, "default": float("inf")},                
             ],
             "links_sets": [
-                {"name": "set", "type": is_str, "dtype": "string", "required": True},
+                {"name": "id_set", "type": is_str, "dtype": "string", "required": True},
                 {"name": "id_link", "type": is_int, "dtype": "Int64", "required": True},
             ],
             "events": [
@@ -374,6 +374,8 @@ class ParamsParser:
         params = self.fields.get(name, None)
         if params is None:
             raise ValueError(f"Unknown name: {name}")
+        if len(df) == 0:
+            return
         if isinstance(df, dict):
             df = pd.DataFrame.from_dict(df)
         for field in params:

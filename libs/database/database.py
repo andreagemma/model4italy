@@ -20,7 +20,89 @@ from ..status import Status
 Base = declarative_base()
 _LOCK = threading.Lock()
 
- 
+class Token(Base):
+    __tablename__ = 'tokens'
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
+    token = Column(String, unique=True, nullable=False)
+    user = Column(String, nullable=True)
+    created_at = Column(DateTime(True), default=lambda : datetime.datetime.now(datetime.timezone.utc))
+    expires_at = Column(DateTime(True), nullable=True)
+
+    __table_args__ = (
+        Index('idx_token', 'token'),
+        {'sqlite_autoincrement': True}
+    )
+    def __init__(self, id: int = None, token: str = None, user: str = None, created_at: datetime.datetime = None, expires_at: datetime.datetime = None):
+        self.id = id
+        self.token = token
+        self.user = user
+        self.created_at = created_at if created_at else datetime.datetime.now(datetime.timezone.utc)
+        self.expires_at = expires_at 
+
+    def is_valid(self) -> bool:
+        """Check if the token is valid based on its expiration date."""
+        if self.expires_at:
+            return datetime.datetime.now(datetime.timezone.utc) < self.expires_at
+        return True
+
+    @staticmethod
+    def create_token(user: str, expires_at: datetime.datetime = None) -> Token:
+        """Create a new token if it does not already exist for the user."""
+        try:
+            with DB.get_engine().connect() as conn:
+                # Check if a token already exists for the user
+                result = conn.execute(
+                    Token.__table__.select().where(Token.user == user)
+                )
+                row = result.fetchone()
+                if row:
+                    existing_token = Token(id=row['id'], token=row['token'], expires_at=row['expires_at'])
+                    if existing_token.is_valid():
+                        return existing_token
+
+                # Create a new token if none exists or the existing one is invalid
+                new_token = Token(token=str(uuid.uuid4()), user=user, expires_at=expires_at)
+                result = conn.execute(
+                    Token.__table__.insert().values(token=new_token.token, user=new_token.user, expires_at=new_token.expires_at)
+                )
+                new_token.id = result.inserted_primary_key[0]
+                return new_token
+        except SQLAlchemyError as ex:
+            DB.log.error("Error creating or retrieving token: %s", ex)
+            raise
+
+    
+    @staticmethod
+    def get_token(user: str) -> Token:
+        """Retrieve a token for the user if it exists and is valid."""
+        try:
+            with DB.get_engine().connect() as conn:
+                result = conn.execute(
+                    Token.__table__.select().where(Token.user == user)
+                )
+                row = result.fetchone()
+                if row:
+                    token = Token(id=row['id'], token=row['token'], user=row['user'], expires_at=row['expires_at'])
+                    if token.is_valid():
+                        return token
+            return None
+        except SQLAlchemyError as ex:
+            DB.log.error("Error retrieving token: %s", ex)
+            raise
+
+    def refresh(self):
+        """Refresh the token's expiration date."""
+        if self.expires_at and self.expires_at > datetime.datetime.now(datetime.timezone.utc):
+            self.expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1)
+            try:
+                with DB.get_engine().connect() as conn:
+                    conn.execute(
+                        Token.__table__.update().where(Token.id == self.id).values(expires_at=self.expires_at)
+                    )
+            except SQLAlchemyError as ex:
+                DB.log.error("Error refreshing token: %s", ex)
+                raise
+
 
 class Execution(Base):
     __tablename__ = 'executions'

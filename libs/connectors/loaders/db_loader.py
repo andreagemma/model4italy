@@ -28,12 +28,22 @@ class DBLoader(BaseLoader):
             raise Exception("'src' not defined")
         
         engine = sa.create_engine(location)
+        # if sqlite then load extension
         sql = f"select * from {src}"
         if filters:
             filters = BaseLoader.filters_to_query_expression(filters=filters)
             sql += f" WHERE {filters}"
 
-        with engine.connect() as conn:
+        if engine.dialect.name == 'sqlite':
+            import sqlite3
+            @sa.event.listens_for(engine, "connect")
+            def load_spatialite(dbapi_conn, connection_record):
+                if isinstance(dbapi_conn, sqlite3.Connection):                
+                    dbapi_conn.enable_load_extension(True)
+                    dbapi_conn.load_extension("mod_spatialite")
+                    dbapi_conn.enable_load_extension(False)  
+
+        with engine.connect() as conn:                                          
             df = pd.read_sql(sql,con=conn)
         
         df = BaseLoader.apply_dtype(df, dtype=dtype)

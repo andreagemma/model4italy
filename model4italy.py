@@ -5,9 +5,8 @@ def monitor():
     monitor_process(process_name="python",interval=5, output_file=None, directory="monitor")        
 if __name__ == "__main__":
     import multiprocessing as mp
-    #monitor = lambda: monitor_process(process_name="python",interval=1, output_file=None, directory="monitor")
-    prc = mp.Process(target=monitor, daemon=True)
-    prc.start()
+    #prc = mp.Process(target=monitor, daemon=True)
+    #prc.start()
 
 
 if __name__ == "__main__":
@@ -39,10 +38,10 @@ if __name__ == "__main__":
             parser_run.add_argument('-o', '--op', help='Operation. Override JSON setting (default: None)')
 
             # Subparser for the "server" command
-            parser_server = subparsers.add_parser('server', help='Start the Flask server')
-            parser_server.add_argument('-P', '--port', type=int, help='Flask server port')
-            parser_server.add_argument('-H', '--host', help='Flask server host address')
-            parser_server.add_argument('-D', '--debug', action='store_true', help='Enable Flask server debug mode')
+            parser_server = subparsers.add_parser('server', help='Start the web server')
+            parser_server.add_argument('-P', '--port', type=int, help='web server port')
+            parser_server.add_argument('-H', '--host', help='Web server host address')
+            parser_server.add_argument('-D', '--debug', action='store_true', help='Enable web server debug mode')
 
             parser_init_db = subparsers.add_parser('init_db', help='Initialize the database')
             parser_init_db.add_argument('-u', '--url', help='Database URL')
@@ -119,14 +118,16 @@ if __name__ == "__main__":
                     Dispatcher(params=params, ini=config, op=args.op).run()       
                     
                 elif args.command == 'server':
-                    host = args.host if args.host else config.FLASK_HOST
-                    port = args.port if args.port else config.FLASK_PORT
-                    debug = args.debug if args.debug else config.FLASK_DEBUG
+                    host = args.host if args.host else config.WEB_SERVER_HOST
+                    port = args.port if args.port else config.WEB_SERVER_PORT
+                    debug = args.debug if args.debug else config.WEB_SERVER_DEBUG
                     start_server(host=host, port=port, debug=debug, config=config)
                 else:
                     parser.print_help()
         except Exception as e:
-            raise e
+            print(f"Error: {e}")
+            os._exit(1)
+            
         finally:
             pass
 
@@ -137,6 +138,6 @@ if __name__ == "__main__":
         raise e
     finally:
         try:
-            prc.kill()
+            pass#prc.kill()
         except:
             pass

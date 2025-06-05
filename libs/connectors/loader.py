@@ -394,7 +394,7 @@ class Loader(BaseLoader):
         return self._ODs
 
     @property
-    def detectors(self) -> pd.DataFrame:
+    def detectors(self) -> list:
         if self._detectors is None:
             self._load_detectors()
         return self._detectors
@@ -512,7 +512,7 @@ class Loader(BaseLoader):
                 tmp = self.load_turns(turns_parameters)
                 if tmp is None:
                     raise Exception(f"load_turns({turns_parameters}) function return None value")
-                tmp.drop_duplicates(keep="last").set_index(["from_node", "via_node", "to_node"])
+                tmp.drop_duplicates(subset=["from_node", "via_node", "to_node"], keep="last").set_index(["from_node", "via_node", "to_node"])
                 if df_turns is None:
                     df_turns = tmp
                 else:
@@ -747,7 +747,7 @@ class Loader(BaseLoader):
             if df_links_sets.shape[0] == 0:
                 self._links_sets = {}
             else:
-                self._links_sets = df_links_sets.groupby("set").agg(list).to_dict()["id_link"]
+                self._links_sets = df_links_sets.groupby("id_set").agg(list).to_dict()["id_link"]
             self.log.info(f"Links Sets identified {len(self.links_sets)}")
             
     def _load_detectors(self):
@@ -756,14 +756,18 @@ class Loader(BaseLoader):
         if parameters is None:            
             self.log.warning("key 'detectors' not found in execution parameters['params']")
             self._detectors = []
-            return
-        self._detectors = []
-        if "src" not in parameters:
-            raise KeyError("key 'src' required in detectors parameters")
-        tmp = self.load_detectors(parameters)
-        if tmp is None:
-            raise Exception(f"load_detectors({parameters}) function return None value")
-        self._detectors = tmp
+        else:
+            detectors = pd.DataFrame()
+            for id_det, set_detect in enumerate(parameters):                
+                self.log.info(f"Loading Detectors {id_det}...")
+                set_detect = self.parser.get_input_parameters("params.detectors", id_det)
+                if "src" not in set_detect:
+                    raise KeyError("key 'src' required in links_sets parameters")
+                tmp = self.load_detectors(set_detect)
+                if tmp is None:
+                    raise Exception(f"load_detectors({set_detect}) function return None value")
+                detectors = detectors.combine_first(tmp)
+        self._detectors = detectors
 
     def _load_counts(self):
         self.log.info("Loading Counts...")

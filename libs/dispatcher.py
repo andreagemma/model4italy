@@ -12,13 +12,13 @@ from .utils import Parallel
 
 class Dispatcher():
     
-    def __init__(self, params, ini, op:str = None):
+    def __init__(self, params, ini, op:str = None, execution: Execution=None):
         self.t_start: int = time.time()
         self.parser: ParamsParser = ParamsParser(params=params, settings=ini)
         if op:
             self.parser.set_value("op", op)
-        self.execution: Execution = None
-        self.execution_id: int = None
+        self.execution: Execution = execution
+        self.execution_id: int = execution.id if execution else None
         self.log: Logger = None
 
         params = self.parser.params
@@ -43,7 +43,7 @@ class Dispatcher():
         if self.parser.ini.PARALLEL_USE:
             Parallel.initialize_parallel(
                 engine=self.parser.ini.PARALLEL_ENGINE,
-                num_cpus=self.parser.ini.PARALLEL_NUMCPU,  
+                num_cpus=self.parser.ini.PARALLEL_NUMCPUS,  
                 address=self.parser.ini.PARALLEL_CLUSTER_ADDRESS
             )
         else:

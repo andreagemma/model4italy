@@ -1,6 +1,6 @@
 from flask import jsonify
 
-class Status:
+class Status(dict):
     REQ_SUCCESS = "success"
     REQ_ERROR = "error"
 

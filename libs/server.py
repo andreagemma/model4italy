@@ -1,13 +1,13 @@
 from flask import Flask, request, jsonify
-from libs import Logger
+from . import Logger
 import traceback
 import json
-from .database.database import DB, Execution
+from .database.database import DB, Execution, Session
 from .status import Status
 
 from .utils.util import run_in_thread
 from .dispatcher import Dispatcher
-from sqlalchemy.orm import Session
+from .utils.parallel import Parallel
 
 app = Flask(__name__)
 
@@ -36,20 +36,20 @@ def execute():
         return Status(status=Status.REQ_ERROR, error="Database error", details=str(ex)).jsonify(), 500
 
     # Launch the calculation asynchronously
-    run_execution_in_thread(params=params, execution_id=new_execution.id)
+    run_execution_in_thread(params=params, execution=new_execution)
 
     # Immediately return the execution ID
     return Status(status=Status.REQ_SUCCESS, execution_id=new_execution.id).jsonify(), 200
 
 @run_in_thread
-def run_execution_in_thread(params, execution_id=None):
+def run_execution_in_thread(params, execution=None):
     try:
-        from libs import IniClass
+        from . import IniClass
         ini = IniClass()
         
-        Dispatcher(params=params, ini=ini, execution_id=execution_id).run()
+        Dispatcher(params=params, ini=ini, execution=execution).run()
         
-        Execution.set_execution_success(execution=execution_id)
+        Execution.set_execution_success(execution_id=execution.id)
 
 
     except Exception as ex:
@@ -57,7 +57,7 @@ def run_execution_in_thread(params, execution_id=None):
         log.error("Execution terminated abnormally", exc_info=True)
 
         # Update the database with status "failed"
-        Execution.set_execution_failed(execution = execution_id, ex=ex, raise_exception=False)
+        Execution.set_execution_failed(execution_id = execution.id, ex=ex, raise_exception=False)
 
 @app.route('/status/<execution_id>', methods=['GET'])
 def get_status(execution_id):
@@ -65,8 +65,7 @@ def get_status(execution_id):
     with Session(DB.get_engine(), autoflush=False, autobegin=False) as session:       
         try:
             session.begin()
-            execution = session.query(Execution).filter_by(id=execution_id).first()
-            
+            execution: Execution = session.query(Execution).filter_by(id=execution_id).first()
             if not execution:
                 return Status(status=Status.REQ_ERROR, error=f"Execution ID={execution_id} not found").jsonify(), 404
 
@@ -77,8 +76,11 @@ def get_status(execution_id):
                 end_time=execution.end_time,
                 params=json.loads(execution.params),
                 result=execution.result,
-                execution_id=execution.id,
-                execution_uuid=execution.uuid
+                id=execution.id,
+                uuid=execution.uuid,
+                progress=execution.progress,
+                last_message=execution.last_message,
+                last_message_time=execution.last_message_time
             )
             return response.jsonify(), 200
         except Exception as ex:
@@ -86,4 +88,8 @@ def get_status(execution_id):
             return Status(status=Status.REQ_ERROR, error="Database error", details=str(ex)).jsonify(), 500
 
 def start_server(host, port, debug, config):
-    app.run(debug=debug, host=host, port=port)
+    try:
+        Parallel.initialize_parallel(num_cpus=config.PARALLEL_NUMCPUS,engine=config.PARALLEL_ENGINE)
+        app.run(debug=debug, host=host, port=port)
+    except Exception as ex:
+        log.error("Error running server: %s", ex)
