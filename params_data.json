@@ -2,7 +2,7 @@
     "params": {
         "input": {
             "connector": "FileLoader",
-            "location": "./dati/GrafoEur"
+            "location": "./dati/eur/files"
         },
         "output": {
             "connector": "FileWriter",
@@ -26,7 +26,6 @@
                 "matrices": [
                     "mat_car.parquet",
                     {
-                        "location":"./dati/GrafoEur",
                         "src":"mat_heavy.csv",
                         "op": "+"
                     },
@@ -45,14 +44,7 @@
                 ]
             }
         ],
-        "zones": {
-            "connector": "FileLoader",
-            "location": "",
-            "src": "dati/GrafoEur/zones.shp",
-            "mapping": {
-                "id": "id"
-            }
-        },
+        "zones": "zones.shp",
         "supply": [
             {
                 "links": {
@@ -78,8 +70,7 @@
             }
         ],
         "links_sets": [ {
-            "location": "./dati",
-            "src": "GrafoEur/links_sets.csv",
+            "src": "links_sets.csv",
             "mapping": {
                 "set": "id_set",
                 "id_link": "id_link"
@@ -103,8 +94,7 @@
         }],
         "traffic_lights": [ 
             {
-                "location": "",
-                "src": "dati/GrafoEur/sign_nodes.json",
+                "src": "sign_nodes.json",
                 "mapping": {
                     "id": "id",
                     "type": "type",

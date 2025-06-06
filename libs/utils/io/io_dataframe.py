@@ -103,8 +103,8 @@ class IO_DataFrame:
             kwargs_driver = {}
         if not isinstance(kwargs_driver, dict):
             raise ValueError(f"kwargs_driver deve essere un dizionario.")
-        kwargs.pop("path", None)
-        kwargs.pop("mode", None)
-        kwargs.pop("partitionby", None)
         kwargs_driver.update(kwargs)
+        kwargs_driver.pop("path", None)
+        kwargs_driver.pop("mode", None)
+        kwargs_driver.pop("partitionby", None)
         driver.export_dataframe(df, path, mode=mode, partitionby=partitionby, **kwargs_driver)
