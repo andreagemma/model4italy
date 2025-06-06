@@ -21,6 +21,7 @@ from . import BaseWriter
 from .. import Loader
 from ... import IniClass
 from ... import Logger
+from ...utils import IO_DataFrame
 class FileWriter(BaseWriter):
 
     def __init__(self):
@@ -40,16 +41,19 @@ class FileWriter(BaseWriter):
         extension = f".{extension}"  # Aggiunge il punto
 
         if partition is not None and extension.lower() not in (".parquet",".geoparquet"):
-            location = join(filename,partition)
-            filename = os.path.basename(filename)
-            filename = join(location,filename)
+            #location = join(filename,partition)
+            #filename = os.path.basename(filename)
+            #filename = join(location,filename)
+            pass
 
         location = os.path.dirname(filename)
             
         if os.path.exists(location) and os.path.isfile(location):
             os.remove(location)
-        os.makedirs(location, exist_ok=True)        
-        export_dataframe(df, filename, mode=mode, crs=crs, partition=partition, partition_cols=partition_cols, **kwargs)
+        os.makedirs(location, exist_ok=True)       
+        iod = IO_DataFrame()
+        iod.export_dataframe(df,path=filename, mode=mode, partitionby=partition_cols,kwargs_driver={"crs":crs})
+        #export_dataframe(df, filename, mode=mode, crs=crs, partition=partition, partition_cols=partition_cols, **kwargs)
         return True
         
 

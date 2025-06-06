@@ -112,8 +112,8 @@
                 }
             }
         ],
-        "aggregated_results": "{simulation_id}_aggregated_results.parquet",
-        "paths": "{simulation_id}_paths.parquet",
+        "aggregated_results": "{simulation_id}_aggregated_results.shp",
+        "paths": "{simulation_id}_paths.geoparquet",
         "rt_paths": "{simulation_id}_rt_paths.parquet",        
         "state": "./dati/output/{description}/state",
         "fcd": {

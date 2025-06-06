@@ -24,6 +24,7 @@ from .utils import save_dict, load_dict, getsize
 from .utils.ipc import IPC
 from .database import Execution
 from .task import task
+import numpy as np
 
 @task
 class MSA:
@@ -39,14 +40,14 @@ class MSA:
         links_cost: str = "time",
         turns_cost: str = "time",
         nodes_cost: str = "time",
-        od_estimation : bool = True,
+        od_estimation : bool = False,
         save_paths: bool = True,
         save_agg_results: bool = True,
         save_state_graph: bool = False,
         load_state_graph: bool = False,
         load_state_paths: bool = False,
         save_state_paths: bool = False,
-        save_ass_matrix: bool = True,
+        save_ass_matrix: bool = False,
         log: Logger = None,
         ipc: IPC = None,
         ):
@@ -119,7 +120,9 @@ class MSA:
     def run(self):
         # self.log.info(f"occupazione graph: {getsize(self.G)/1024/1024}MB")
         # self.log.info(f"occupazione od: {getsize(self.od)/1024/1024}MB")
-        n_steps = 2 + (len(self.global_intervals)*6) + len(self.global_intervals) * min(self.max_ite,self.max_k) * 2 + len(self.global_intervals) * max(0,self.max_ite-self.max_k) * 1
+        n_steps = 2 + (len(self.global_intervals)*5) + len(self.global_intervals) * min(self.max_ite,self.max_k) * 2 + len(self.global_intervals) * max(0,self.max_ite-self.max_k) * 1
+        if self.calc_ass_matrix:
+            n_steps += 1
         self._task_on_step_done = self.update_progress
         self.task_set_steps(n_steps)        
 
@@ -203,6 +206,10 @@ class MSA:
             if self.save_paths:
                 self.log.info("Saving paths...")
                 saved = True
+                paths = self.get_paths_dataframe()
+                mode = "w" if self.interval==0 else "a"
+                saved = self.writer.write_paths(paths, mode=mode, partition=f"t")
+                """
                 mode="w"
                 for t in range(self.real_time_start,self.real_time_end,self.delta_t):
                     paths = self.get_paths_dataframe(t=t)
@@ -212,6 +219,7 @@ class MSA:
                     mode = "a"
                     if not saved:                        
                         break
+                """
                 paths = None   
                 if saved:
                     self.log.info("Saved paths")
@@ -224,7 +232,6 @@ class MSA:
         try:
             if self.save_state_paths:
                 self.log.info("Saving state (Paths)...")
-
                 for t in range(self.real_time_start,self.real_time_end,self.delta_t):
                     paths = list(self.m_paths.get_paths_by_t(t))
                     self.state_manager.write_state(paths, "paths", mode="w", partition=f"t={t}")
@@ -240,12 +247,21 @@ class MSA:
                 saved = True
                 df=self.get_aggregated_results_dataframe()
                 ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400 ) / 60
-                for t in range(self.real_time_start,self.real_time_end,self.delta_t):
-                    tmp = df[ds_t.between(t,t+self.delta_t)].copy()
-                    tmp["t"] = t
-                    saved=self.writer.write_agg_results(tmp, mode="W", partition=f"t={t}")
+                mode = "w" if self.interval==0 else "a"
+                df["t"] = ds_t
+                saved = self.writer.write_agg_results(df, mode=mode, partition=f"t")
+                
+                """
+                mode = "w"
+                for t in np.arange(self.real_time_start,self.real_time_end,self.loader.ini.AGG_INT):
+                    b = ds_t.between(t,t+self.loader.ini.AGG_INT, inclusive="left")
+                    tmp = df[b].copy()
+                    tmp["t"] = ds_t[b]
+                    saved=self.writer.write_agg_results(tmp, mode="w", partition=f"t={t}")
+                    mode = "a"
                     if not saved:
                         break
+                """
                 if saved:                    
                     self.log.info("Saved aggregated results")
                 else:
@@ -366,7 +382,10 @@ class MSA:
             """
             for (o, d, t_start, mode), k_paths in self.m_paths.all_kpaths():
                 f = self.ODs[mode][o, d, self.current_time_start + t_start] * self.eq_factors.get(mode, 1)
-                k = iteration + 1 - (len(k_paths) - 1)
+                if self.loader.ini.MSA_K_BALANCING>0:
+                    k = iteration - len(k_paths) + self.loader.ini.MSA_K_BALANCING
+                else:
+                    k = iteration + 1
                 for path in k_paths:
                     path["path_flow"] *= (k - 1) / k
 
@@ -378,7 +397,10 @@ class MSA:
                 f = self.ODs[mode][o, d, self.current_time_start + t_start] * self.eq_factors.get(mode, 1)
                 if f > 0:
                     best = min(k_paths, key=lambda path: path["tot_cost"])
-                    k = iteration + 1 - (len(k_paths) - 1)
+                    if self.loader.ini.MSA_K_BALANCING>0:
+                        k = iteration - len(k_paths) + self.loader.ini.MSA_K_BALANCING
+                    else:
+                        k = iteration + 1
                     best["path_flow"] += f / k
                     tempi_od.append(best["tot_cost"])
                     tot_tt_current += f * best["tot_cost"]

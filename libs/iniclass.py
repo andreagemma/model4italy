@@ -77,6 +77,7 @@ class IniClass:
         self.MSA_K = config_reader.getint("MSA_K", 'ASSIGNMENT', 3)
         self.MSA_MAX_TIMESLICE = config_reader.getint("MSA_MAX_TIMESLICE", 'ASSIGNMENT', int(3 * 60))
         self.MSA_SPP_NUMCPUS = config_reader.getint("MSA_SPP_NUMCPUS", 'ASSIGNMENT', 0)
+        self.MSA_K_BALANCING = config_reader.getint("MSA_K_BALANCING", 'ASSIGNMENT', -1)
         self.DELTA_T = config_reader.getint("DELTA_T", 'ASSIGNMENT', 15)
         self.MSA_PRELOAD = config_reader.getint("MSA_PRELOAD", 'ASSIGNMENT', 60)
         self.MSA_POSTLOAD = config_reader.getint("MSA_POSTLOAD", 'ASSIGNMENT', 60)
@@ -84,6 +85,7 @@ class IniClass:
         self.LOAD_GRAPH = config_reader.getboolean("LOAD_GRAPH", 'ASSIGNMENT', False)
         self.SAVE_PATHS = config_reader.getboolean("SAVE_PATHS", 'ASSIGNMENT', False)
         self.LOAD_PATHS = config_reader.getboolean("LOAD_PATHS", 'ASSIGNMENT', False)
+
 
         # OD ESTIMATION
         self.OD_ESTIMATION_PRELOAD = config_reader.getint("OD_ESTIMATION_PRELOAD", 'OD_ESTIMATION', 60)

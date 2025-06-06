@@ -12,7 +12,7 @@ from uuid import uuid4
 from typing import Generator, Any
 from pathlib import Path
 import polars as pl
-
+import glob
 class PandasDriver(BaseDriver):
 
     @property
@@ -73,6 +73,7 @@ class PandasDriver(BaseDriver):
         path: str,
         mode: str = "w",
         partitionby: Optional[List[str]] = None,
+        template: str = "{filename}-{partition}-{i}",
         **kwargs
     ):
         index = kwargs.pop("index", False)
@@ -104,10 +105,29 @@ class PandasDriver(BaseDriver):
                 filename = os.path.basename(path)
                 extension = os.path.splitext(filename)[1]
                 partitions_hive = [str(p) + "=" + str(v) for p,v in zip(partitionBy, partition_values)]
-                uid = str(int(datetime.now().timestamp())) + "_" + str(uuid4()) + "_" + str(getpid()) + extension
                 path= os.path.join(path,*partitions_hive)
-                os.makedirs(path, exist_ok=True)
-                new_file = os.path.join(path, uid)
+                
+                d = datetime.now()
+                date = d.strftime("%Y%m%d%H%M%S")
+                timestamp = d.timestamp()
+                uid = str(uuid4())
+                pid = getpid()
+                file_name = template.format(
+                    filename=os.path.splitext(filename)[0],
+                    date = date, uid=uid,pid=pid, timestamp=timestamp,
+                    partition='-'.join((str(x) for x in partition_values)),
+                    partitions_hive='-'.join(partitions_hive),
+                    i="*",
+                )
+                i = len(glob.glob(os.path.join(path,f"{file_name}{extension}")))
+                file_name = file_name = template.format(
+                    filename=os.path.splitext(filename)[0],
+                    date = date, uid=uid,pid=pid, timestamp=timestamp,
+                    partition='-'.join((str(x) for x in partition_values)),
+                    partitions_hive='-'.join(partitions_hive),
+                    i=str(int(i) + 1),
+                )
+                new_file = os.path.join(path, file_name + extension)
                 self.export_dataframe(
                     df=df,
                     path=new_file,

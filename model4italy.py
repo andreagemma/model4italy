@@ -1,12 +1,9 @@
 import logging
 from monitor import monitor_process
 
+prc = None
 def monitor():
     monitor_process(process_name="python",interval=5, output_file=None, directory="monitor")        
-if __name__ == "__main__":
-    import multiprocessing as mp
-    #prc = mp.Process(target=monitor, daemon=True)
-    #prc.start()
 
 
 if __name__ == "__main__":
@@ -27,6 +24,7 @@ if __name__ == "__main__":
             parser.add_argument('-d', '--params_data', help='JSON file with data parameters (default: params_data.json)')
             parser.add_argument('-c', '--config', default='settings.ini', help='Configuration file (default: settings.ini)')
             parser.add_argument('-o', '--op', help='Operation. Override JSON setting (default: None)')
+            parser.add_argument('-m', '--monitor', help='Monitor process', action='store_true', default=False,)
 
             subparsers = parser.add_subparsers(dest='command', help='Sub-command help')
 
@@ -54,6 +52,13 @@ if __name__ == "__main__":
             parser_init_db.add_argument('-D', '--driver', help='Database driver')
 
             args = parser.parse_args()
+            if args.monitor:
+                global prc
+                import multiprocessing as mp
+                prc = mp.Process(target=monitor, daemon=True)
+                prc.start()
+            else:
+                prc = None
                 
             # Set default command to 'run' if no command is provided
             if args.command is None:
@@ -138,6 +143,7 @@ if __name__ == "__main__":
         raise e
     finally:
         try:
-            pass#prc.kill()
+            if prc:
+                prc.kill()
         except:
             pass

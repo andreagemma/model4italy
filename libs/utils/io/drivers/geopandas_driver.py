@@ -1,4 +1,5 @@
 import pandas as pd
+import time
 import uuid
 from ... import remove_path
 import os
@@ -12,7 +13,7 @@ from typing import Generator, Any
 import geopandas as gpd
 from geopandas import GeoDataFrame
 import warnings
-
+import glob
 class GeoPandasDriver(BaseDriver):
 
     @property
@@ -57,6 +58,7 @@ class GeoPandasDriver(BaseDriver):
         path: str,
         mode: str = "w",
         partitionby: Optional[List[str]] = None,
+        template: str = "{filename}-{partition}-{i}",
         **kwargs
     ):
         crs = kwargs.pop("crs", None)
@@ -67,16 +69,20 @@ class GeoPandasDriver(BaseDriver):
                 mode = "a"
         if mode == "w":
             remove_path(path)
+            mode="a"
         if partitionby is None or len(partitionby)==0:            
+            
             if path.lower().endswith(".geoparquet"):
                 df.to_parquet(path, index=index, **kwargs)
+            elif path.lower().endswith(".shp"):
+                for col in df.columns:
+                    if df[col].dtype.name == "datetime64[ns]":
+                        df[col] = df[col].dt.strftime("%Y-%m-%d %H:%M:%S")
+                df.to_file(path, index=index, mode=mode, **kwargs)
+            elif path.lower().endswith(".gpkg"):
+                df.to_file(path, index=index, **kwargs)
             else:
-                if path.lower().endswith(".shp"):
-                    df.to_file(path, index=index, mode=mode, **kwargs)
-                elif path.lower().endswith(".gpkg"):
-                    df.to_file(path, index=index, **kwargs)
-                else:
-                    raise ValueError(f"Formato file non supportato: {path}")
+                raise ValueError(f"Formato file non supportato: {path}")
         else:
             def fn(grp, path, **kwargs):
                 partition_values, partitionBy, df = grp
@@ -86,10 +92,30 @@ class GeoPandasDriver(BaseDriver):
                 filename = os.path.basename(path)
                 extension = os.path.splitext(filename)[1]
                 partitions_hive = [str(p) + "=" + str(v) for p,v in zip(partitionBy, partition_values)]
-                uid = str(int(datetime.now().timestamp())) + "_" + str(uuid4()) + "_" + str(getpid()) + extension
                 path= os.path.join(path,*partitions_hive)
                 os.makedirs(path, exist_ok=True)
-                new_file = os.path.join(path, uid)
+
+                d = datetime.now()
+                date = d.strftime("%Y%m%d%H%M%S")
+                timestamp = d.timestamp()
+                uid = str(uuid4())
+                pid = getpid()
+                file_name = template.format(
+                    filename=os.path.splitext(filename)[0],
+                    date = date, uid=uid,pid=pid, timestamp=timestamp,
+                    partition='-'.join((str(x) for x in partition_values)),
+                    partitions_hive='-'.join(partitions_hive),
+                    i="*",
+                )
+                i = len(glob.glob(os.path.join(path,f"{file_name}{extension}")))
+                file_name = file_name = template.format(
+                    filename=os.path.splitext(filename)[0],
+                    date = date, uid=uid,pid=pid, timestamp=timestamp,
+                    partition='-'.join((str(x) for x in partition_values)),
+                    partitions_hive='-'.join(partitions_hive),
+                    i=str(int(i) + 1),
+                )
+                new_file = os.path.join(path, file_name + extension)
                 self.export_dataframe(
                     df=df,
                     path=new_file,

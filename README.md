@@ -231,6 +231,7 @@ Il file `settings.ini` contiene tutte le impostazioni di configurazione per Mode
 - **MSA_K**: Numero di cammini alternativi.
 - **MSA_MAX_TIMESLICE**: Massima durata di una slice temporale.
 - **MSA_SPP_NUMCPUS**: Numero di CPU per SPP.
+- **MSA_K_BALANCING**: <=0 indica che che il bilanciamento dell'MSA inizia con k=MSA_K >0 indica che k=valore inidcato
 - **DELTA_T**: Intervallo temporale per l’assegnazione.
 - **SAVE_PATHS**, **LOAD_PATHS**: Salva/carica i cammini.
 - **SAVE_GRAPH**, **LOAD_GRAPH**: Salva/carica il grafo.

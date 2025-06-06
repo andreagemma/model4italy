@@ -562,7 +562,7 @@ class MicroSimulator(BaseSimulator):
             self.vehs = self.sim_step(t1, self.vehs)
 
             if t > ini_t and (t-ini_t) % self.ints_agg == 0: #UPDATE: GEMMA: ottimizzato
-                self.update_res(t1) # UPDATE: GEMMA: modificato
+                self.update_res(t1-self.ints_agg*self.deltat) # UPDATE: GEMMA: modificato
                 self.G.apply_links(self.reset_flags)
 
             if t > ini_t and (t-ini_t) % int_update == 0: #UPDATE: GEMMA ottimizzato
@@ -577,7 +577,7 @@ class MicroSimulator(BaseSimulator):
         t = fin_t
         t1 = tstart + (t - ini_t) * self.deltat
         if t > ini_t and (t-ini_t) % self.ints_agg == 0: #UPDATE: GEMMA: per salvare ultimi risultati            
-            self.update_res(t1)
+            self.update_res(t1-self.ints_agg*self.deltat)
             self.G.apply_links(self.reset_flags)
 
         if t > ini_t and (t-ini_t) % int_update == 0: #UPDATE: GEMMA per salvare ultimi risultati
