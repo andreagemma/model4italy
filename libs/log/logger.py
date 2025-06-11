@@ -108,6 +108,7 @@ class Logger:
         Logger.level = logging.DEBUG if level is not None else level
         Logger.log_name = log_name
         logging.getLogger("filelock").setLevel(logging.WARNING)
+        logging.getLogger("pyogrio._io").setLevel(logging.WARNING)
         Logger.params = {
             'version': 1,
             'disable_existing_loggers': True,

@@ -87,13 +87,13 @@ class PandasDriver(BaseDriver):
                 df.to_parquet(path, index=index, **kwargs)
             else:
                 if path.lower().endswith(".csv"):
-                    df.to_csv(path, index=index, mode=mode, **kwargs)
+                    df.to_csv(path, index=index, mode=mode)
                 elif path.lower().endswith(".xlsx") or path.lower().endswith(".xls"):
-                    df.to_excel(path, index=index, **kwargs)
+                    df.to_excel(path, index=index)
                 elif path.lower().endswith(".feather"):
-                    df.to_feather(path, **kwargs)
+                    df.to_feather(path)
                 elif path.lower().endswith(".pkl") or path.lower().endswith(".pickle"):
-                    df.to_pickle(path, **kwargs)
+                    df.to_pickle(path)
                 else:
                     raise ValueError(f"Formato file non supportato: {path}")
         else:

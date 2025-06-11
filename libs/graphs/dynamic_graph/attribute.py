@@ -11,7 +11,7 @@ import dill
 T = TypeVar("T")  # Defines a generic type
 
 
-class Attribute(dict, Generic[T]):
+class DynamicAttribute(dict, Generic[T]):
     """
     Base class for attributes.
 
@@ -19,7 +19,7 @@ class Attribute(dict, Generic[T]):
     value setting, and retrieval operations.
     """
 
-    def __init__(self, **kwargs) -> Attribute[T]:
+    def __init__(self, **kwargs) -> DynamicAttribute[T]:
         """
         Initialize the attribute with given keyword arguments.
 
@@ -28,7 +28,7 @@ class Attribute(dict, Generic[T]):
         super().__init__()
         self.update(kwargs)
 
-    def copy(self) -> Attribute[T]:
+    def copy(self) -> DynamicAttribute[T]:
         """
         Create a deep copy of the attribute.
 
@@ -36,7 +36,7 @@ class Attribute(dict, Generic[T]):
         """
         return deepcopy(self)
 
-    def __iadd__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __iadd__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         In-place addition operator.
 
@@ -45,7 +45,7 @@ class Attribute(dict, Generic[T]):
         """
         raise NotImplementedError()
 
-    def __add__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __add__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         Addition operator.
 
@@ -54,7 +54,7 @@ class Attribute(dict, Generic[T]):
         """
         raise NotImplementedError()
 
-    def __isub__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __isub__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         In-place subtraction operator.
 
@@ -63,7 +63,7 @@ class Attribute(dict, Generic[T]):
         """
         raise NotImplementedError()
 
-    def __sub__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __sub__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         Subtraction operator.
 
@@ -72,7 +72,7 @@ class Attribute(dict, Generic[T]):
         """
         raise NotImplementedError()
 
-    def __imul__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __imul__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         In-place multiplication operator.
 
@@ -81,7 +81,7 @@ class Attribute(dict, Generic[T]):
         """
         raise NotImplementedError()
 
-    def __mul__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __mul__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         Multiplication operator.
 
@@ -90,7 +90,7 @@ class Attribute(dict, Generic[T]):
         """
         raise NotImplementedError()
 
-    def __itruediv__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __itruediv__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         In-place true division operator.
 
@@ -99,7 +99,7 @@ class Attribute(dict, Generic[T]):
         """
         raise NotImplementedError()
 
-    def __truediv__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __truediv__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         True division operator.
 
@@ -108,7 +108,7 @@ class Attribute(dict, Generic[T]):
         """
         raise NotImplementedError()
 
-    def __ipow__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __ipow__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         In-place exponentiation operator.
 
@@ -117,7 +117,7 @@ class Attribute(dict, Generic[T]):
         """
         raise NotImplementedError()
 
-    def __pow__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __pow__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         Exponentiation operator.
 
@@ -135,7 +135,7 @@ class Attribute(dict, Generic[T]):
         """
         raise NotImplementedError()
 
-    def set_value(self, value: T, **kwargs) -> Attribute[T]:
+    def set_value(self, value: T, **kwargs) -> DynamicAttribute[T]:
         """
         Set the value of the attribute.
 
@@ -145,7 +145,7 @@ class Attribute(dict, Generic[T]):
         """
         raise NotImplementedError()
 
-    def reset(self, value: T, *args, **kwargs) -> Attribute[T]:
+    def reset(self, value: T, *args, **kwargs) -> DynamicAttribute[T]:
         """
         Set the value of the attribute to all instances.
 
@@ -154,7 +154,7 @@ class Attribute(dict, Generic[T]):
         """
         raise NotImplementedError()
 
-    def resize_attribute(self, new_total_time: Number, new_delta_t: Optional[Number] = None, offset: Number = 0, **kwargs) -> Attribute[T]:
+    def resize_attribute(self, new_total_time: Number, new_delta_t: Optional[Number] = None, offset: Number = 0, **kwargs) -> DynamicAttribute[T]:
         """
         Resize the attribute based on new total seconds and optionally a new delta_t.
 
@@ -200,7 +200,7 @@ class Attribute(dict, Generic[T]):
             dill.dump(self, f, dill.HIGHEST_PROTOCOL)
 
     @staticmethod
-    def load(filename: str) -> Attribute[T]:
+    def load(filename: str) -> DynamicAttribute[T]:
         """
         Load an attribute from a file.
 
@@ -212,7 +212,7 @@ class Attribute(dict, Generic[T]):
         return ret
 
 
-class ValueAttribute(Attribute, Generic[T]):
+class DynamicValueAttribute(DynamicAttribute, Generic[T]):
     """
     Attribute for a single value of type T.
 
@@ -220,7 +220,7 @@ class ValueAttribute(Attribute, Generic[T]):
     operations, value setting, and retrieval on the attribute.
     """
 
-    def __init__(self, value: T, **kwargs) -> ValueAttribute[T]:
+    def __init__(self, value: T, **kwargs) -> DynamicValueAttribute[T]:
         """
         Initialize the ValueAttribute with a given value.
 
@@ -239,14 +239,14 @@ class ValueAttribute(Attribute, Generic[T]):
         if isinstance(b, tuple):
             b, t= b
 
-        if isinstance(b, ValueAttribute):
+        if isinstance(b, DynamicValueAttribute):
             dict.__setitem__(self, "value", op(dict.__getitem__(self, "value"), dict.__getitem__(b, "value")))
-        elif isinstance(b, Attribute):
+        elif isinstance(b, DynamicAttribute):
             raise NotImplementedError()
         else:
             dict.__setitem__(self, "value", op(dict.__getitem__(self, "value"), b))
 
-    def __iadd__(self, b: Union[T, Attribute[T]]) -> ValueAttribute[T]:
+    def __iadd__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicValueAttribute[T]:
         """
         In-place addition operator.
 
@@ -256,7 +256,7 @@ class ValueAttribute(Attribute, Generic[T]):
         self._apply_inplace_operation(b, add)
         return self
 
-    def __isub__(self, b: Union[T, Attribute[T]]) -> ValueAttribute[T]:
+    def __isub__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicValueAttribute[T]:
         """
         In-place subtraction operator.
 
@@ -266,7 +266,7 @@ class ValueAttribute(Attribute, Generic[T]):
         self._apply_inplace_operation(b, sub)
         return self
 
-    def __imul__(self, b: Union[T, Attribute[T]]) -> ValueAttribute[T]:
+    def __imul__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicValueAttribute[T]:
         """
         In-place multiplication operator.
 
@@ -276,7 +276,7 @@ class ValueAttribute(Attribute, Generic[T]):
         self._apply_inplace_operation(b, mul)
         return self
 
-    def __itruediv__(self, b: Union[T, Attribute[T]]) -> ValueAttribute[T]:
+    def __itruediv__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicValueAttribute[T]:
         """
         In-place true division operator.
 
@@ -286,7 +286,7 @@ class ValueAttribute(Attribute, Generic[T]):
         self._apply_inplace_operation(b, truediv)
         return self
 
-    def __ipow__(self, b: Union[T, Attribute[T]]) -> ValueAttribute[T]:
+    def __ipow__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicValueAttribute[T]:
         """
         In-place exponentiation operator.
 
@@ -297,66 +297,66 @@ class ValueAttribute(Attribute, Generic[T]):
         return self
 
     # Copy-based operators that rely on in-place methods
-    def __add__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __add__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         Addition operator (non in-place).
 
         :param b: The value or attribute to add.
         :return: New attribute after addition.
         """
-        if isinstance(b, (TimeArrayAttribute, CallableAttribute)):
+        if isinstance(b, (DynamicTimeArrayAttribute, DynamicCallableAttribute)):
             b, self = self, b
         ret = self.copy()
         ret += b
         return ret
 
-    def __sub__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __sub__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         Subtraction operator (non in-place).
 
         :param b: The value or attribute to subtract.
         :return: New attribute after subtraction.
         """
-        if isinstance(b, (TimeArrayAttribute, CallableAttribute)):
+        if isinstance(b, (DynamicTimeArrayAttribute, DynamicCallableAttribute)):
             b, self = self, b
         ret = self.copy()
         ret -= b
         return ret
 
-    def __mul__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __mul__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         Multiplication operator (non in-place).
 
         :param b: The value or attribute to multiply.
         :return: New attribute after multiplication.
         """
-        if isinstance(b, (TimeArrayAttribute, CallableAttribute)):
+        if isinstance(b, (DynamicTimeArrayAttribute, DynamicCallableAttribute)):
             b, self = self, b
         ret = self.copy()
         ret *= b
         return ret
 
-    def __truediv__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __truediv__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         True division operator (non in-place).
 
         :param b: The value or attribute to divide.
         :return: New attribute after division.
         """
-        if isinstance(b, (TimeArrayAttribute, CallableAttribute)):
+        if isinstance(b, (DynamicTimeArrayAttribute, DynamicCallableAttribute)):
             b, self = self, b
         ret = self.copy()
         ret /= b
         return ret
 
-    def __pow__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __pow__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         Exponentiation operator (non in-place).
 
         :param b: The value or attribute to exponentiate.
         :return: New attribute after exponentiation.
         """
-        if isinstance(b, (TimeArrayAttribute, CallableAttribute)):
+        if isinstance(b, (DynamicTimeArrayAttribute, DynamicCallableAttribute)):
             b, self = self, b
         ret = self.copy()
         ret **= b
@@ -372,7 +372,7 @@ class ValueAttribute(Attribute, Generic[T]):
         value = dict.__getitem__(self, "value")
         return value if value is not None else default
 
-    def set_value(self, value: T, *args, **kwargs) -> ValueAttribute[T]:
+    def set_value(self, value: T, *args, **kwargs) -> DynamicValueAttribute[T]:
         """
         Set the value of the attribute.
 
@@ -383,7 +383,7 @@ class ValueAttribute(Attribute, Generic[T]):
         return self
         
 
-    def reset(self, value: T, *args, **kwargs) -> ValueAttribute[T]:
+    def reset(self, value: T, *args, **kwargs) -> DynamicValueAttribute[T]:
         """
         Set a constant value for all.
 
@@ -430,7 +430,7 @@ class ValueAttribute(Attribute, Generic[T]):
         return ret
 
 
-class TimeArrayAttribute(Attribute, Generic[T]):
+class DynamicTimeArrayAttribute(DynamicAttribute, Generic[T]):
     """
     Attribute for a time-based array.
 
@@ -444,7 +444,7 @@ class TimeArrayAttribute(Attribute, Generic[T]):
         total_time: Number = 1,
         delta_t: Number = 1,
         **kwargs,
-    ) -> TimeArrayAttribute[T]:
+    ) -> DynamicTimeArrayAttribute[T]:
         """
         Initialize the TimeArrayAttribute with a given value, total time, and time step.
 
@@ -485,7 +485,7 @@ class TimeArrayAttribute(Attribute, Generic[T]):
         num_intervals = dict.__getitem__(self, "num_intervals")
         delta_t = dict.__getitem__(self, "delta_t")
 
-        if isinstance(b, TimeArrayAttribute) and dict.__getitem__(b, "num_intervals") == num_intervals and dict.__getitem__(b, "delta_t") == delta_t:
+        if isinstance(b, DynamicTimeArrayAttribute) and dict.__getitem__(b, "num_intervals") == num_intervals and dict.__getitem__(b, "delta_t") == delta_t:
             # If b is a TimeArrayAttribute, apply the operation to corresponding elements
             operand = dict.__getitem__(b, "value")
             if t is None:
@@ -494,7 +494,7 @@ class TimeArrayAttribute(Attribute, Generic[T]):
             else:
                 index = int(t // dict.__getitem__(self, "delta_t"))
                 values[index] = operation(values[index], operand[index])
-        elif isinstance(b, Attribute):
+        elif isinstance(b, DynamicAttribute):
             # If b is an Attribute, generate operand values dynamically based on time
             if t is None:
                 for index in range(num_intervals):
@@ -514,7 +514,7 @@ class TimeArrayAttribute(Attribute, Generic[T]):
                 values[index] = operation(values[index], b)
 
     # In-place addition
-    def __iadd__(self, b: Union[T, Attribute[T]]) -> TimeArrayAttribute[T]:
+    def __iadd__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicTimeArrayAttribute[T]:
         """
         In-place addition operator.
 
@@ -525,7 +525,7 @@ class TimeArrayAttribute(Attribute, Generic[T]):
         return self
 
     # Addition
-    def __add__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __add__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         Addition operator (non in-place).
 
@@ -537,7 +537,7 @@ class TimeArrayAttribute(Attribute, Generic[T]):
         return ret
 
     # In-place subtraction
-    def __isub__(self, b: Union[T, Attribute[T]]) -> TimeArrayAttribute[T]:
+    def __isub__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicTimeArrayAttribute[T]:
         """
         In-place subtraction operator.
 
@@ -548,7 +548,7 @@ class TimeArrayAttribute(Attribute, Generic[T]):
         return self
 
     # Subtraction
-    def __sub__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __sub__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         Subtraction operator (non in-place).
 
@@ -560,7 +560,7 @@ class TimeArrayAttribute(Attribute, Generic[T]):
         return ret
 
     # In-place multiplication
-    def __imul__(self, b: Union[T, Attribute[T]]) -> TimeArrayAttribute[T]:
+    def __imul__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicTimeArrayAttribute[T]:
         """
         In-place multiplication operator.
 
@@ -571,7 +571,7 @@ class TimeArrayAttribute(Attribute, Generic[T]):
         return self
 
     # Multiplication
-    def __mul__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __mul__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         Multiplication operator (non in-place).
 
@@ -583,7 +583,7 @@ class TimeArrayAttribute(Attribute, Generic[T]):
         return ret
 
     # In-place division
-    def __itruediv__(self, b: Union[T, Attribute[T]]) -> TimeArrayAttribute[T]:
+    def __itruediv__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicTimeArrayAttribute[T]:
         """
         In-place true division operator.
 
@@ -594,7 +594,7 @@ class TimeArrayAttribute(Attribute, Generic[T]):
         return self
 
     # Division
-    def __truediv__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __truediv__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         True division operator (non in-place).
 
@@ -606,7 +606,7 @@ class TimeArrayAttribute(Attribute, Generic[T]):
         return ret
 
     # In-place exponentiation
-    def __ipow__(self, b: Union[T, Attribute[T]]) -> TimeArrayAttribute[T]:
+    def __ipow__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicTimeArrayAttribute[T]:
         """
         In-place exponentiation operator.
 
@@ -616,7 +616,7 @@ class TimeArrayAttribute(Attribute, Generic[T]):
         self._apply_inplace_operation(b, pow)
         return self
 
-    def __pow__(self, b: Union[T, Attribute[T]]) -> Attribute[T]:
+    def __pow__(self, b: Union[T, DynamicAttribute[T]]) -> DynamicAttribute[T]:
         """
         Exponentiation operator (non in-place).
 
@@ -644,7 +644,7 @@ class TimeArrayAttribute(Attribute, Generic[T]):
         else:
             return values[-1]
 
-    def set_value(self, value: T, t: Number = 0, **kwargs) -> TimeArrayAttribute[T]:
+    def set_value(self, value: T, t: Number = 0, **kwargs) -> DynamicTimeArrayAttribute[T]:
         """
         Set a value at a specific time.
 
@@ -666,7 +666,7 @@ class TimeArrayAttribute(Attribute, Generic[T]):
             dict.__setitem__(self, "total_time", (index + 1) * dict.__getitem__(self, "delta_t"))
         return self
 
-    def reset(self, value: Any, **kwargs) -> TimeArrayAttribute[T]:
+    def reset(self, value: Any, **kwargs) -> DynamicTimeArrayAttribute[T]:
         """
         Set a value for all time intervals.
 
@@ -682,7 +682,7 @@ class TimeArrayAttribute(Attribute, Generic[T]):
                 values[i] = value
         return self
 
-    def resize_attribute(self, new_total_time: Optional[Number] = None, new_delta_t: Optional[Number] = None, offset: Number=0, **kwargs) -> TimeArrayAttribute[T]:
+    def resize_attribute(self, new_total_time: Optional[Number] = None, new_delta_t: Optional[Number] = None, offset: Number=0, **kwargs) -> DynamicTimeArrayAttribute[T]:
         """
         Resize the attribute based on new total time and optionally a new delta_t.
 
@@ -760,7 +760,7 @@ class TimeArrayAttribute(Attribute, Generic[T]):
 # TODO: Perhaps use t_start in each call or pass t_start to the function. Does SPP contain t_Start?
 
 
-class CallableAttribute(Attribute, Generic[T]):
+class DynamicCallableAttribute(DynamicAttribute, Generic[T]):
     """
     Attribute for callable functions.
 
@@ -768,7 +768,7 @@ class CallableAttribute(Attribute, Generic[T]):
     such as arithmetic between callables and other types of attributes.
     """
 
-    def __init__(self, value: Union[str, Callable[..., T]], total_time: Number = 1, delta_t: Number = 1, **kwargs) -> CallableAttribute[T]:
+    def __init__(self, value: Union[str, Callable[..., T]], total_time: Number = 1, delta_t: Number = 1, **kwargs) -> DynamicCallableAttribute[T]:
         """
         Initialize the CallableAttribute with a callable function or reference.
 
@@ -802,14 +802,14 @@ class CallableAttribute(Attribute, Generic[T]):
         if isinstance(b, tuple):
             b, t= b        
         fn = dict.__getitem__(self, "fn")
-        if isinstance(b, CallableAttribute):
+        if isinstance(b, DynamicCallableAttribute):
             b = b.copy()
             fnb = dict.__getitem__(b, "fn")            
             if t is None:
                 dict.__setitem__(self, "fn", lambda **kw: op(fn(**kw), fnb(**kw)))
             else:
                 dict.__setitem__(self, "fn", lambda **kw: fn(**kw) if kw["t"] != t else op(fn(**kw), fnb(**kw)))
-        elif isinstance(b, Attribute):
+        elif isinstance(b, DynamicAttribute):
             b = b.copy()
             if t is None:
                 dict.__setitem__(self, "fn", lambda **kw: op(fn(**kw), b.get_value(**kw)))
@@ -828,7 +828,7 @@ class CallableAttribute(Attribute, Generic[T]):
                 dict.__setitem__(self, "fn", lambda **kw: fn(**kw) if kw["t"] != t else op(fn(**kw), b))
 
     # In-place operators
-    def __iadd__(self, b: Union[T, Attribute, Callable[..., T]]) -> CallableAttribute[T]:
+    def __iadd__(self, b: Union[T, DynamicAttribute, Callable[..., T]]) -> DynamicCallableAttribute[T]:
         """
         In-place addition operator.
 
@@ -838,7 +838,7 @@ class CallableAttribute(Attribute, Generic[T]):
         self._apply_inplace_operation(b, add)
         return self
 
-    def __isub__(self, b: Union[T, Attribute, Callable[..., T]]) -> CallableAttribute[T]:
+    def __isub__(self, b: Union[T, DynamicAttribute, Callable[..., T]]) -> DynamicCallableAttribute[T]:
         """
         In-place subtraction operator.
 
@@ -848,7 +848,7 @@ class CallableAttribute(Attribute, Generic[T]):
         self._apply_inplace_operation(b, sub)
         return self
 
-    def __imul__(self, b: Union[T, Attribute, Callable[..., T]]) -> CallableAttribute[T]:
+    def __imul__(self, b: Union[T, DynamicAttribute, Callable[..., T]]) -> DynamicCallableAttribute[T]:
         """
         In-place multiplication operator.
 
@@ -858,7 +858,7 @@ class CallableAttribute(Attribute, Generic[T]):
         self._apply_inplace_operation(b, mul)
         return self
 
-    def __itruediv__(self, b: Union[T, Attribute, Callable[..., T]]) -> CallableAttribute[T]:
+    def __itruediv__(self, b: Union[T, DynamicAttribute, Callable[..., T]]) -> DynamicCallableAttribute[T]:
         """
         In-place true division operator.
 
@@ -868,7 +868,7 @@ class CallableAttribute(Attribute, Generic[T]):
         self._apply_inplace_operation(b, truediv)
         return self
 
-    def __ipow__(self, b: Union[T, Attribute, Callable[..., T]]) -> CallableAttribute[T]:
+    def __ipow__(self, b: Union[T, DynamicAttribute, Callable[..., T]]) -> DynamicCallableAttribute[T]:
         """
         In-place exponentiation operator.
 
@@ -879,7 +879,7 @@ class CallableAttribute(Attribute, Generic[T]):
         return self
 
     # Copy-based operators that use the in-place methods
-    def __add__(self, b: Union[T, Attribute, Callable[..., T]]) -> CallableAttribute[T]:
+    def __add__(self, b: Union[T, DynamicAttribute, Callable[..., T]]) -> DynamicCallableAttribute[T]:
         """
         Addition operator (non in-place).
 
@@ -890,7 +890,7 @@ class CallableAttribute(Attribute, Generic[T]):
         ret += b
         return ret
 
-    def __sub__(self, b: Union[T, Attribute, Callable[..., T]]) -> CallableAttribute[T]:
+    def __sub__(self, b: Union[T, DynamicAttribute, Callable[..., T]]) -> DynamicCallableAttribute[T]:
         """
         Subtraction operator (non in-place).
 
@@ -901,7 +901,7 @@ class CallableAttribute(Attribute, Generic[T]):
         ret -= b
         return ret
 
-    def __mul__(self, b: Union[T, Attribute, Callable[..., T]]) -> CallableAttribute[T]:
+    def __mul__(self, b: Union[T, DynamicAttribute, Callable[..., T]]) -> DynamicCallableAttribute[T]:
         """
         Multiplication operator (non in-place).
 
@@ -912,7 +912,7 @@ class CallableAttribute(Attribute, Generic[T]):
         ret *= b
         return ret
 
-    def __truediv__(self, b: Union[T, Attribute, Callable[..., T]]) -> CallableAttribute[T]:
+    def __truediv__(self, b: Union[T, DynamicAttribute, Callable[..., T]]) -> DynamicCallableAttribute[T]:
         """
         True division operator (non in-place).
 
@@ -923,7 +923,7 @@ class CallableAttribute(Attribute, Generic[T]):
         ret /= b
         return ret
 
-    def __pow__(self, b: Union[T, Attribute, Callable[..., T]]) -> CallableAttribute[T]:
+    def __pow__(self, b: Union[T, DynamicAttribute, Callable[..., T]]) -> DynamicCallableAttribute[T]:
         """
         Exponentiation operator (non in-place).
 
@@ -947,7 +947,7 @@ class CallableAttribute(Attribute, Generic[T]):
         ret = dict.__getitem__(self, "fn")(**kwargs)
         return ret if ret is not None else kwargs.get("default",0)
 
-    def set_value(self, value: T, t: Number = 0, **kwargs) -> CallableAttribute[T]:
+    def set_value(self, value: T, t: Number = 0, **kwargs) -> DynamicCallableAttribute[T]:
         """
         Set the value of the callable at a specific time.
 
@@ -959,7 +959,7 @@ class CallableAttribute(Attribute, Generic[T]):
         dict.__setitem__(self, "fn", lambda **kw: (value if t == kw["t"] else fn(**kw)))
         return self
 
-    def resize_attribute(self, new_total_time: Number, new_delta_t: Optional[Number] = None, offset: Number = 0, **kwargs) -> CallableAttribute[T]:
+    def resize_attribute(self, new_total_time: Number, new_delta_t: Optional[Number] = None, offset: Number = 0, **kwargs) -> DynamicCallableAttribute[T]:
         """
         Resize the callable attribute for a new total time and optionally a new delta_t.
 

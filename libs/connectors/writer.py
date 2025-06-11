@@ -25,7 +25,7 @@ from libs.utils.decorators import stat_results
 from ..utils import util
 from . import BaseWriter
 from .. import IniClass
-from .. import Logger
+from ..log import Logger
 from shapely import to_wkb, to_wkt, to_geojson
 import copy
 class Writer(ABC):
@@ -101,6 +101,9 @@ class Writer(ABC):
     def has_write_paths(self):
         return self.parser.get("params.paths") is not None
     
+    def has(self, name):
+        return self.parser.get(name) is not None
+
     def write_agg_results(self, results: gpd.GeoDataFrame, mode=None, partition=None, **kwargs):
         kwargs["df"] = results
         kwargs["dtype"] = self.parser.get_dtype("aggregated_results")

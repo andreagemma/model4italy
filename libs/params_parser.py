@@ -358,7 +358,7 @@ class ParamsParser:
             ],
             "fcd": [
                 {"name": "id_fcd", "type": is_str, "dtype": "string", "required": True},
-                {"name": "id_veh", "type": is_str, "dtype": "string", "required": True},
+                {"name": "id_trip", "type": is_str, "dtype": "string", "required": True},
                 {"name": "timestamp", "type": is_str_datetime, "dtype": "datetime64[ns]", "required": True},
                 {"name": "engine", "type": is_int, "dtype": "Int8", "required": True},
                 {"name": "speed", "type": is_float, "dtype": "Float32", "required": True},

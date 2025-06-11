@@ -22,7 +22,7 @@ from ...graphs import KPathContainer
 from .. import Loader
 from ... import IniClass
 
-from ... import Logger
+from ...log import Logger
 
 class GpkgWriter(BaseWriter):
 

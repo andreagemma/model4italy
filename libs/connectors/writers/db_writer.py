@@ -23,7 +23,7 @@ from .. import Loader
 from ... import IniClass
 import sqlalchemy as sa
 
-from ... import Logger
+from ...log import Logger
 
 class DBWriter(BaseWriter):
 

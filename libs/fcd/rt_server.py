@@ -22,10 +22,11 @@ import geopandas as gpd
             
 from ..graphs import AbstractGraph, PathList, PathList
 from .build_paths import BuildPaths
-from .. import ParamsParser, Loader,  Logger, Writer
+from ..params_parser import ParamsParser
+from ..connectors import Loader, Writer
 from ..utils import export_dataframe, TicToc, multi_line_to_line
 from ..utils.ipc import IPC
-from .. import Logger
+from ..log import Logger
 
 
 class RTServer:

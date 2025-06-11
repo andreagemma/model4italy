@@ -22,12 +22,12 @@ from itertools import product
 from importlib import import_module
 from os.path import join
 
-from libs.utils.util import to_datetime_auto
-from ..matrix_od import MatrixODT, MatrixOD
-from ..graphs import DynamicGraph, TimeArrayAttribute, CallableAttribute, KPathList, Path, KPathContainer
+from ..utils.util import to_datetime_auto
+from ..matrix import MatrixODT, MatrixOD
+from ..graphs import DynamicGraph, DynamicTimeArrayAttribute, DynamicCallableAttribute, KPathList, Path, KPathContainer
 from ..utils import util
 from .. import IniClass
-from .. import Logger
+from ..log import Logger
 from ..utils import import_dataframe, filters_to_query_expression, rename_filters
 from ..utils.ipc.ipc import IPC
 from ..params_parser import ParamsParser
@@ -164,7 +164,8 @@ class Loader(BaseLoader):
         self.start = int(util.min_from_midnight(start))
         self.end = int(util.min_from_midnight(end))
         
-
+    def has(self, name):
+        return self.parser.get(name) is not None
 
     def load_dataset(self, parameters: dict, filters=None, dtype = None)-> Union[pd.DataFrame, gpd.GeoDataFrame, dict]:
         pass
@@ -908,7 +909,7 @@ class Loader(BaseLoader):
                 kwargs["modes"]=row["modes"]            
             kwargs["idx"]=int(row["id"])
             kwargs["is_centroid"]=int(row["id"]) in self.zones
-            kwargs["time"]=TimeArrayAttribute(0)
+            kwargs["time"]=DynamicTimeArrayAttribute(0)
 
             #[kwargs.pop(k,None) for k in set(mapping_nodes.values())]
             G.add_node(**kwargs)
@@ -953,8 +954,8 @@ class Loader(BaseLoader):
                         row["modes"] = set([m.strip() for m in row["modes"].split(",")])
                 kwargs["modes"]=row["modes"]      
             kwargs["t0"]=float(row["length"] / row["v0"] * 60)
-            kwargs["time"]=TimeArrayAttribute(float(row["length"] / row["v0"] * 60))
-            kwargs["flow"]=TimeArrayAttribute(0)
+            kwargs["time"]=DynamicTimeArrayAttribute(float(row["length"] / row["v0"] * 60))
+            kwargs["flow"]=DynamicTimeArrayAttribute(0)
             #[kwargs.pop(k,None) for k in set(mapping_links.values())]
             G.add_link(**kwargs)            
 

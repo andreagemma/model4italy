@@ -3,25 +3,27 @@ import pandas as pd
 from ..connectors import Loader
 from ..graphs import KPathList
 from abc import ABC, abstractmethod
-from .. import Logger
+from ..log import Logger
+from ..taskbase import TaskBase
 
-class BaseSimulator():
+class BaseSimulator(TaskBase):
     
     
-    def __init__(self,loader: Loader) -> None:
+    def __init__(self,loader: Loader, **kwargs) -> None:
+        super().__init__(**kwargs)
         self.loader: Loader = loader        
         self.log: Logger = Logger.getLogger("SIM", execution_id=self.loader.execution_id)
     
     @abstractmethod
-    def update_performance(self, k: int, tstart: int, tend: int):
+    def update_performance(self, tstart: int, tend: int):
         pass
         
     @abstractmethod
-    def initialize_assignment(self,time_start: int,time_end: int):
+    def initialize_assignment(self, time_start: int,time_end: int):
         pass
     
     @abstractmethod
-    def finalize_assignment(self,time_start: int,time_end: int):
+    def finalize_assignment(self, time_start: int,time_end: int):
         pass
     
     @abstractmethod

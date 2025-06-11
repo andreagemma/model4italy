@@ -7,7 +7,7 @@ Created on Wed Oct 27 11:27:43 2021
 import copy
 import typing
 from .particle import car
-from ...graphs import AbstractGraph
+from ...graphs import AbstractGraph, KPathList
 from .. import BaseSimulator
 from ...connectors import Loader #UPDATE: Gemma 
 from ...utils import min2hhmm
@@ -19,6 +19,7 @@ from operator import itemgetter
 import random
 import logging
 import time
+
 
 unroll_results = False
 
@@ -106,8 +107,8 @@ class YieldNode:
 
 class MicroSimulator(BaseSimulator):
 
-    def __init__(self, loader: Loader, monitored_links=None, yield_nodes=None): #UPDATE: Gemma 
-        super().__init__(loader=loader)
+    def __init__(self, loader: Loader, monitored_links=None, yield_nodes=None, **kwargs): #UPDATE: Gemma         
+        super().__init__(loader=loader, **kwargs)
         self.simustep = self.loader.ini.SIMU_STEP  # [s] simulation step in seconds
         self.G: AbstractGraph = self.loader.G
         self.agg_int = self.loader.ini.AGG_INT  # [m] aggregation of results
@@ -122,7 +123,7 @@ class MicroSimulator(BaseSimulator):
         self.ODs = self.loader.OD
         self.origini: list[int] = self.loader.origins.copy()
         self.destinazioni: list[int] = self.loader.destinations.copy()
-        self.paths: list[int] = None
+        self.paths: KPathList = None
         self.monitored_links = monitored_links
         self.yield_nodes: list[YieldNode] = yield_nodes
 
@@ -321,7 +322,7 @@ class MicroSimulator(BaseSimulator):
                     if o != d:
                         self.res_flow[o, d] = 0
 
-    def update_performance(self, k, tstart, tend):
+    def update_performance(self, tstart, tend):
         #UPDATE: GEMMA - se non è importante riduce la memoria usata tra le iterazioni
         self.results = []
         self.ass_results = []
@@ -330,7 +331,7 @@ class MicroSimulator(BaseSimulator):
 
         if self.heavy_vehicles_ass:
             for t in self.int_update:
-                self.emission_model(self.OD, self.heavy_perc, k, tstart, tend)
+                self.emission_model(self.OD, self.heavy_perc, tstart, tend)
                 self.inx_update += 1
             self.heavy_preload = True
             self.preload_vehs = copy.copy(self.vehs)
@@ -346,7 +347,7 @@ class MicroSimulator(BaseSimulator):
             self.heavy_vehicles_ass = False
 
         else:
-            self.run_simulation(k, tstart, tend)
+            self.run_simulation(tstart, tend)
 
         return
 
@@ -504,7 +505,7 @@ class MicroSimulator(BaseSimulator):
         result_all = pd.concat([result,result_light, result_heavy], ignore_index=True)
         return result_all[["time", "mode", id_link, "flow_in", "flow_out", max_q, "mov_vehs", "que_vehs", "speed", "density", "tt"]]
 
-    def emission_model(self, od, heavy_perc, k, tstart, tend):
+    def emission_model(self, od, heavy_perc, tstart, tend):
 
         "Emission model"
 
@@ -521,8 +522,13 @@ class MicroSimulator(BaseSimulator):
                             heavy_p = heavy_perc[(o, d, tstart + n * self.t_slice)]
 
                             fod_out = int(round(fod))
-                            p = [path["path_flow"] / fod for path in self.paths.paths(source=o,target=d,t_start=n * self.t_slice)]
-                            if sum(p)>0:
+                            p = [path["path_flow"] / fod for path in self.paths.paths(source=o,target=d,t_start=n * self.t_slice, mode='c')]
+                            k = len(p)
+                            tot_flow= sum(p)
+                            if k == 0:
+                                self.log.warning("No paths available for origin %d and destination %d at time %s", o, d, min2hhmm(tstart + n * self.t_slice))
+                                continue
+                            if tot_flow>0:
                                 f = random.choices(range(int(k)), p, k=fod_out)
                             else:
                                 f = random.choices(range(int(k)), k=fod_out)
@@ -547,10 +553,10 @@ class MicroSimulator(BaseSimulator):
                         else:
                             self.res_flow[o, d] = fod
 
-    def run_simulation(self,k, tstart, tend):
+    def run_simulation(self, tstart, tend):
         "Run simulation without tracking"
         time_ = time.time()
-        self.emission_model(self.OD, self.heavy_perc, k, tstart, tend)
+        self.emission_model(self.OD, self.heavy_perc, tstart, tend)
         #self.G["links_set"] = {} #UPDATE: GEMMA: non serve più
         ini_t = self.t_i
         fin_t = self.t_f
@@ -570,7 +576,7 @@ class MicroSimulator(BaseSimulator):
                 self.G.apply_links(self.t_compute)
 
                 self.inx_update += 1
-                self.emission_model(self.OD, self.heavy_perc, k, tstart, tend)
+                self.emission_model(self.OD, self.heavy_perc, tstart, tend)
                 self.log.info("updated time for t=%s", min2hhmm(t1))
 
             self.update_ta(t, t1)
@@ -585,7 +591,7 @@ class MicroSimulator(BaseSimulator):
             self.G.apply_links(self.t_compute)
 
             self.inx_update += 1
-            self.emission_model(self.OD, self.heavy_perc, k, tstart, tend)
+            self.emission_model(self.OD, self.heavy_perc, tstart, tend)
             self.log.info("update timed for t=%s", min2hhmm(t1))
 
 

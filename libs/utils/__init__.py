@@ -14,4 +14,6 @@ from .util import remove_path
 from .config_reader import ConfigReader
 from .geom import ST_Multi, multi_line_to_line
 from . import ipc
-from .io.io_dataframe import IO_DataFrame
+from .ipc import *
+from . import io
+from .io import *

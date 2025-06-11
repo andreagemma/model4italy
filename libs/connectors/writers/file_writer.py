@@ -20,7 +20,7 @@ from ...graphs import KPathContainer
 from . import BaseWriter
 from .. import Loader
 from ... import IniClass
-from ... import Logger
+from ...log import Logger
 from ...utils import IO_DataFrame
 class FileWriter(BaseWriter):
 

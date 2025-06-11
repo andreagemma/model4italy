@@ -91,6 +91,7 @@ class IO_DataFrame:
         driver: str=None,
         mode: str = "w",
         partitionby: Optional[List[str]] = None,
+        force_partitioning: Optional[bool] = None,
         kwargs_driver: Optional[dict] = None,
         **kwargs
     ):
@@ -107,4 +108,5 @@ class IO_DataFrame:
         kwargs_driver.pop("path", None)
         kwargs_driver.pop("mode", None)
         kwargs_driver.pop("partitionby", None)
+        kwargs_driver.pop("force_partitioning", None)
         driver.export_dataframe(df, path, mode=mode, partitionby=partitionby, **kwargs_driver)

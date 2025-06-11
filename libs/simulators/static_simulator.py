@@ -1,7 +1,6 @@
 import pandas as pd
 
-from libs.utils.parallel import Parallel
-from .. import Logger
+from ..log import Logger
 from ..connectors import Loader
 from . import BaseSimulator
 from ..graphs import *

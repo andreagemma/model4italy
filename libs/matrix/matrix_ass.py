@@ -1,3 +1,4 @@
+from __future__ import annotations
 import numpy as np
 import csv
 import pandas as pd
@@ -109,6 +110,12 @@ class MatrixAss:
             id = self.d2i[d]
             il = self.l2i[l]
             mat[io, id, il] += flow
+
+    def __getitem__(self, key) -> MatrixAss.OD:
+        if isinstance(key, tuple):
+            return self.mats[key]
+        else:
+            raise KeyError(f"Key {key} not found in MatrixAss")
 
     def get_all_matrix_by_tenter(self):
         keys = list(self.mats.keys())

@@ -7,7 +7,7 @@ import dill  # Importa dill per la serializzazione
 import numpy as np
 from ..abstract_graph import AbstractGraphElement, AbstractNode, AbstractLink, AbstractTurn, AbstractGraph
 
-from .attribute import TimeArrayAttribute, CallableAttribute, ValueAttribute, Attribute
+from .attribute import DynamicTimeArrayAttribute, DynamicCallableAttribute, DynamicValueAttribute, DynamicAttribute
 
 class DynamicGraphElement(AbstractGraphElement):
     """Base class for graph elements."""
@@ -19,20 +19,20 @@ class DynamicGraphElement(AbstractGraphElement):
             self.add_attribute(key=key, value=value, total_time=total_time, delta_t=delta_t)
 
     def add_attribute(self, key: str, value: Any, total_time: Optional[Number] = None, delta_t: Optional[Number] = None):
-        if isinstance(value, Attribute):
+        if isinstance(value, DynamicAttribute):
             attr = value
             attr.resize_attribute(new_total_time=value["total_time"], new_delta_t=value["delta_t"])
         elif isinstance(value, (list,tuple)) and not isinstance(value, str):
             assert total_time is not None and delta_t is not None, "total_time and delta_t required for iterable value"
-            attr = TimeArrayAttribute(value, total_time=total_time, delta_t=delta_t)
+            attr = DynamicTimeArrayAttribute(value, total_time=total_time, delta_t=delta_t)
             attr.resize_attribute(new_total_time=total_time, new_delta_t=delta_t)
         elif callable(value):
             assert total_time is not None and delta_t is not None, "total_time and delta_t required for callable value"
-            attr = CallableAttribute(value, total_time=total_time, delta_t=delta_t)
+            attr = DynamicCallableAttribute(value, total_time=total_time, delta_t=delta_t)
             attr.resize_attribute(new_total_time=total_time, new_delta_t=delta_t)
         elif isinstance(value, str) and value.startswith("function.") and ":" in value:
             assert total_time is not None and delta_t is not None, "total_time and delta_t required for callable value"
-            attr = CallableAttribute(value, total_time=total_time, delta_t=delta_t)
+            attr = DynamicCallableAttribute(value, total_time=total_time, delta_t=delta_t)
             attr.resize_attribute(new_total_time=total_time, new_delta_t=delta_t)
         else:
             attr = value
@@ -41,14 +41,14 @@ class DynamicGraphElement(AbstractGraphElement):
 
     def reset_attribute(self, name: str, value: Any):
         attr = dict.get(self, name)
-        if isinstance(attr, Attribute):
+        if isinstance(attr, DynamicAttribute):
             attr.reset(value)
         elif name is not None:
             dict.__setitem__(self, name, value)
 
     def get_value(self, name: str, default: Optional[Any] = None, **kwargs) -> Any:
         value = dict.get(self, name, default)
-        if isinstance(value, Attribute):
+        if isinstance(value, DynamicAttribute):
             kwargs["elem"] = self
             return value.get_value(**kwargs)
         else:
@@ -56,7 +56,7 @@ class DynamicGraphElement(AbstractGraphElement):
 
     def get_values(self, name: str, list_t: Optional[Iterable[Number]] = None, **kwargs) -> List[Any]:
         value = dict.get(self, name)
-        if isinstance(value, Attribute):
+        if isinstance(value, DynamicAttribute):
             kwargs["elem"] = self
             return value.get_values(list_t=list_t, **kwargs)
         else:
@@ -64,7 +64,7 @@ class DynamicGraphElement(AbstractGraphElement):
 
     def get_times(self, name: str, **kwargs) -> List[Number]:
         value = dict.get(self, name)
-        if isinstance(value, Attribute):
+        if isinstance(value, DynamicAttribute):
             kwargs["elem"] = self
             return value.get_times(**kwargs)
         else:
@@ -72,7 +72,7 @@ class DynamicGraphElement(AbstractGraphElement):
 
     def get_items(self, name: str, list_t: Optional[Iterable[Number]] = None, **kwargs) -> List[Tuple[Number, Any]]:
         value = dict.get(self, name)
-        if isinstance(value, Attribute):
+        if isinstance(value, DynamicAttribute):
             kwargs["elem"] = self
             return value.get_items(list_t=list_t, **kwargs)
         else:
@@ -80,7 +80,7 @@ class DynamicGraphElement(AbstractGraphElement):
 
     def set_value(self, name: str, value: Any, **kwargs) -> None:
         current_value = dict.get(self, name)
-        if isinstance(current_value, Attribute):
+        if isinstance(current_value, DynamicAttribute):
             current_value.set_value(value, **kwargs)
         else:
             self[name] = value
@@ -352,15 +352,15 @@ class DynamicGraph(AbstractGraph, dict):
         new_delta_t = new_delta_t or dict.__getitem__(self,"delta_t")
         for link in self["links"].values():
             for attribute in link.values():
-                if isinstance(attribute, Attribute):
+                if isinstance(attribute, DynamicAttribute):
                     attribute.resize_attribute(new_total_time, new_delta_t, offset),
         for node in self["nodes"].values():
             for attribute in node.values():
-                if isinstance(attribute, Attribute):
+                if isinstance(attribute, DynamicAttribute):
                     attribute.resize_attribute(new_total_time, new_delta_t, offset)
         for turn in self["turns"].values():
             for attribute in turn.values():
-                if isinstance(attribute, Attribute):
+                if isinstance(attribute, DynamicAttribute):
                     attribute.resize_attribute(new_total_time, new_delta_t, offset)
         dict.__setitem__(self,"total_time",new_total_time)
         dict.__setitem__(self,"delta_t",new_delta_t)

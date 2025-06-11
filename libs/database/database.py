@@ -15,7 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from sqlalchemy import event, text
 
 from ..log import Logger
-from ..status import Status
+from ..server.status import Status
 
 Base = declarative_base()
 _LOCK = threading.Lock()

@@ -1,7 +1,7 @@
 import pandas as pd
-from .. import Logger
+from ..log import Logger
 from ..connectors import Loader
-from ..graphs import KPathContainer, DynamicGraph as Graph, TimeArrayAttribute, DynamicLink as Link, DynamicNode as Node, DynamicTurn as Turn
+from ..graphs import KPathContainer, DynamicGraph as Graph, DynamicTimeArrayAttribute, DynamicLink as Link, DynamicNode as Node, DynamicTurn as Turn
 from . import BaseSimulator
 class QuasiDynamicSimulator(BaseSimulator):
 
@@ -35,14 +35,14 @@ class QuasiDynamicSimulator(BaseSimulator):
                 prev_link = link
 
         for link in self.G.get_all_links():
-            link.add_attribute("n_paths",TimeArrayAttribute(0, total_time=total_time, delta_t=delta_t))
-            link.add_attribute("time",TimeArrayAttribute(0, total_time=total_time, delta_t=delta_t))
+            link.add_attribute("n_paths",DynamicTimeArrayAttribute(0, total_time=total_time, delta_t=delta_t))
+            link.add_attribute("time",DynamicTimeArrayAttribute(0, total_time=total_time, delta_t=delta_t))
         for node in self.G.get_all_nodes():
-            node.add_attribute("n_paths",TimeArrayAttribute(0, total_time=total_time, delta_t=delta_t))
-            node.add_attribute("time",TimeArrayAttribute(0, total_time=total_time, delta_t=delta_t))
+            node.add_attribute("n_paths",DynamicTimeArrayAttribute(0, total_time=total_time, delta_t=delta_t))
+            node.add_attribute("time",DynamicTimeArrayAttribute(0, total_time=total_time, delta_t=delta_t))
         for turn in self.G.get_all_turns():
-            turn.add_attribute("n_paths",TimeArrayAttribute(0, total_time=total_time, delta_t=delta_t))
-            turn.add_attribute("time",TimeArrayAttribute(0, total_time=total_time, delta_t=delta_t))
+            turn.add_attribute("n_paths",DynamicTimeArrayAttribute(0, total_time=total_time, delta_t=delta_t))
+            turn.add_attribute("time",DynamicTimeArrayAttribute(0, total_time=total_time, delta_t=delta_t))
 
         for path in self.paths.all_paths():
             prev_link = None

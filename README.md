@@ -6,7 +6,7 @@ Model4Italy è uno strumento avanzato per la meso-simulazione e l'analisi del tr
 Installare la versione di python 3.12.
 Installare le librerie presenti in ```requirements.txt```
 
-Se è la prima volta che viene eseguito il sistema sulla macchina e non è presente il file ```model4italy.db``` necessario come database interno della piattagorma eseguire il comando:
+Se è la prima volta che viene eseguito il sistema sulla macchina e non è presente il file ```model4italy.db``` necessario come database interno della piattaforma eseguire il comando:
 ```sh
 python model4italy.py init_db
 ```
@@ -144,22 +144,23 @@ Il file `settings.ini` contiene tutte le impostazioni di configurazione per Mode
 ---
 
 ## [GENERAL]
-- **SRC_COEFS**: Percorso al file dei coefficienti per la valutazione degli eventi.
-- **SRC_CONV_TBL**: Percorso alla tabella di conversione (opzionale).
-- **DEBUG**: Abilita/disabilita la modalità debug (`True`/`False`).
-- **CRS**: Sistema di riferimento delle coordinate del progetto (es. `EPSG:4326`).
-- **CRS_CALC**: Sistema di riferimento locale delle coordinate per i calcoli.
+- **SRC_COEFS**: Percorso al file dei coefficienti per la valutazione degli eventi (default: coefficients.json).
+- **SRC_CONV_TBL**: Percorso alla tabella di conversione (opzionale) (default: None).
+- **DEBUG**: Abilita/disabilita la modalità debug (`True`/`False`) (defualt: False).
+- **CRS**: Sistema di riferimento delle coordinate del progetto (default: `EPSG:4326`).
+- **CRS_CALC**: Sistema di riferimento locale delle coordinate per i calcoli (default: `EPSG:6875`).
 
 ---
 
 ## [OUTPUT]
-- **OUTPUT_AGG_INT**: Intervallo di aggregazione dei risultati (in minuti).
-- **OUTPUT_STATE_COMPRESSION**: Metodo di compressione per la memorizzazione dello stato (es. `"gzip"`).
+- **OUTPUT_AGG_INT**: Intervallo di aggregazione dei risultati in minuti (default:15)..
+- **OUTPUT_STATE_COMPRESSION**: Metodo di compressione per la memorizzazione dello stato (default: None).
+- **OUTPUT_STATE_LEVEL_COMPRESSION**: Livello di comrpressione (default: 5)
 
 ---
 
 ## [WEB_SERVER]
-- **WEB_SERVER_HOST**: Indirizzo host del server web.
+- **WEB_SERVER_HOST**: Indirizzo host del server web (default: localhost).
 - **WEB_SERVER_PORT**: Porta del server web.
 - **WEB_SERVER_DEBUG**: Abilita/disabilita la modalità debug per il server web.
 

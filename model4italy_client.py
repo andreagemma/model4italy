@@ -1,6 +1,6 @@
 import requests, json, time
 from libs.utils import run_in_thread
-from libs.status import Status
+from libs.server.status import Status
 url = "http://localhost:5000/execute"
 
 with open("params.json") as f:

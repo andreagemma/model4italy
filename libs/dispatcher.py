@@ -1,14 +1,16 @@
 import time
+from .ops import *
 from .simulators import BaseSimulator, MicroSimulator, StaticSimulator
 from .connectors import Loader, Writer
-from . import Logger
-from . import MSA
+from .log import Logger
+from .assignment_models import *
 from .database import Execution
-from datetime import datetime
 from .params_parser import ParamsParser
 from .utils.ipc import IPC
 from .fcd.rt_server import RTServer
 from .utils import Parallel
+
+from datetime import datetime
 
 class Dispatcher():
     
@@ -28,7 +30,7 @@ class Dispatcher():
             self.log = Logger.getLogger(self.__class__.__name__, execution_id=self.execution_id)
             self.log.info("Execution created")
         else:
-            self.log = Logger.getLogger(self.__class__.__name__)
+            self.log = Logger.getLogger(self.__class__.__name__, execution_id=self.execution_id)
 
         if self.execution_id is None:
             self.log.info(f"Executing...")
@@ -110,118 +112,34 @@ class Dispatcher():
             raise ex       
          
     def run_dynamic_assignment(self):        
-
-        # Initialize the simulator
-        simulator: BaseSimulator = MicroSimulator(loader=self.loader)
-
-        # Initialize the MSA
-        msa = MSA(
-            loader=self.loader,
-            writer=self.writer,
-            max_k=self.loader.ini.MSA_K,
-            max_ite=self.loader.ini.MSA_MAX_ITE,
-            max_rel_gap=self.loader.ini.MSA_RGAP,
-            simulator=simulator,
-            save_state_graph=self.loader.ini.SAVE_GRAPH,
-            load_state_graph=self.loader.ini.LOAD_GRAPH,
-            save_state_paths=self.loader.ini.SAVE_PATHS,
-            load_state_paths=self.loader.ini.LOAD_PATHS)
-
-        # Run the calculation
-        msa.run()        
+        op: OP = DynamicAssignment(loader=self.loader, writer=self.writer)  
+        op.run()        
 
     def run_static_assignment(self):        
-        # Initialize the simulator
-        simulator: BaseSimulator = StaticSimulator(loader=self.loader, links_vdf="vdf")
-
-        # Initialize the MSA
-        msa = MSA(
-            loader=self.loader,
-            writer=self.writer,
-            max_k=self.loader.ini.MSA_K,
-            max_ite=self.loader.ini.MSA_MAX_ITE,
-            max_rel_gap=self.loader.ini.MSA_RGAP,
-            simulator=simulator,
-            save_state_graph=self.loader.ini.SAVE_GRAPH,
-            load_state_graph=self.loader.ini.LOAD_GRAPH,
-            save_state_paths=self.loader.ini.SAVE_PATHS,
-            load_state_paths=self.loader.ini.LOAD_PATHS)
-
-        # Run the calculation
-        msa.run() 
+        op: OP = StaticAssignment(loader=self.loader, writer=self.writer)  
+        op.run()        
 
     def run_dynamic_simulation(self):        
 
-        # Initialize the simulator
-        simulator: BaseSimulator = MicroSimulator(loader=self.loader)
-
-        # Initialize the MSA
-        msa = MSA(
-            loader=self.loader,
-            writer=self.writer,
-            max_k=self.loader.ini.MSA_K,
-            max_ite=1,
-            max_rel_gap=self.loader.ini.MSA_RGAP,
-            simulator=simulator,
-            save_state_graph=False,
-            load_state_graph=False,
-            save_state_paths=False,
-            load_state_paths=False)
-
-        # Run the calculation
-        msa.run()     
+        op: OP = DynamicSimulation(loader=self.loader, writer=self.writer)  
+        op.run()         
 
     def run_online(self):        
-        # Initialize the simulator
-        simulator: BaseSimulator = MicroSimulator(loader=self.loader)
-
-        # Initialize the MSA
-        msa = MSA(
-            loader=self.loader,
-            writer=self.writer,
-            max_k=self.loader.ini.MSA_K,
-            max_ite=1,
-            max_rel_gap=self.loader.ini.MSA_RGAP,
-            simulator=simulator,
-            save_state_graph=False,
-            load_state_graph=True,
-            save_state_paths=False,
-            load_state_paths=True,
-            ipc=self.ipc,
-            )
-
-        # Run the calculation
-        msa.run()  
+        op: OP = OnlineSimulator(loader=self.loader, writer=self.writer)  
+        op.run()   
 
     def run_save_state(self):        
-
-        # Initialize the simulator
-        simulator: BaseSimulator = MicroSimulator(loader=self.loader)
-
-        # Initialize the MSA
-        msa = MSA(
-            loader=self.loader,
-            writer=self.writer,
-            max_k=self.loader.ini.MSA_K,
-            max_ite=self.loader.ini.MSA_MAX_ITE,
-            max_rel_gap=self.loader.ini.MSA_RGAP,
-            simulator=simulator,
-            save_state_graph=True,
-            load_state_graph=False,
-            save_state_paths=True,
-            load_state_paths=False)
-
-        # Run the calculation
-        msa.run()                  
+        op: OP = OfflineSaveState(loader=self.loader, writer=self.writer)  
+        op.run()                     
 
     def run_rt_server(self):
-        rt_server: RTServer = RTServer(parser=self.parser, ipc=self.ipc, loader=self.loader, writer=self.writer) 
-        rt_server.run()
+        op: OP = OnlineRTServer(loader=self.loader, writer=self.writer, ipc=self.ipc)  
+        op.run()                     
 
     def run_rt_server_period(self):
-        rt_server: RTServer = RTServer(parser=self.parser, ipc=self.ipc, loader=self.loader, writer=self.writer) 
-        rt_server.elaborate_period(self.parser.get("date_start"), self.parser.get("date_end"), self.parser.ini.FCD_HORIZON)
-
+        op: OP = OfflineRTServer(loader=self.loader, writer=self.writer, ipc=self.ipc)  
+        op.run()                     
+        
     def run_ipc_client(self):
         if self.ipc is None:
             raise ValueError("IPC not initialized")

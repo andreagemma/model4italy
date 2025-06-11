@@ -24,23 +24,7 @@
             {
                 "mode": "c",
                 "matrices": [
-                    "mat_car.parquet",
-                    {
-                        "src":"mat_heavy.csv",
-                        "op": "+"
-                    },
-                    { 
-                        "scalar": 1.1,
-                        "op": "*"
-                    }
-                ]
-            },
-            {
-                "mode": "h",
-                "matrices": [
-                    {
-                        "scalar": 1.1
-                    }
+                    "mat_car.parquet"
                 ]
             }
         ],
@@ -105,6 +89,7 @@
         "aggregated_results": "{simulation_id}_aggregated_results.shp",
         "paths": "{simulation_id}_paths.geoparquet",
         "rt_paths": "{simulation_id}_rt_paths.parquet",        
+        "statistics": "{simulation_id}_stats.csv", 
         "state": "./dati/output/{description}/state",
         "fcd": {
             "connector": "DBLoader",

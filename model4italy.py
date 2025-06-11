@@ -10,11 +10,11 @@ if __name__ == "__main__":
     def main():    
         import argparse
         from libs.iniclass import IniClass
-        from libs.server import start_server
+        from libs.server.server import start_server
         from libs.dispatcher import Dispatcher
         from libs.utils import parse_sqlalchemy_url, generate_sqlalchemy_url
         from libs.database import DB
-        from libs.log.logger import Logger
+        from libs.log import Logger
 
         import os
             

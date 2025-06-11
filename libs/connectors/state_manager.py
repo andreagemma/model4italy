@@ -15,24 +15,24 @@ from importlib import import_module
 from abc import ABC, abstractmethod
 import copy
 
-from ..matrix_od import MatrixODT
-from ..graphs import DynamicGraph, TimeArrayAttribute, CallableAttribute, KPathContainer
+from ..matrix import MatrixODT
+from ..graphs import DynamicGraph, DynamicTimeArrayAttribute, DynamicCallableAttribute, KPathContainer
 from ..utils import util
 from .. import ParamsParser
 from .. import IniClass
-from .. import Logger
+from ..log import Logger
 
 from ..utils import save_dict, load_dict
 
 
 class StateManager(object):
-    def __init__(self, parser: ParamsParser, default_ext=".pickle.lz4", compression:str="lz4"):
+    def __init__(self, parser: ParamsParser):
         self.parser = parser
         self.execution_id = self.parser.get("execution_id")
         self.log = Logger.getLogger(self.__class__.__name__, execution_id=self.execution_id)
         self.ini: IniClass = self.parser.ini
-        self.default_ext = default_ext
-        self.compression = compression
+        self.default_ext = f"pickle.{self.parser.ini.OUTPUT_STATE_COMPRESSION}" if self.parser.ini.OUTPUT_STATE_COMPRESSION else "pickle"
+        self.compression = self.parser.ini.OUTPUT_STATE_LEVEL_COMPRESSION
     
     
     def has_write_state(self):

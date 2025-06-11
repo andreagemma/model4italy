@@ -1,13 +1,11 @@
 from flask import Flask, request, jsonify
-from . import Logger
+from ..log import Logger
 import traceback
 import json
-from .database.database import DB, Execution, Session
-from .status import Status
+from ..database.database import DB, Execution, Session
 
-from .utils.util import run_in_thread
-from .dispatcher import Dispatcher
-from .utils.parallel import Parallel
+from ..utils.util import run_in_thread
+
 
 app = Flask(__name__)
 
@@ -17,6 +15,7 @@ log = Logger.getLogger("M4I_Server")
 
 @app.route('/execute', methods=['POST'])
 def execute():
+    from .status import Status    
     log.info("Received request to execute elaboration")
 
     # Read the `params` parameter from the request
@@ -43,8 +42,10 @@ def execute():
 
 @run_in_thread
 def run_execution_in_thread(params, execution=None):
+    from .status import Status
+    from .. import Dispatcher
     try:
-        from . import IniClass
+        from .. import IniClass
         ini = IniClass()
         
         Dispatcher(params=params, ini=ini, execution=execution).run()
@@ -61,6 +62,7 @@ def run_execution_in_thread(params, execution=None):
 
 @app.route('/status/<execution_id>', methods=['GET'])
 def get_status(execution_id):
+    from .status import Status
     """Returns the status of a specific execution."""
     with Session(DB.get_engine(), autoflush=False, autobegin=False) as session:       
         try:
@@ -89,6 +91,7 @@ def get_status(execution_id):
 
 def start_server(host, port, debug, config):
     try:
+        from ..utils.parallel import Parallel
         Parallel.initialize_parallel(num_cpus=config.PARALLEL_NUMCPUS,engine=config.PARALLEL_ENGINE)
         app.run(debug=debug, host=host, port=port)
     except Exception as ex:

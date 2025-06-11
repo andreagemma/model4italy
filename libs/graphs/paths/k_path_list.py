@@ -39,8 +39,8 @@ class KPathList(KPathContainer):
     def get_modes(self, source: Optional[Hashable]=None, target: Optional[Hashable]=None, t_start: Optional[Number] = None, **kwargs) -> Tuple[Hashable]:
         return tuple(set([m for (s,t,ts,m) in map(lambda x: x.key(), self.all_paths()) if (source is None or s==source) and (t_start is None or ts==t_start) and (target is None or t==target)]))
 
-    def paths(self, source: Hashable, target: Hashable, t_start: Number, **kwargs) -> Generator[Path]:
-        for path in self["paths"].get((source, target, t_start), []):
+    def paths(self, source: Hashable, target: Hashable, t_start: Number, mode=None, **kwargs) -> Generator[Path]:
+        for path in self["paths"].get((source, target, t_start, mode), []):
             yield path
 
     def path(self, 
