@@ -3,7 +3,10 @@ from typing import Union, Optional, List, Generator, Tuple, Any, Callable, Itera
 from numbers import Number
 from uuid import uuid4
 from math import ceil, inf
-from datetime import datetime, timedelta, MAXYEAR
+import warnings
+from datetime import datetime, timedelta, MAXYEAR, date, time
+from dateutil import parser
+
 import sys
 from types import ModuleType, FunctionType
 from gc import get_referents
@@ -16,8 +19,6 @@ import sys
 from urllib.parse import urlparse, parse_qs, urlencode
 import os
 
-from datetime import datetime, date, time
-from dateutil import parser
 import re
 from pathlib import Path
 import shutil
@@ -393,7 +394,7 @@ def min_from_midnight(date: Union[datetime, str], date_base: Optional[Union[date
     return (date - date_base).total_seconds() // 60  # Restituisce i minuti come intero
 
 # Formati noti data e orari
-KNOWN_FORMATS = [
+DATETIME_KNOWN_FORMATS = [
     "%Y-%m-%d",
     "%Y/%m/%d",
     "%Y%m%d",
@@ -409,46 +410,163 @@ KNOWN_FORMATS = [
     "%H:%M:%S"
 ]
 
+TIMEDELTA_KNOWN_FORMATS = [
+    "%H:%M",
+    "%H:%M:%S"
+    "%H%M",
+    "%H%M%S"
+    "%H:%M.%f",
+    "%H:%M:%S.%f"
+    "%H%M.%f",
+    "%H%M%S%f"
+]
+
 import psutil
 import re
 from typing import Optional, Union, Iterable
 import warnings
 
 
-def to_datetime_auto(date_str, date_default=None, time_default=None) -> Optional[datetime]:
+def to_datetime_auto(t: Union[str,int, float,datetime, time, date], 
+                     date_default: date=None, 
+                     time_default: time=None, 
+                     on_error:str='ignore',
+                     unit = "seconds") -> Optional[datetime]:
+    """
+    Convert a string, number, datetime, time, or date to a datetime object.
+    :param t: The input value to convert, can be a string, number, datetime, time, or date.
+    :param date_default: Default date to use if only time is provided (default is epoch date 1970-01-01).
+    :param time_default: Default time to use if only date is provided (default is midnight 00:00:00).
+    :param on_error: Action to take on error ('raise', 'warn', 'ignore').
+    :param unit: Unit of the number if t is a number (default is "seconds").
+    :return: A datetime object or None if conversion fails.
+    """
     if date_default is None:
-        date_default = date.today()
+        date_default = datetime.fromtimestamp(0).date()  # Default to epoch date (1970-01-01)
     if time_default is None:
-        time_default = time(0, 0, 0)
-    if isinstance(date_str, datetime):
-        return date_str
-    if not isinstance(date_str, str) or not date_str.strip():
+        time_default = datetime.fromtimestamp(0).time()  # Default to midnight (00:00:00)
+
+    if isinstance(t, str) and t.strip():
+            t=t.strip()
+            if t.isnumeric():
+                _kwargs = {unit: float(t)}
+                t = datetime.combine(date_default, time_default) + timedelta(**_kwargs)
+            else:
+                try:
+                    # Prova con dateutil (include anche orari puri)
+                    return parser.parse(t, fuzzy=True, default=datetime.combine(date_default, time_default))
+                except (ValueError, OverflowError):
+                    pass
+
+                # Prova con formati espliciti
+                for fmt in DATETIME_KNOWN_FORMATS:
+                    try:
+                        return datetime.strptime(t, fmt)
+                    except ValueError:
+                        continue
+
+                # Tentativo numerico compatto (solo data)
+                digits = re.sub(r"[^\d]", "", t)
+                if len(digits) == 8:
+                    for fmt in ("%Y%m%d", "%d%m%Y", "%m%d%Y"):
+                        try:
+                            return datetime.strptime(digits, fmt)
+                        except ValueError:
+                            continue
+                if on_error:
+                    if on_error == 'raise':
+                        raise ValueError(f"Cannot parse date string: {t}")
+                    elif on_error == 'warn':
+                        warnings.warn(f"Cannot parse date string: {t}")
+                    elif on_error == 'ignore':
+                        return None
+    elif isinstance(t, (int, float)):
+        # Se è un numero, lo interpretiamo come timestamp (secondi dall'epoca)
+        _kwargs = {unit: float(t)}
+        return datetime.combine(date_default, time_default) + timedelta(**_kwargs)
+    elif isinstance(t, datetime):
+        return t
+    elif isinstance(t, date):
+        # Se è una data, la combiniamo con l'orario predefinito
+        return datetime.combine(t, time_default)
+    elif isinstance(t, time):
+        # Se è un orario, lo combiniamo con la data predefinita
+        return datetime.combine(date_default, t)    
+    if on_error == 'raise':
+        raise ValueError("Cannot parse {t} as a date")
+    elif on_error == 'warn':
+        warnings.warn("Cannot parse {t} as a date")
         return None
+    elif on_error == 'ignore': 
+        return None
+        
+def to_timedelta_auto(t: Union[str,int, float,datetime, time, date], unit='seconds', on_error='raise', 
+                        base_date: Optional[datetime] = None) -> Optional[timedelta]:
+    """
+    Convert a string, number, datetime, time, or date to a timedelta object.
+    :param t: The input value to convert, can be a string, number, datetime, time, or date.
+    :param unit: Unit of the number if t is a number (default is "seconds").
+    :param on_error: Action to take on error ('raise', 'warn', 'ignore').
+    :param base_date: Base date to use for timedelta calculation (default is epoch date 1970-01-01).
+    :return: A timedelta object or None if conversion fails.
+    """
+    if isinstance(t, str) and t.strip():
+        t = t.strip()
+        if t.isnumeric():
+            _kwargs = {unit: float(t)}
+            return timedelta(**_kwargs)
+        else:
+            parts = t.split('.')    
+            if len(parts) >= 2:
+                days = int(parts[0])
+                time_part = '.'.join(parts[1:])
+            else:
+                days = 0
+                time_part = parts[0]
 
-    try:
-        # Prova con dateutil (include anche orari puri)
-        return parser.parse(date_str, fuzzy=True, default=datetime.combine(date_default, time_default))
-    except (ValueError, OverflowError):
-        pass
-
-    # Prova con formati espliciti
-    for fmt in KNOWN_FORMATS:
-        try:
-            return datetime.strptime(date_str, fmt)
-        except ValueError:
-            continue
-
-    # Tentativo numerico compatto (solo data)
-    digits = re.sub(r"[^\d]", "", date_str)
-    if len(digits) == 8:
-        for fmt in ("%Y%m%d", "%d%m%Y", "%m%d%Y"):
-            try:
-                return datetime.strptime(digits, fmt)
-            except ValueError:
-                continue
-
-    return None
-
+            # Prova con formati espliciti
+            for fmt in TIMEDELTA_KNOWN_FORMATS:
+                try:
+                    dt= datetime.strptime(time_part, fmt)
+                    return timedelta(days=days, hours=dt.hour, minutes=dt.minute, seconds=dt.second, microseconds=dt.microsecond)
+                except ValueError:
+                    continue
+    elif isinstance(t, (int, float)):
+        # Se è un numero, lo interpretiamo come secondi
+        _kwargs = {unit: float(t)}
+        return timedelta(**_kwargs)
+    elif isinstance(t, timedelta):
+        return t
+    elif isinstance(t, datetime):
+        if base_date is None:
+            return t - datetime.fromtimestamp(0)
+        else:
+            if not isinstance(base_date, datetime):
+                base_date = to_datetime_auto(base_date, 
+                                             date_default=datetime.fromtimestamp(0).date(), 
+                                             time_default=datetime.fromtimestamp(0).time())            
+            return t - base_date
+    elif isinstance(t, date):
+        if base_date is None:
+            base_date = datetime.fromtimestamp(0).date()
+        else:
+            if not isinstance(base_date, date):
+                base_date = to_datetime_auto(base_date, 
+                                             date_default=datetime.fromtimestamp(0).date(), 
+                                             time_default=datetime.fromtimestamp(0).time()).date()
+        return timedelta(days=(t - base_date).days)
+    elif isinstance(t, time):
+        if base_date is None:
+            base_date = datetime.fromtimestamp(0).time()
+        else:
+            if not isinstance(base_date, time):
+                base_date = to_datetime_auto(base_date, 
+                                             date_default=datetime.fromtimestamp(0).date(), 
+                                             time_default=datetime.fromtimestamp(0).time()).time()
+        return timedelta(hours=t.hour - base_date.hour, minutes=t.minute - base_date.minute, seconds=t.second - base_date.second, microseconds=t.microsecond - base_date.microsecond)
+       
+        
+    
 
 def memory_usage(
     process_filter: Optional[Union[Iterable[Union[str, int]], int, str]] = ["python", "ray", "dask"],
@@ -907,3 +1025,8 @@ def remove_path(path):
             path.unlink() # Rimuove un file
         else:
             shutil.rmtree(path)
+
+def to_namedtuple(dict_obj):
+    import json
+    from collections import namedtuple
+    return json.loads(json.dumps(dict_obj), object_hook=lambda d: namedtuple("X", d.keys())(*d.values()) if isinstance(d, dict) else d)        

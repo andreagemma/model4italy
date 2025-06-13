@@ -359,6 +359,7 @@ class ParamsParser:
             "fcd": [
                 {"name": "id_fcd", "type": is_str, "dtype": "string", "required": True},
                 {"name": "id_trip", "type": is_str, "dtype": "string", "required": True},
+                {"name": "id_Veh", "type": is_str, "dtype": "string", "required": True},
                 {"name": "timestamp", "type": is_str_datetime, "dtype": "datetime64[ns]", "required": True},
                 {"name": "engine", "type": is_int, "dtype": "Int8", "required": True},
                 {"name": "speed", "type": is_float, "dtype": "Float32", "required": True},
@@ -372,6 +373,7 @@ class ParamsParser:
     
     def check_fields(self, name: str, df: Union[pd.DataFrame,gpd.GeoDataFrame, dict]) -> str:
         params = self.fields.get(name, None)
+        
         if params is None:
             raise ValueError(f"Unknown name: {name}")
         if len(df) == 0:
@@ -536,16 +538,23 @@ class ParamsParser:
                 ret[k] = None
         return ret
     
-    @staticmethod
-    def apply_dtype(df, dtype, copy=False):
+    def apply_dtype(self, df, dtype, copy=False):
         if dtype is None:
             return df
         try:
             if isinstance(dtype, dict):
                 dtype = {k: v for k, v in dtype.items() if k in df.columns}
-                df=df.astype(dtype, copy=copy)
+                df=df.astype(dtype, copy=copy)            
             else:
                 df = df.astype(dtype, copy=copy)
+            for col in df.columns:
+                if pd.api.types.is_datetime64_any_dtype(df[col]):
+                    if df[col].dt.tz is None:
+                        # naive → localize
+                        df[col] = df[col].dt.tz_localize(self.ini.TZ_LOCAL)
+                    else:
+                        # aware → convert
+                        df[col] = df[col].dt.tz_convert(self.ini.TZ_LOCAL)                
         except Exception as e:
             raise ValueError(f"Invalid dtype: {dtype}") from e
         return df

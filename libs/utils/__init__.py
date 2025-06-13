@@ -10,7 +10,7 @@ from .util import parse_sqlalchemy_url, generate_sqlalchemy_url
 from .util import parse_postgres_dns, generate_postgres_dns
 from .util import fast_memory_usage, memory_usage
 from .util import serialize, deserialize
-from .util import remove_path
+from .util import remove_path, to_namedtuple
 from .config_reader import ConfigReader
 from .geom import ST_Multi, multi_line_to_line
 from . import ipc

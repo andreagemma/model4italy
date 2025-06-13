@@ -3,9 +3,11 @@
 import math
 import geopandas as gpd
 import pandas as pd
+import numpy as np
 from shapely.geometry import LineString, Point
 from math import degrees, atan2, exp
 import logging
+from ..utils import Parallel
 
 class MapMatching:
     def __init__(self, links_gdf, links_id_col="id",link_direction_col=None):
@@ -125,4 +127,21 @@ class MapMatching:
                 match = pd.DataFrame(columns=[fcd_id_col, 'mm_id_link', 'mm_pos', 'mm_seg_prob', 'mm_link_prob'])
         else:
             match = pd.DataFrame(matched_results)        
+        return match
+
+    def parallel_match(self, gps_gdf, 
+                       max_distance=50, max_angle=45, 
+                       fcd_id_col='id_fcd', fcd_dir_col='heading', fcd_state_col='engine', 
+                       all_matches=False, chunksize:int=10000, n_workers:int=None):
+        n_partitions = max(1, len(gps_gdf) // chunksize)
+        tasks = np.array_split(gps_gdf, n_partitions)
+        match = None
+        for df_mm in Parallel.execute(self.match, tasks, n_workers=n_workers,
+                                        max_distance=max_distance, max_angle=max_angle, 
+                                        fcd_id_col=fcd_id_col, fcd_dir_col=fcd_dir_col, 
+                                        fcd_state_col=fcd_state_col, all_matches=all_matches):
+            if match is None:
+                match = df_mm
+            else:
+                match = pd.concat([match, df_mm], ignore_index=True)
         return match

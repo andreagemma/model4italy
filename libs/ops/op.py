@@ -4,24 +4,17 @@ from ..connectors import Writer
 from ..connectors import Loader
 from ..utils import IPC
 from .. import ParamsParser
-from .. import TaskBase
 from ..log import Logger
 from ..database import Execution
-from ..taskbase import TaskBase
-class OP(TaskBase):
+from ..base_m4i_model import BaseM4IModel
+class OP(BaseM4IModel):
 
     def __init__(self, loader:Loader, writer:Writer, ipc: IPC=None, **kwargs):
-        super().__init__(**kwargs)
-        self.loader: Loader = loader
-        self.writer: Writer = writer
-        self.ipc: IPC = ipc
-        self.execution_id: int = self.loader.execution_id
-        self.parser: ParamsParser = self.loader.parser
-        self.ini = self.loader.ini
-        self.task_on_progress = lambda _, m, p : OP.update_progress(self,m,p)
+        super().__init__(laoder=loader, writer=writer, ipc=ipc, **kwargs)
         if self.execution_id is None:
             self.execution = Execution.create_execution(params=self.parser.params)        
             self.execution_id = self.execution.id
+            self.loader.execution_id = self.execution_id
             self.log = Logger.getLogger(self.__class__.__name__, execution_id=self.execution_id)
             self.log.info("Execution created")
         else:

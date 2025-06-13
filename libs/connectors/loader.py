@@ -12,10 +12,11 @@ import numpy as np
 import geopandas as gpd
 import re
 import shapely
+import time
 from typing import Union, Any
 from collections import namedtuple, defaultdict
 import json
-from datetime import datetime
+from datetime import datetime, date
 import ast
 from abc import ABC, abstractmethod
 from itertools import product
@@ -116,9 +117,9 @@ class Loader(BaseLoader):
                 if df.crs is None:
                     df.set_crs(crs, inplace=True)                    
             if df.crs is not None:
-                df.to_crs(self.ini.CRS, inplace=True)
+                df.to_crs(self.ini.CRS_CALC, inplace=True)
             else:
-                df.set_crs(self.ini.CRS, inplace=True)
+                df.set_crs(self.ini.CRS, inplace=True).to_crs(self.ini.CRS_CALC, inplace=True)
             if geometry:
                 if geometry != df.geometry.name:
                     df.rename_geometry(geometry, inplace=True)
@@ -132,7 +133,8 @@ class Loader(BaseLoader):
             else:
                 return pd.DataFrame(df)
 
-        df=self.parser.apply_dtype(df=df, dtype=dtype, copy=False)                        
+        df=self.parser.apply_dtype(df=df, dtype=dtype, copy=False)  
+                              
         return df
             
 
@@ -156,9 +158,12 @@ class Loader(BaseLoader):
             self.conv_tbl = pd.read_csv(self.ini.SRC_CONV_TBL)
         else:
             self.conv_tbl = None
-        date_default = util.to_datetime_auto(self.parser.params.get("date_simulation", None))
-        start = util.to_datetime_auto(self.parser.params.get("start", None), date_default=date_default)
-        end = util.to_datetime_auto(self.parser.params.get("end", None), date_default=date_default)
+        date_default = util.to_datetime_auto(self.parser.params.get("date_simulation", None),  
+                                             date_default = datetime.now().date,
+                                             time_default = datetime(hour=0, minute=0, second=0, microsecond=0).time,
+                                             unit='minutes')
+        start = util.to_datetime_auto(self.parser.params.get("start", None), date_default=date_default,unit='minutes')
+        end = util.to_datetime_auto(self.parser.params.get("end", None), date_default=date_default,unit='minutes')
         if end<start:
             start += datetime.timedelta(days=1)
         self.start = int(util.min_from_midnight(start))

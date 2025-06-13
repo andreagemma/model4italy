@@ -8,9 +8,8 @@ import itertools
 import pdb
 import pandas as pd
 
-from libs.utils.tictoc import TicToc
-from libs.assignment_models.assignment_model import AssignmentModel
-from ..utils.parallel import Parallel
+from ..assignment_models.assignment_model import AssignmentModel
+from ..utils.parallel import Parallel, TicToc
 from ..connectors import StateManager
 from ..simulators.micro_sim.micro_simulator import MicroSimulator
 from ..matrix import MatrixOD, MatrixODT, MatrixAss

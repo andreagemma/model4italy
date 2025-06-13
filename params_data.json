@@ -95,6 +95,8 @@
             "connector": "DBLoader",
             "location": "postgresql+psycopg://postgres:lDvdc15dcd5@192.168.133.80:5432/fcd_mobito",
             "src": "eur.fcdmm",
+            "crs": "EPSG:4326",
+            "tz_data": "Etc/UTC",
             "mapping": {
                 "id_fcd": "id_fcd",
                 "id_trip": "id_trip",

@@ -22,11 +22,11 @@ class IniClass:
             self.DB_SETTINGS_HOST = self.config_reader.get("DB_SETTINGS_HOST", 'DATABASE_SETTINGS', '')
             self.DB_SETTINGS_PORT = self.config_reader.get("DB_SETTINGS_PORT", 'DATABASE_SETTINGS', '')
             self.DB_SETTINGS_NAME = self.config_reader.get("DB_SETTINGS_NAME", 'DATABASE_SETTINGS', 'settings.db')
-            self.DB_SETTINGS_URI = self.config_reader.get("DB_SETTINGS_URI", 'DATABASE_SETTINGS', '')
+            self.DB_SETTINGS_URL = self.config_reader.get("DB_SETTINGS_URL", 'DATABASE_SETTINGS', '')
 
             # Stringhe di connessione
-            if self.DB_SETTINGS_URI == "":
-                self.DB_SETTINGS_URI = generate_sqlalchemy_url(
+            if self.DB_SETTINGS_URL == "":
+                self.DB_SETTINGS_URL = generate_sqlalchemy_url(
                     db_type=self.DB_SETTINGS_TYPE,
                     db_driver=self.DB_SETTINGS_DRIVER,
                     db_user=self.DB_SETTINGS_USER,
@@ -37,7 +37,7 @@ class IniClass:
                 )                   
             self.config_reader = ConfigReader(
                 ini_file='settings.ini',
-                db_url=self.DB_SETTINGS_URI,
+                db_url=self.DB_SETTINGS_URL,
                 use_db=self.DB_SETTINGS_USE,
                 db_query="SELECT value FROM settings WHERE name = :name"
             )
@@ -64,6 +64,7 @@ class IniClass:
         self.DEBUG = self.config_reader.getboolean("DEBUG", 'GENERAL', False)
         self.CRS = self.config_reader.get("CRS", 'GENERAL', "EPSG:4326")  # Coordinate Reference System
         self.CRS_CALC = self.config_reader.get("CRS_CALC", 'GENERAL', "EPSG:6875")  # Coordinate Reference System for calculation
+        self.TZ_LOCAL = self.config_reader.get("TZ_LOCAL", 'GENERAL', "Europe/Rome")  # Timezone locale
 
 
         # SIMULATOR
@@ -121,6 +122,22 @@ class IniClass:
         self.FCD_PATH_START_FROM_ZONE = self.config_reader.getboolean("FCD_PATH_START_FROM_ZONE", 'FCD', False) # se True il path inizia dalla zona di partenza
         self.FCD_PATH_END_TO_ZONE = self.config_reader.getboolean("FCD_PATH_END_TO_ZONE", 'FCD', False) # se True il path termina nella zona di arrivo
         self.FCD_PATH_AGGRATION_INTERVAL = self.config_reader.getint("FCD_PATH_AGGRATION_INTERVAL", 'FCD', 15) # intervallo di aggregazione in secondi
+     
+    
+        self.TRIPS_SIGNAL_BREAK_MAX_DT = self.config_reader.getint("TRIPS_SIGNAL_BREAK_MAX_DT", 'FCD', 900)  # max time for signal break in seconds
+        self.TRIPS_SIGNAL_BREAK_DT = self.config_reader.getint("TRIPS_SIGNAL_BREAK_DT", 'FCD', 300)  # time for signal break in seconds
+        self.TRIPS_SIGNAL_BREAK_V = self.config_reader.getfloat("TRIPS_SIGNAL_BREAK_V", 'FCD', 0.5555555555555556)  # speed for signal break in m/s
+        self.TRIPS_STOP_O_DS = self.config_reader.getfloat("TRIPS_STOP_O_DS", 'FCD', 50)  # distance for stop at origin in meters
+        self.TRIPS_STOP_D_DS = self.config_reader.getfloat("TRIPS_STOP_D_DS", 'FCD', 50)  # distance for stop at destination in meters
+        self.TRIPS_SIGNAL_CONT_DT = self.config_reader.getint("TRIPS_SIGNAL_CONT_DT", 'FCD', 600)  # time for signal continuation in seconds
+        self.TRIPS_SIGNAL_CONT_V = self.config_reader.getfloat("TRIPS_SIGNAL_CONT_V", 'FCD', 0.1388888888888889)  # speed for signal continuation in m/s
+        self.TRIPS_MAX_V3 = self.config_reader.getfloat("TRIPS_MAX_V3", 'FCD', 69.44444444444444)  # max speed for V3 in m/s
+        self.TRIPS_MAX_DISTANCE_OVERRIDE_POSITION_FIRST_POINT = self.config_reader.getfloat("TRIPS_MAX_DISTANCE_OVERRIDE_POSITION_FIRST_POINT", 'FCD', 200)  # max distance override in meters
+        self.TRIPS_MIN_LENGTH = self.config_reader.getfloat("TRIPS_MIN_LENGTH", 'FCD', 100)  # min length of trip in meters
+        self.TRIPS_MIN_TIME = self.config_reader.getint("TRIPS_MIN_TIME", 'FCD', 1)  # min time of trip in seconds
+        self.TRIPS_REMOVE_STOPS = self.config_reader.getboolean("TRIPS_REMOVE_STOPS", 'FCD', False)  # remove stops in trips
+        self.TRIPS_MAX_DISTANCE_BETWEEN_DATA = self.config_reader.getfloat("TRIPS_MAX_DISTANCE_BETWEEN_DATA", 'FCD', 20000)  # max distance between data in meters
+        self.TRIPS_MAX_DELTA_PROGR = self.config_reader.getfloat("TRIPS_MAX_DELTA_PROGR", 'FCD', 20000)  # max delta progression in meters
         
         # OUPTUT
         self.OUTPUT_AGG_INT = self.config_reader.getfloat("OUTPUT_AGG_INT", 'OUTPUT', 15)
