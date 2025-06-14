@@ -1,20 +1,10 @@
 import logging
-from .monitor import monitor_process
 
 def main():    
     import argparse
-    from .iniclass import IniClass
-    from .server.server import start_server
-    from .dispatcher import Dispatcher
-    from .utils import parse_sqlalchemy_url, generate_sqlalchemy_url
-    from .database import DB
-    from .log import Logger
-
     import os
         
     prc = None
-    def monitor(directory):
-        monitor_process(process_name="python",interval=5, output_file=None, directory=directory)                
     try:
         parser = argparse.ArgumentParser(description="Run an elaboration or start the server")
         parser.add_argument('-p', '--params', default='params.json', help='JSON file with parameters (default: params.json)')
@@ -50,11 +40,7 @@ def main():
 
         args = parser.parse_args()
         if args.monitor is not None:
-            import multiprocessing as mp
-            def fn():
-                return monitor(directory="monitor")
-            prc = mp.Process(target=fn, daemon=True)
-            prc.start()
+            prc = launch_monitor(directory=args.monitor)
         else:
             prc = None
             
@@ -63,74 +49,28 @@ def main():
             args.command = 'run'
 
         if args.command == 'init_db':
-            config = IniClass(ini_file=args.config)
-            Logger.initLogger(
-                level=logging.getLevelName(config.LOG_LEVEL),
-                console=config.LOG_ON_CONSOLE,
-                file=config.LOG_ON_FILE,
-                db=config.LOG_ON_DATABASE,
-                engine=None,                    
-                log_name=config.LOG_NAME, 
-                dir_log=config.LOG_DIR,
-                format=config.LOG_FORMAT,
-                execution_format=config.LOG_EXECUTION_FORMAT
-                )
-            url_dict = {}
-            if config.DATABASE_URL:
-                url = config.DATABASE_URL
-                url_dict = parse_sqlalchemy_url(url)
-            if args.type:
-                url_dict["db_type"] = args.type
-            if args.driver:
-                url_dict["db_driver"] = args.driver
-            if args.user:
-                url_dict["db_user"] = args.user
-            if args.password:
-                url_dict["db_password"] = args.password
-            if args.host:
-                url_dict["db_host"] = args.host
-            if args.port:
-                url_dict["db_port"] = args.port
-            if args.name:
-                url_dict["db_name"] = args.name                    
-            url = generate_sqlalchemy_url(**url_dict)                
-            DB.init_db(url)          
+            init_db(
+                ini_file=args.config,
+                db_type=args.type,
+                db_driver=args.driver,
+                db_user=args.user,
+                db_password=args.password,
+                db_host=args.host,
+                db_port=args.port,
+                db_name=args.name
+            )
         else:
-            config = IniClass(ini_file=args.config)
-            Logger.initLogger(
-                level=logging.getLevelName(config.LOG_LEVEL),
-                console=config.LOG_ON_CONSOLE,
-                file=config.LOG_ON_FILE,
-                db=config.LOG_ON_DATABASE,
-                engine=None,                    
-                log_name=config.LOG_NAME, 
-                dir_log=config.LOG_DIR,
-                format=config.LOG_FORMAT,
-                execution_format=config.LOG_EXECUTION_FORMAT
-                )
-            try:
-                if config.DATABASE_URL:
-                    DB.open_db(config.DATABASE_URL)  
-                else:
-                    raise ValueError("DATABASE_URL is not set in the configuration file.")
-            except Exception as e:
-                raise Exception(f"Error initializing database: {e}")            
-            Logger.setEngine(DB.get_engine())
-                
             if args.command == 'run':
-                params = args.params
-                if args.params_data:
-                    params = [args.params_data, args.params]                
-                else:
-                    if os.path.exists("params_data.json"):
-                        params = ["params_data.json", args.params]
-                Dispatcher(params=params, ini=config, op=args.op).run()       
+                run(ini_file=args.config,
+                params=args.params,
+                params_data=args.params_data,
+                op=args.op)
                 
             elif args.command == 'server':
-                host = args.host if args.host else config.WEB_SERVER_HOST
-                port = args.port if args.port else config.WEB_SERVER_PORT
-                debug = args.debug if args.debug else config.WEB_SERVER_DEBUG
-                start_server(host=host, port=port, debug=debug, config=config)
+                run_server(ini_file=args.config,
+                host=args.host,
+                port=args.port,
+                debug=args.debug)
             else:
                 parser.print_help()
     except Exception as e:
@@ -147,6 +87,111 @@ def main():
         except:
             pass
 
+def launch_monitor(directory="monitor"):
+    import multiprocessing as mp
+    from .monitor import monitor_process
+    prc = None
+    def monitor():
+        monitor_process(process_name="python",interval=5, output_file=None, directory=directory)          
+
+    prc = mp.Process(target=monitor, daemon=True)
+    prc.start()
+    return prc
+
+def init_db(ini_file="settings.ini", db_type=None, db_driver=None, db_user=None, db_password=None, db_host=None, db_port=None, db_name=None):
+    """
+    Initialize the database connection.
+    This function is called when the script is executed directly.
+    """
+    from .iniclass import IniClass
+    from .database import DB
+    from .log import Logger
+    from .utils import parse_sqlalchemy_url, generate_sqlalchemy_url
+
+    config = IniClass(ini_file=ini_file)
+    Logger.initLogger(
+        level=logging.getLevelName(config.LOG_LEVEL),
+        console=config.LOG_ON_CONSOLE,
+        file=config.LOG_ON_FILE,
+        db=config.LOG_ON_DATABASE,
+        engine=None,                    
+        log_name=config.LOG_NAME, 
+        dir_log=config.LOG_DIR,
+        format=config.LOG_FORMAT,
+        execution_format=config.LOG_EXECUTION_FORMAT
+        )
+    url_dict = {}
+    if config.DATABASE_URL:
+        url = config.DATABASE_URL
+        url_dict = parse_sqlalchemy_url(url)
+    if db_type:
+        url_dict["db_type"] = db_type
+    if db_driver:
+        url_dict["db_driver"] = db_driver
+    if db_user:
+        url_dict["db_user"] = db_user
+    if db_password:
+        url_dict["db_password"] = db_password
+    if db_host:
+        url_dict["db_host"] = db_host
+    if db_port:
+        url_dict["db_port"] = db_port
+    if db_name:
+        url_dict["db_name"] = db_name                    
+        url = generate_sqlalchemy_url(**url_dict)                
+        DB.init_db(url) 
+
+def open_db(ini_file="settings.ini"):
+    from .iniclass import IniClass
+    from .database import DB
+    from .log import Logger
+    config = IniClass(ini_file=ini_file)
+    Logger.initLogger(
+        level=logging.getLevelName(config.LOG_LEVEL),
+        console=config.LOG_ON_CONSOLE,
+        file=config.LOG_ON_FILE,
+        db=config.LOG_ON_DATABASE,
+        engine=None,                    
+        log_name=config.LOG_NAME, 
+        dir_log=config.LOG_DIR,
+        format=config.LOG_FORMAT,
+        execution_format=config.LOG_EXECUTION_FORMAT
+        )
+    try:
+        if config.DATABASE_URL:
+            DB.open_db(config.DATABASE_URL)  
+        else:
+            raise ValueError("DATABASE_URL is not set in the configuration file.")
+    except Exception as e:
+        raise Exception(f"Error initializing database: {e}")            
+    Logger.setEngine(DB.get_engine())   
+    return config
+
+def run(ini_file="settings.ini", params="params.json", params_data="params_data.json", op=None):
+    import os
+    from .dispatcher import Dispatcher
+
+    config = open_db(ini_file=ini_file)
+    if params_data:
+        params = [params_data, params]                
+    else:
+        if os.path.exists("params_data.json"):
+            params = ["params_data.json", params]
+    Dispatcher(params=params, ini=config, op=op).run()       
+
+def run_server(ini_file="settings.ini", host=None, port=None, debug=None):
+    """
+    Start the web server.
+    This function is called when the script is executed directly.
+    """
+    from .server.server import start_server
+    
+    config = open_db(ini_file=ini_file)
+    host = host if host is None else config.WEB_SERVER_HOST
+    port = port if port is None  else config.WEB_SERVER_PORT
+    debug = debug if debug is None  else config.WEB_SERVER_DEBUG
+    start_server(host=host, port=port, debug=debug, config=config)    
+    
 if __name__ == "__main__":
     main()
         

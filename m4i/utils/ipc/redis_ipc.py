@@ -2,12 +2,19 @@ import pickle
 import threading
 import logging
 from collections import defaultdict
-import redis
+import warnings
+try:
+    import redis
+except ImportError:
+    warnings.warn("Redis library not found. Please install it with 'pip install redis' to use it.", ImportWarning)
+
+
 import socket
 
 try:
     import dill as pickle
 except ImportError:
+    warnings.warn("Dill library not found. Using standard pickle instead. Install it with 'pip install dill' for better serialization support.", ImportWarning)
     import pickle
 
 logging.basicConfig(level=logging.DEBUG)
