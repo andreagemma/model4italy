@@ -281,8 +281,8 @@ class DB:
                 cursor = dbapi_connection.cursor()
                 cursor.execute("PRAGMA journal_mode=WAL;")
                 cursor.close()     
-
-        DB._session_factory = scoped_session(sessionmaker(bind=DB._engine))
+        
+        DB._session_factory = scoped_session(sessionmaker(bind=DB._engine, autoflush=True))
         try:
             Base.metadata.create_all(DB._engine)
             DB.log.info("Database initialized successfully.")
