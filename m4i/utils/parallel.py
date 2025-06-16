@@ -111,6 +111,8 @@ class Parallel:
                     import ray
                     ray.util.register_serializer(dict, serializer=dill.dumps, deserializer=dill.loads)
                     kwargs["ignore_reinit_error"] = True
+                    kwargs["include_dashboard"] = False
+                    kwargs["include_dashboard"]={"log_to_driver": True}
                     address = kwargs.pop("address", None)
                     if address and address.lower() != "local":
                         try:
