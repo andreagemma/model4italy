@@ -44,7 +44,7 @@ class IniClass:
 
         self.load_parameters()
         if self.LOG_USE:
-            logging.info("File %s caricato", __file__)
+            logging.info("File %s caricato", os.path.abspath(ini_file))
 
     def load_parameters(self):
 

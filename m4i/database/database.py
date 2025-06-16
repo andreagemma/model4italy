@@ -274,7 +274,6 @@ class DB:
             pool_pre_ping=True,
             connect_args=connect_args
         )
-        # ➕ Abilita WAL per SQLite
         if DATABASE_URL.startswith("sqlite"):
             @event.listens_for(DB._engine, "connect")
             def set_sqlite_pragma(dbapi_connection, connection_record):

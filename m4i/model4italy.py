@@ -124,6 +124,8 @@ def init_db(ini_file="settings.ini", db_type=None, db_driver=None, db_user=None,
     if config.DATABASE_URL:
         url = config.DATABASE_URL
         url_dict = parse_sqlalchemy_url(url)
+    if db_type is not None or db_driver is not None or db_user is not None or db_password is not None or db_host is not None or db_port is not None or db_name is not None:
+        url_dict = {}
     if db_type:
         url_dict["db_type"] = db_type
     if db_driver:
@@ -139,7 +141,7 @@ def init_db(ini_file="settings.ini", db_type=None, db_driver=None, db_user=None,
     if db_name:
         url_dict["db_name"] = db_name                    
         url = generate_sqlalchemy_url(**url_dict)                
-        DB.init_db(url) 
+    DB.init_db(url) 
 
 def open_db(ini_file="settings.ini"):
     from .iniclass import IniClass
