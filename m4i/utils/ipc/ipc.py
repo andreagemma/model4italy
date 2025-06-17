@@ -8,7 +8,7 @@ from .web_socket_ipc import WebSocketIPC
 from typing import Callable, Any, Generator
 class IPC:
 
-    def __init__(self,bucket: str=None, host='localhost', port=6379, db=0, compression: str = None, clevel: int = 5, backend: str = "redis"):
+    def __init__(self,bucket: str=None, host='localhost', port=6379, db=0, compression: str = None, compression_level: int = 5, backend: str = "redis"):
         """
         Inizializza l'oggetto IPC con il backend desiderato.
         """
@@ -17,17 +17,17 @@ class IPC:
         self.port = port
         self.db = db
         self.compression = compression
-        self.clevel = clevel
+        self.compression_level = compression_level
         self.backend = backend
         self.prefix = f"{bucket}:" if bucket else ""     
         assert backend in ["redis", "local"], f"Backend {backend} non supportato. Scegli tra 'redis' o 'local'."
 
         if backend == "redis":
             self.ipc = RedisIPC(host=host, port=port, db=db)
-            self.shdmem = RedisSharedMemory(bucket=bucket, host=host, port=port, db=db, compression=compression, clevel=clevel)
+            self.shdmem = RedisSharedMemory(bucket=bucket, host=host, port=port, db=db, compression=compression, clevel=compression_level)
         elif backend == "local":
             self.ipc = WebSocketIPC(host="localhost", port=port)
-            self.shdmem = SharedMemory(bucket=bucket, compression=compression, clevel=clevel)
+            self.shdmem = SharedMemory(bucket=bucket, compression=compression, clevel=compression_level)
 
     def _key(self, key) ->str:
         return f"{self.prefix}{key}"

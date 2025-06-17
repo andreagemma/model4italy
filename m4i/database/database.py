@@ -278,7 +278,7 @@ class DB:
             @event.listens_for(DB._engine, "connect")
             def set_sqlite_pragma(dbapi_connection, connection_record):
                 cursor = dbapi_connection.cursor()
-                cursor.execute("PRAGMA journal_mode=WAL;")
+                cursor.execute("PRAGMA journal_mode=DELETE;")
                 cursor.close()     
         
         DB._session_factory = scoped_session(sessionmaker(bind=DB._engine, autoflush=True))
@@ -303,7 +303,7 @@ class DB:
             @event.listens_for(DB._engine, "connect")
             def set_sqlite_pragma(dbapi_connection, connection_record):
                 cursor = dbapi_connection.cursor()
-                cursor.execute("PRAGMA journal_mode=WAL;")
+                cursor.execute("PRAGMA journal_mode=DELETE;")
                 cursor.close()             
         DB._session_factory = scoped_session(sessionmaker(bind=DB._engine))
         DB.log = Logger.getLogger("DB_INIT")

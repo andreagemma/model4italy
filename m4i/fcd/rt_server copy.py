@@ -24,7 +24,7 @@ from ..graphs import AbstractGraph, PathList, PathList
 from .build_paths import BuildPaths
 from ..params_parser import ParamsParser
 from ..connectors import Loader, Writer
-from ..utils import export_dataframe, TicToc, multi_line_to_line, to_datetime_auto, to_timedelta_auto
+from ..utils import export_dataframe, TicToc, multi_line_to_line
 from ..utils.ipc import IPC
 from ..log import Logger
 
@@ -61,49 +61,95 @@ class RTServer:
         self.zones: gpd.GeoDataFrame = None
         self.t:int = 0
 
-        self.t_start: datetime = None
-        self.t_end: datetime = None
-        self.horizon: timedelta = None
-        self.timeslice: timedelta = None
+    def to_datetime(self, t: Union[str,int,datetime]) -> datetime:
+        """
+        Convert a string or int to a datetime object.
+        """
+        if isinstance(t, str):
+            if t.isnumeric():
+                t = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(minutes=float(t))
+            else:
+                try:
+                    t = datetime.strptime(t, "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    raise ValueError("Invalid date format. Use 'YYYY-MM-DD HH:MM:SS' or a number.")
+        elif isinstance(t, (float,int)):
+            t = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(minutes=t)
+        return t
+    def to_timedelta(self, t: Union[str,int,datetime]) -> timedelta:
+        """
+        Convert a string or int to a datetime object.
+        """
+        if isinstance(t, str):
+            if t.isnumeric():
+                t = timedelta(minutes=float(t))
+            else:
+                raise ValueError("Invalid timedelta format. Use a number.")
+        elif isinstance(t, (float,int)):
+            t = timedelta(minutes=t)
+        return t  
 
     def elaborate_period(self, 
                          t_start: Union[str,int,datetime], 
-                         t_end: Union[str,int,datetime]
+                         t_end: Union[str,int,datetime],
+                         horizon: Union[str,int,timedelta]=15,
                          ):
         tic=self.tic.get().info("Elaborating period...")
         assert isinstance(t_start, (str,int,datetime)), "t_start must be a string, int or datetime"
         assert isinstance(t_end, (str,int,datetime)), "t_end must be a string, int or datetime"
-        self.t_start = to_datetime_auto(t_start,unit="minutes")
-        self.t_end = to_datetime_auto(t_end,unit="minutes")        
-        self.horizon = to_timedelta_auto(self.parser.ini.FCD_SERVER_FCD_HORIZON, unit="minutes")
-        self.timeslice = to_timedelta_auto(self.parser.ini.FCD_SERVER_FCD_TIMESLICE_OFFLINE, unit="minutes") 
+        t_start = self.to_datetime(t_start)
+        t_end = self.to_datetime(t_end)
+        horizon = self.to_timedelta(horizon)
 
-
-        ts = self.t_start
-        te = self.t_start + self.horizon
+        ts = t_start
+        te = t_start + horizon
         mode = "w"
         while te <= t_end:
             self.tic.info("Processing period from {ts} to {te}", ts=ts, te=te)
-            self.step(t_start=ts, t_end=te)
+            self.step(t_start=ts, t_end=te, share_on_ipc=False, clean=False)
             path_to_save = self.paths.filter(lambda x: x.get("closed") == True, inplace=False)
             if self.save_paths(paths=path_to_save,path_parameters="params.rt_paths", mode=mode):
                 mode = "a"
             for path in path_to_save.all_paths():
                 self.paths.delete(path)
             ts = te
-            te = ts + self.horizon
+            te = ts + horizon
 
 
     def step(self, 
-             t_start: datetime=None, 
-             t_end: datetime=None
+             t_start: Union[str,int,datetime]=None, 
+             t_end: Union[str,int,datetime]=None, 
+             horizon: Union[str,int,timedelta]=None,
+             share_on_ipc: bool=True,
+             clean: bool=True,     
              ) -> None:
         """
         Perform a step in the FCD processing pipeline.
         """
         t_step=self.tic.get().info("Performing step...")
+        if t_start is not None:            
+            t_start = self.to_datetime(t_start)
+        if t_end is not None:
+            t_end = self.to_datetime(t_end)
+        if horizon is not None:
+            horizon = self.to_timedelta(horizon)
 
-        self.tic.info("Step from {t_start} to {t_end}", t_start=self.t_start, t_end=self.t_end)
+        if t_start is None and t_end is None:
+            t_end = datetime.now()
+            horizon = horizon or timedelta(minutes=self.parser.ini.FCD_SERVER_FCD_HORIZON)
+            t_start = t_end - horizon
+        elif t_start is None and t_end is not None:
+            t_end = t_end
+            horizon = horizon or timedelta(minutes=self.parser.ini.FCD_SERVER_FCD_HORIZON)
+            t_start = t_end - horizon
+        elif t_start is not None and t_end is None:
+            horizon = horizon or timedelta(minutes=self.parser.ini.FCD_SERVER_FCD_HORIZON)
+            t_end = t_start + horizon
+        elif t_start is not None and t_end is not None:
+            if t_start >= t_end:
+                raise ValueError("t_start must be less than t_end")
+            horizon = t_end - t_start
+        self.tic.info("Step from {t_start} to {t_end} with horizon {horizon}", t_start=t_start, t_end=t_end, horizon=horizon)
         self.t = int((t_start-t_start.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds() // 60)
         self.load_graph(share_on_ipc=share_on_ipc)
         self.build_paths.load_graph(df_links=self.df_links)

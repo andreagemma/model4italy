@@ -7,7 +7,7 @@ from ..log import Logger
 from ..utils import IPC, to_datetime_auto, to_timedelta_auto, to_namedtuple
 from ..utils.parallel import Parallel
 from ..base_m4i_model import BaseM4IModel
-from typing import Optional, List, Union
+from typing import Union, Optional, List, Generator, Tuple
 from datetime import datetime
 import pandas as pd
 import geopandas as gpd
@@ -58,7 +58,6 @@ class FCDManager(BaseM4IModel):
     
     def build_trips(self, 
                  df_fcd: Union[pd.DataFrame, gpd.GeoDataFrame], 
-                 group_by: Optional[List[str]] = ["id_veh"],
                  tz_data: Optional[str]= None,
                  crs_data: Optional[str] = None,
                  crs_calc: Optional[str] = None,
@@ -75,32 +74,34 @@ class FCDManager(BaseM4IModel):
                  max_delta_progr:Optional[float] = None,
                  limited_to: Optional[List[str]] = None,
                  t_begin: Optional[datetime] = None,
-                 t_end: Optional[datetime] = None
-               ):
+                 t_end: Optional[datetime] = None,
+                 add_truncated_trips: bool = False,
+               ) -> Generator[Tuple[pd.DataFrame,pd.DataFrame], None, None]:
         self.df_fcd = df_fcd
         self.tz_data = tz_data or self.ini.TZ_DATA
-        self.crs_calc = crs_calc or self.ini.FCD_CRS_CALC
-        self.crs_data = crs_data or self.ini.FCD_CRS_DATA
-        self.signal_break_max_dt = signal_break_max_dt if signal_break_max_dt is None else self.ini.TRIPS_SIGNAL_BREAK_MAX_DT 
-        self.signal_break_dt = signal_break_dt if signal_break_dt is None else self.ini.TRIPS_SIGNAL_BREAK_DT
-        self.signal_break_v = signal_break_v if signal_break_v is not None else self.ini.TRIPS_SIGNAL_BREAK_V
-        self.stop_o_ds = stop_o_ds if stop_o_ds is not None else self.ini.TRIPS_STOP_O_DS
-        self.stop_d_ds = stop_d_ds if stop_d_ds is not None else self.ini.TRIPS_STOP_D_DS
-        self.signal_cont_dt = signal_cont_dt if signal_cont_dt is not None else self.ini.TRIPS_SIGNAL_CONT_DT
-        self.signal_cont_v = signal_cont_v if signal_cont_v is not None else self.ini.TRIPS_SIGNAL_CONT_V
-        self.max_v3 = max_v3 if max_v3 is not None else self.ini.TRIPS_MAX_V3
-        self.max_distance_override = max_distance_override if max_distance_override is not None else self.ini.TRIPS_MAX_DISTANCE_OVERRIDE_POSITION_FIRST_POINT
-        self.min_length = min_length if min_length is not None else self.ini.TRIPS_MIN_LENGTH
-        self.min_time = min_time if min_time is not None else self.ini.TRIPS_MIN_TIME
-        self.remove_stops = remove_stops if remove_stops is not None else self.ini.TRIPS_REMOVE_STOPS
-        self.max_distance_between_data = max_distance_between_data if max_distance_between_data is not None else self.ini.TRIPS_MAX_DISTANCE_BETWEEN_DATA
-        self.max_delta_progr = max_delta_progr if max_delta_progr is not None else self.ini.TRIPS_MAX_DELTA_PROGR
+        self.crs_calc = crs_calc or self.ini.FCD_SERVER_FCD_CRS_CALC
+        self.crs_data = crs_data or self.ini.FCD_SERVER_FCD_CRS_DATA
+        self.signal_break_max_dt = signal_break_max_dt if signal_break_max_dt is None else self.ini.FCD_TRIPS_SIGNAL_BREAK_MAX_DT 
+        self.signal_break_dt = signal_break_dt if signal_break_dt is None else self.ini.FCD_TRIPS_SIGNAL_BREAK_DT
+        self.signal_break_v = signal_break_v if signal_break_v is not None else self.ini.FCD_TRIPS_SIGNAL_BREAK_V
+        self.stop_o_ds = stop_o_ds if stop_o_ds is not None else self.ini.FCD_TRIPS_STOP_O_DS
+        self.stop_d_ds = stop_d_ds if stop_d_ds is not None else self.ini.FCD_TRIPS_STOP_D_DS
+        self.signal_cont_dt = signal_cont_dt if signal_cont_dt is not None else self.ini.FCD_TRIPS_SIGNAL_CONT_DT
+        self.signal_cont_v = signal_cont_v if signal_cont_v is not None else self.ini.FCD_TRIPS_SIGNAL_CONT_V
+        self.max_v3 = max_v3 if max_v3 is not None else self.ini.FCD_TRIPS_MAX_V3
+        self.max_distance_override = max_distance_override if max_distance_override is not None else self.ini.FCD_TRIPS_MAX_DISTANCE_OVERRIDE_POSITION_FIRST_POINT
+        self.min_length = min_length if min_length is not None else self.ini.FCD_TRIPS_MIN_LENGTH
+        self.min_time = min_time if min_time is not None else self.ini.FCD_TRIPS_MIN_TIME
+        self.remove_stops = remove_stops if remove_stops is not None else self.ini.FCD_TRIPS_REMOVE_STOPS
+        self.max_distance_between_data = max_distance_between_data if max_distance_between_data is not None else self.ini.FCD_TRIPS_MAX_DISTANCE_BETWEEN_DATA
+        self.max_delta_progr = max_delta_progr if max_delta_progr is not None else self.ini.FCD_TRIPS_MAX_DELTA_PROGR
         self.limited_to = limited_to
         self.t_begin = to_datetime_auto(t_begin) if t_begin is not None else None
         self.t_end = to_datetime_auto(t_end) if t_end is not None else None
+        self.add_truncated_trips = add_truncated_trips
 
         DEBUG = True
-        def process_single_vehicle(id_group, vehicle_df: pd.DataFrame) -> pd.DataFrame:
+        def process_single_vehicle(id_group, vehicle_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
             params = to_namedtuple(self.to_dict())
             return FCDManager._process_single_vehicle(params, vehicle_df, DEBUG)
 
@@ -114,15 +115,11 @@ class FCDManager(BaseM4IModel):
         df_fcd.drop(columns=["geometry"], inplace=True, errors="ignore")
         df_fcd["timestamp"] = df_fcd["timestamp"].dt.tz_convert("Etc/UTC")
         
-        tasks = list(df_fcd.groupby(group_by))
-        ret = None
+        tasks = list(df_fcd.groupby("id_veh"))
         
-        for df_trips in Parallel.execute(process_single_vehicle, tasks, n_workers=1 if DEBUG else None):
-            if ret is None:
-                ret = df_trips
-            else:
-                ret = pd.concat([ret, df_trips], ignore_index=True)
-        return ret
+        for df_trips, df_fcd_trunced in Parallel.execute(process_single_vehicle, tasks, n_workers=1 if DEBUG else None):
+            yield df_trips, df_fcd_trunced
+        
 
     def set_fcd(self, fcd):
         self.fcd = fcd
@@ -133,7 +130,7 @@ class FCDManager(BaseM4IModel):
 
     
     @staticmethod
-    def _process_single_vehicle(params: namedtuple, vehicle_df: pd.DataFrame, DEBUG:bool = False) -> pd.DataFrame:    
+    def _process_single_vehicle(params: namedtuple, vehicle_df: pd.DataFrame, DEBUG:bool = False) -> Tuple[pd.DataFrame,pd.DataFrame]:    
               
         vehicle_df["ts"]=vehicle_df["timestamp"].astype(int)/1000000000
         vehicle_df = vehicle_df.sort_values("ts")
@@ -150,6 +147,7 @@ class FCDManager(BaseM4IModel):
         fcds = list(vehicle_df.itertuples(index=False))
         checkstate = {}
         error_in_max_distance = False
+        truncated_fcds = []
         for i, fcd in enumerate(fcds):
             new_trip = False
 
@@ -267,6 +265,9 @@ class FCDManager(BaseM4IModel):
             if fcd_next is None and not new_trip:
                 new_trip = True
                 trip_fcds.append(fcd)
+                if params.add_truncated_trips:
+                    truncated_fcds.append([f for f in trip_fcds])
+                    FCD_TRIPS_fcds=[]
 
             if not new_trip:  # if no new_trip add fcd to current list
                 trip_fcds.append(fcd)
@@ -447,18 +448,22 @@ class FCDManager(BaseM4IModel):
                                     "dt_o", "dt_d", "tt", "dist", "avg_speed", 
                                     "id_fcds", "progr_o", "id_prev", "id_next", 
                                     "p_before", "p_after", "checkstate", "geometry"])
-            return df
         else:
             df = pd.DataFrame(ret).drop(columns=["t_o", "t_d","fcds"])
             numeric_columns = df.select_dtypes(include=[np.number]).columns
             df[numeric_columns] = df[numeric_columns].fillna(np.nan)
 
-        df =df.astype({"id_trip": 'Int64', "id_veh": str, params.field_group: 'Int32',
-            "dt_o": "datetime64[ns, Etc/UTC]", "dt_d": "datetime64[ns, Etc/UTC]", "tt": np.float64,
-            "dist": np.float64,"avg_speed": np.float64,
-            "id_fcds": object, "progr_o": np.float64, "id_prev": 'Int64', "id_next": 'Int64',
-            "p_before": np.float64, "p_after": np.float64, "checkstate": str, "geometry": str})        
-        return df[['id_trip', 'id_veh', params.field_group, 
-                'dt_o', 'dt_d', 'tt', 'dist', 'avg_speed', 
-                'id_fcds', 'progr_o', 'id_prev', 'id_next', 
-                'p_before', 'p_after', "checkstate", 'geometry']]        
+            df =df.astype({"id_trip": 'Int64', "id_veh": str, params.field_group: 'Int32',
+                "dt_o": "datetime64[ns, Etc/UTC]", "dt_d": "datetime64[ns, Etc/UTC]", "tt": np.float64,
+                "dist": np.float64,"avg_speed": np.float64,
+                "id_fcds": object, "progr_o": np.float64, "id_prev": 'Int64', "id_next": 'Int64',
+                "p_before": np.float64, "p_after": np.float64, "checkstate": str, "geometry": str})        
+            df = df[['id_trip', 'id_veh', params.field_group, 
+                    'dt_o', 'dt_d', 'tt', 'dist', 'avg_speed', 
+                    'id_fcds', 'progr_o', 'id_prev', 'id_next', 
+                    'p_before', 'p_after', "checkstate", 'geometry']]        
+        if params.add_truncated_trips and len(truncated_fcds) > 0:
+            df_truncated_fcds = pd.DataFrame(truncated_fcds, columns=truncated_fcds[0]._fields)
+        else:
+            df_truncated_fcds = pd.DataFrame(colummns=vehicle_df.columns).astype(vehicle_df.dtypes.to_dict())
+        return df, df_truncated_fcds

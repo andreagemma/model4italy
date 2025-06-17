@@ -76,7 +76,7 @@ class GeoPandasDriver(BaseDriver):
                 df.to_parquet(path, index=index, **kwargs)
             elif path.lower().endswith(".shp"):
                 for col in df.columns:
-                    if df[col].dtype.name == "datetime64[ns]":
+                    if df[col].dtype.name.startswith("datetime64"):
                         df[col] = df[col].dt.strftime("%Y-%m-%d %H:%M:%S")
                 df.to_file(path, index=index, mode=mode, **kwargs)
             elif path.lower().endswith(".gpkg"):

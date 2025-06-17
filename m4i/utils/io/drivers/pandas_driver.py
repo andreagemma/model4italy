@@ -76,14 +76,23 @@ class PandasDriver(BaseDriver):
         template: str = "{filename}-{partition}-{i}",
         **kwargs
     ):
+        if isinstance(df, geopandas.GeoDataFrame):
+            tmp = pd.DataFrame(df.drop("geometry", axis=1, errors="ignore"))
+            tmp["geometry"] = df.geometry.to_wkt()
+            kwargs.pop("crs")
+            df = tmp
         index = kwargs.pop("index", False)
         if partitionby is None or len(partitionby)==0:
             if mode in ("wa","aw"):
                 mode = "a"
         if mode == "w":
             remove_path(path)
+            mode="a"
         if partitionby is None or len(partitionby)==0:
             if path.lower().endswith(".parquet"):
+                for col in df.columns:
+                    if df[col].dtype.name.startswith("datetime64"):
+                        df[col] = df[col].dt.strftime("%Y-%m-%d %H:%M:%S")
                 df.to_parquet(path, index=index, **kwargs)
             else:
                 if path.lower().endswith(".csv"):
@@ -101,12 +110,13 @@ class PandasDriver(BaseDriver):
                 partition_values, partitionBy, df = grp
                 if path.lower().endswith(".parquet"):
                     for partition in partitionby:
-                        df.drop(partition, axis=1, inplace=True)            
+                        df.drop(partition, axis=1, inplace=True)
                 filename = os.path.basename(path)
                 extension = os.path.splitext(filename)[1]
                 partitions_hive = [str(p) + "=" + str(v) for p,v in zip(partitionBy, partition_values)]
                 path= os.path.join(path,*partitions_hive)
-                
+                os.makedirs(path, exist_ok=True)
+
                 d = datetime.now()
                 date = d.strftime("%Y%m%d%H%M%S")
                 timestamp = d.timestamp()
@@ -145,4 +155,3 @@ class PandasDriver(BaseDriver):
                 path=path,
                 **kwargs
             )
-

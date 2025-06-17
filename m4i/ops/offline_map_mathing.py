@@ -29,7 +29,7 @@ class OfflineMapMatching(OP):
     def run(self):
         t_start = self.parser.get("date_start")
         t_end = self.parser.get("date_end")
-        horizon = self.ini.FCD_HORIZON
+        horizon = self.ini.FCD_SERVER_FCD_HORIZON
         tic=self.tic.get().info("Elaborating period...")
         assert isinstance(t_start, (str,int,datetime)), "date_start must be a string, int or datetime"
         assert isinstance(t_end, (str,int,datetime)), "date_end must be a string, int or datetime"
@@ -70,14 +70,14 @@ class OfflineMapMatching(OP):
 
         if t_start is None and t_end is None:
             t_end = datetime.now()
-            horizon = horizon or timedelta(minutes=self.parser.ini.FCD_HORIZON)
+            horizon = horizon or timedelta(minutes=self.parser.ini.FCD_SERVER_FCD_HORIZON)
             t_start = t_end - horizon
         elif t_start is None and t_end is not None:
             t_end = t_end
-            horizon = horizon or timedelta(minutes=self.parser.ini.FCD_HORIZON)
+            horizon = horizon or timedelta(minutes=self.parser.ini.FCD_SERVER_FCD_HORIZON)
             t_start = t_end - horizon
         elif t_start is not None and t_end is None:
-            horizon = horizon or timedelta(minutes=self.parser.ini.FCD_HORIZON)
+            horizon = horizon or timedelta(minutes=self.parser.ini.FCD_SERVER_FCD_HORIZON)
             t_end = t_start + horizon
         elif t_start is not None and t_end is not None:
             if t_start >= t_end:
@@ -98,19 +98,19 @@ class OfflineMapMatching(OP):
             if self.ipc.get("_df_links") is not None:
                 self.tic.info("Loading df_links from IPC...")
                 self.df_links = self.ipc.get("_df_links")
-                self.df_links = gpd.GeoDataFrame(self.df_links, crs=self.parser.ini.FCD_CRS_DATA).to_crs(self.parser.ini.FCD_CRS_CALC)
+                self.df_links = gpd.GeoDataFrame(self.df_links, crs=self.parser.ini.FCD_SERVER_FCD_CRS_DATA).to_crs(self.parser.ini.FCD_SERVER_FCD_CRS_CALC)
             if self.ipc.get("_df_nodes") is not None:
                 self.tic.info("Loading df_nodes from IPC...")
                 self.df_nodes = self.ipc.get("_df_nodes")
-                self.df_nodes = gpd.GeoDataFrame(self.df_nodes, crs=self.parser.ini.FCD_CRS_DATA).to_crs(self.parser.ini.FCD_CRS_CALC)
+                self.df_nodes = gpd.GeoDataFrame(self.df_nodes, crs=self.parser.ini.FCD_SERVER_FCD_CRS_DATA).to_crs(self.parser.ini.FCD_SERVER_FCD_CRS_CALC)
             if self.ipc.get("_df_turns") is not None:
                 self.tic.info("Loading df_turns from IPC...")
                 self.df_turns = self.ipc.get("_df_turns")
 
         if self.df_links is None or self.df_nodes is None or self.df_turns is None:
             self.df_links, self.df_nodes, self.df_turns = self.loader.load_df_graph()
-            self.df_nodes = gpd.GeoDataFrame(self.df_nodes, crs=self.parser.ini.FCD_CRS_DATA).to_crs(self.parser.ini.FCD_CRS_CALC)
-            self.df_links = gpd.GeoDataFrame(self.df_links, crs=self.parser.ini.FCD_CRS_DATA).to_crs(self.parser.ini.FCD_CRS_CALC)
+            self.df_nodes = gpd.GeoDataFrame(self.df_nodes, crs=self.parser.ini.FCD_SERVER_FCD_CRS_DATA).to_crs(self.parser.ini.FCD_SERVER_FCD_CRS_CALC)
+            self.df_links = gpd.GeoDataFrame(self.df_links, crs=self.parser.ini.FCD_SERVER_FCD_CRS_DATA).to_crs(self.parser.ini.FCD_SERVER_FCD_CRS_CALC)
         self.graph = self.loader.load_graph(df_links=self.df_links, df_nodes=self.df_nodes, df_turns=self.df_turns)
         id_links = set(l["idx"] for l in self.graph.get_all_links())
         self.df_links = self.df_links[self.df_links["id"].isin(id_links)]

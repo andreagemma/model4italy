@@ -14,16 +14,15 @@ class IniClass:
             db_query="SELECT value FROM settings WHERE name = :name"
         )
         self.DB_SETTINGS_USE = self.config_reader.getboolean("DB_SETTINGS_USE","DATABASE_SETTINGS", False)
+        self.DB_SETTINGS_TYPE = self.config_reader.get("DB_SETTINGS_TYPE", 'DATABASE_SETTINGS', 'sqlite')
+        self.DB_SETTINGS_DRIVER = self.config_reader.get("DB_SETTINGS_DRIVER", 'DATABASE_SETTINGS', 'sqlite')
+        self.DB_SETTINGS_USER = self.config_reader.get("DB_SETTINGS_USER", 'DATABASE_SETTINGS', '')
+        self.DB_SETTINGS_PASS = self.config_reader.get("DB_SETTINGS_PASS", 'DATABASE_SETTINGS', '')
+        self.DB_SETTINGS_HOST = self.config_reader.get("DB_SETTINGS_HOST", 'DATABASE_SETTINGS', '')
+        self.DB_SETTINGS_PORT = self.config_reader.get("DB_SETTINGS_PORT", 'DATABASE_SETTINGS', '')
+        self.DB_SETTINGS_NAME = self.config_reader.get("DB_SETTINGS_NAME", 'DATABASE_SETTINGS', 'settings.db')
+        self.DB_SETTINGS_URL = self.config_reader.get("DB_SETTINGS_URL", 'DATABASE_SETTINGS', '')
         if self.DB_SETTINGS_USE:
-            self.DB_SETTINGS_TYPE = self.config_reader.get("DB_SETTINGS_TYPE", 'DATABASE_SETTINGS', 'sqlite')
-            self.DB_SETTINGS_DRIVER = self.config_reader.get("DB_SETTINGS_DRIVER", 'DATABASE_SETTINGS', 'sqlite')
-            self.DB_SETTINGS_USER = self.config_reader.get("DB_SETTINGS_USER", 'DATABASE_SETTINGS', '')
-            self.DB_SETTINGS_PASS = self.config_reader.get("DB_SETTINGS_PASS", 'DATABASE_SETTINGS', '')
-            self.DB_SETTINGS_HOST = self.config_reader.get("DB_SETTINGS_HOST", 'DATABASE_SETTINGS', '')
-            self.DB_SETTINGS_PORT = self.config_reader.get("DB_SETTINGS_PORT", 'DATABASE_SETTINGS', '')
-            self.DB_SETTINGS_NAME = self.config_reader.get("DB_SETTINGS_NAME", 'DATABASE_SETTINGS', 'settings.db')
-            self.DB_SETTINGS_URL = self.config_reader.get("DB_SETTINGS_URL", 'DATABASE_SETTINGS', '')
-
             # Stringhe di connessione
             if self.DB_SETTINGS_URL == "":
                 self.DB_SETTINGS_URL = generate_sqlalchemy_url(
@@ -41,6 +40,7 @@ class IniClass:
                 use_db=self.DB_SETTINGS_USE,
                 db_query="SELECT value FROM settings WHERE name = :name"
             )
+        
 
         self.load_parameters()
         if self.LOG_USE:
@@ -93,7 +93,6 @@ class IniClass:
         self.SAVE_PATHS = self.config_reader.getboolean("SAVE_PATHS", 'ASSIGNMENT', False)
         self.LOAD_PATHS = self.config_reader.getboolean("LOAD_PATHS", 'ASSIGNMENT', False)
 
-
         # OD ESTIMATION
         self.OD_ESTIMATION_PRELOAD = self.config_reader.getint("OD_ESTIMATION_PRELOAD", 'OD_ESTIMATION', 60)
         self.OD_ESTIMATION_MAX_ITE = self.config_reader.getint("OD_ESTIMATION_MAX_ITE", 'OD_ESTIMATION', 2)
@@ -112,34 +111,43 @@ class IniClass:
         self.OD_ESTIMATION_EPS = self.config_reader.getfloat("OD_ESTIMATION_EPS", 'OD_ESTIMATION', 0.000001)  # Soglia di arresto dell'ottimizzazione monodimensionale
         self.OD_ESTIMATION_EPS2 = self.config_reader.getfloat("OD_ESTIMATION_EPS2", 'OD_ESTIMATION', 10)  # Soglia di arresto dell'ottimizzazione monodimensionale
         self.OD_ESTIMATION_SA = self.config_reader.getfloat("OD_ESTIMATION_SA", 'OD_ESTIMATION', 0.362)  # segmento minore della sezione aurea
-        # FCD
-        self.FCD_HORIZON = self.config_reader.getint("FCD_HORIZON", 'FCD', 60) # orario di previsione in minuti
-        self.FCD_TIMESLICE = self.config_reader.getint("FCD_TIMESLICE", 'FCD', 15) # numero massimo di iterazioni per la previsione
-        self.FCD_MAP_MATCHING_CPUS = self.config_reader.getint("FCD_MAP_MATCHING_CPUS", 'FCD', 1) # numero di processi per il map matching
-        self.FCD_PATH_MATCHING_CPUS = self.config_reader.getint("FCD_PATH_MATCHING_CPUS", 'FCD', 1)
-        self.FCD_MAP_MATCHING_MAX_DISTANCE = self.config_reader.getfloat("FCD_MAP_MATCHING_MAX_DISTANCE", 'FCD', 50) # distanza massima per il map matching in metri
-        self.FCD_MAP_MATCHING_MAX_ANGLE = self.config_reader.getfloat("FCD_MAP_MATCHING_MAX_ANGLE", 'FCD', 45) # angolo massimo per il map matching in gradi
-        self.FCD_CRS_DATA = self.config_reader.get("FCD_CRS_DATA", 'FCD', "EPSG:4326") # CRS dei dati FCD
-        self.FCD_CRS_CALC = self.config_reader.get("FCD_CRS_CALC", 'FCD', "EPSG:6875") # CRS dei dati FCD
-        self.FCD_PATH_START_FROM_ZONE = self.config_reader.getboolean("FCD_PATH_START_FROM_ZONE", 'FCD', False) # se True il path inizia dalla zona di partenza
-        self.FCD_PATH_END_TO_ZONE = self.config_reader.getboolean("FCD_PATH_END_TO_ZONE", 'FCD', False) # se True il path termina nella zona di arrivo
-        self.FCD_PATH_AGGRATION_INTERVAL = self.config_reader.getint("FCD_PATH_AGGRATION_INTERVAL", 'FCD', 15) # intervallo di aggregazione in secondi
-     
-    
-        self.TRIPS_SIGNAL_BREAK_MAX_DT = self.config_reader.getint("TRIPS_SIGNAL_BREAK_MAX_DT", 'FCD', 900)  # max time for signal break in seconds
-        self.TRIPS_SIGNAL_BREAK_DT = self.config_reader.getint("TRIPS_SIGNAL_BREAK_DT", 'FCD', 300)  # time for signal break in seconds
-        self.TRIPS_SIGNAL_BREAK_V = self.config_reader.getfloat("TRIPS_SIGNAL_BREAK_V", 'FCD', 0.5555555555555556)  # speed for signal break in m/s
-        self.TRIPS_STOP_O_DS = self.config_reader.getfloat("TRIPS_STOP_O_DS", 'FCD', 50)  # distance for stop at origin in meters
-        self.TRIPS_STOP_D_DS = self.config_reader.getfloat("TRIPS_STOP_D_DS", 'FCD', 50)  # distance for stop at destination in meters
-        self.TRIPS_SIGNAL_CONT_DT = self.config_reader.getint("TRIPS_SIGNAL_CONT_DT", 'FCD', 600)  # time for signal continuation in seconds
-        self.TRIPS_SIGNAL_CONT_V = self.config_reader.getfloat("TRIPS_SIGNAL_CONT_V", 'FCD', 0.1388888888888889)  # speed for signal continuation in m/s
-        self.TRIPS_MAX_V3 = self.config_reader.getfloat("TRIPS_MAX_V3", 'FCD', 69.44444444444444)  # max speed for V3 in m/s
-        self.TRIPS_MAX_DISTANCE_OVERRIDE_POSITION_FIRST_POINT = self.config_reader.getfloat("TRIPS_MAX_DISTANCE_OVERRIDE_POSITION_FIRST_POINT", 'FCD', 200)  # max distance override in meters
-        self.TRIPS_MIN_LENGTH = self.config_reader.getfloat("TRIPS_MIN_LENGTH", 'FCD', 100)  # min length of trip in meters
-        self.TRIPS_MIN_TIME = self.config_reader.getint("TRIPS_MIN_TIME", 'FCD', 1)  # min time of trip in seconds
-        self.TRIPS_REMOVE_STOPS = self.config_reader.getboolean("TRIPS_REMOVE_STOPS", 'FCD', False)  # remove stops in trips
-        self.TRIPS_MAX_DISTANCE_BETWEEN_DATA = self.config_reader.getfloat("TRIPS_MAX_DISTANCE_BETWEEN_DATA", 'FCD', 20000)  # max distance between data in meters
-        self.TRIPS_MAX_DELTA_PROGR = self.config_reader.getfloat("TRIPS_MAX_DELTA_PROGR", 'FCD', 20000)  # max delta progression in meters
+        
+        # FCD_SERVER
+        self.FCD_SERVER_FCD_HORIZON = self.config_reader.getint("FCD_SERVER_FCD_HORIZON", 'FCD_SERVER', 60) # orario di previsione in minuti
+        self.FCD_SERVER_FCD_TIMESLICE = self.config_reader.getint("FCD_SERVER_FCD_TIMESLICE", 'FCD_SERVER', 15) # numero massimo di iterazioni per la previsione
+        self.FCD_SERVER_FCD_TIMESLICE_OFFLINE = self.config_reader.getint("FCD_SERVER_FCD_TIMESLICE_OFFLINE", 'FCD_SERVER', 120) # numero di iterazioni per la previsione offline
+        self.FCD_SERVER_FCD_CRS_DATA = self.config_reader.get("FCD_SERVER_FCD_CRS_DATA", 'FCD_SERVER', "EPSG:4326") # CRS dei dati FCD
+        self.FCD_SERVER_FCD_CRS_CALC = self.config_reader.get("FCD_SERVER_FCD_CRS_CALC", 'FCD_SERVER', "EPSG:6875") # CRS dei dati FCD
+        self.FCD_SERVER_EXPORT_IPC = self.config_reader.getboolean("FCD_SERVER_EXPORT_IPC", 'FCD_SERVER', True) # esporta i dati FCD su IPC
+        self.FCD_SERVER_EXPORT_SUPPORT = self.config_reader.getboolean("FCD_SERVER_EXPORT_SUPPORT", 'FCD_SERVER', False) # esporta i dati FCD su DB
+        self.FCD_SERVER_MAP_MATCHING = self.config_reader.getboolean("FCD_SERVER_MAP_MATCHING", 'FCD_SERVER', True) # abilita il map matching
+        self.FCD_SERVER_ROUTING = self.config_reader.getboolean("FCD_SERVER_ROUTING", 'FCD_SERVER', True) # abilita il routing
+        self.FCD_SERVER_TRIPS = self.config_reader.getboolean("FCD_SERVER_TRIPS", 'FCD_SERVER', True) # abilita la generazione dei viaggi
+
+
+        self.FCD_MAP_MATCHING_CPUS = self.config_reader.getint("FCD_MAP_MATCHING_CPUS", 'FCD_MAP_MATCHING', 1) # numero di processi per il map matching
+        self.FCD_MAP_MATCHING_MAX_DISTANCE = self.config_reader.getfloat("FCD_MAP_MATCHING_MAX_DISTANCE", 'FCD_MAP_MATCHING', 50) # distanza massima per il map matching in metri
+        self.FCD_MAP_MATCHING_MAX_ANGLE = self.config_reader.getfloat("FCD_MAP_MATCHING_MAX_ANGLE", 'FCD_MAP_MATCHING', 45) # angolo massimo per il map matching in gradi
+
+        self.FCD_ROUTING_CPUS = self.config_reader.getint("FCD_ROUTING_CPUS", 'FCD_ROUTING', 1)
+        self.FCD_ROUTING_START_FROM_ZONE = self.config_reader.getboolean("FCD_ROUTING_START_FROM_ZONE", 'FCD_ROUTING', False) # se True il path inizia dalla zona di partenza
+        self.FCD_ROUTING_END_TO_ZONE = self.config_reader.getboolean("FCD_ROUTING_END_TO_ZONE", 'FCD_ROUTING', False) # se True il path termina nella zona di arrivo
+        self.FCD_ROUTING_AGGRATION_INTERVAL = self.config_reader.getint("FCD_ROUTING_AGGRATION_INTERVAL", 'FCD_ROUTING', 15) # intervallo di aggregazione in secondi
+         
+        self.FCD_TRIPS_SIGNAL_BREAK_MAX_DT = self.config_reader.getint("FCD_TRIPS_SIGNAL_BREAK_MAX_DT", 'FCD_TRIPS', 900)  # max time for signal break in seconds
+        self.FCD_TRIPS_SIGNAL_BREAK_DT = self.config_reader.getint("FCD_TRIPS_SIGNAL_BREAK_DT", 'FCD_TRIPS', 300)  # time for signal break in seconds
+        self.FCD_TRIPS_SIGNAL_BREAK_V = self.config_reader.getfloat("FCD_TRIPS_SIGNAL_BREAK_V", 'FCD_TRIPS', 0.5555555555555556)  # speed for signal break in m/s
+        self.FCD_TRIPS_STOP_O_DS = self.config_reader.getfloat("FCD_TRIPS_STOP_O_DS", 'FCD_TRIPS', 50)  # distance for stop at origin in meters
+        self.FCD_TRIPS_STOP_D_DS = self.config_reader.getfloat("FCD_TRIPS_STOP_D_DS", 'FCD_TRIPS', 50)  # distance for stop at destination in meters
+        self.FCD_TRIPS_SIGNAL_CONT_DT = self.config_reader.getint("FCD_TRIPS_SIGNAL_CONT_DT", 'FCD_TRIPS', 600)  # time for signal continuation in seconds
+        self.FCD_TRIPS_SIGNAL_CONT_V = self.config_reader.getfloat("FCD_TRIPS_SIGNAL_CONT_V", 'FCD_TRIPS', 0.1388888888888889)  # speed for signal continuation in m/s
+        self.FCD_TRIPS_MAX_V3 = self.config_reader.getfloat("FCD_TRIPS_MAX_V3", 'FCD_TRIPS', 69.44444444444444)  # max speed for V3 in m/s
+        self.FCD_TRIPS_MAX_DISTANCE_OVERRIDE_POSITION_FIRST_POINT = self.config_reader.getfloat("FCD_TRIPS_MAX_DISTANCE_OVERRIDE_POSITION_FIRST_POINT", 'FCD_TRIPS', 200)  # max distance override in meters
+        self.FCD_TRIPS_MIN_LENGTH = self.config_reader.getfloat("FCD_TRIPS_MIN_LENGTH", 'FCD_TRIPS', 100)  # min length of trip in meters
+        self.FCD_TRIPS_MIN_TIME = self.config_reader.getint("FCD_TRIPS_MIN_TIME", 'FCD_TRIPS', 1)  # min time of trip in seconds
+        self.FCD_TRIPS_REMOVE_STOPS = self.config_reader.getboolean("FCD_TRIPS_REMOVE_STOPS", 'FCD_TRIPS', False)  # remove stops in trips
+        self.FCD_TRIPS_MAX_DISTANCE_BETWEEN_DATA = self.config_reader.getfloat("FCD_TRIPS_MAX_DISTANCE_BETWEEN_DATA", 'FCD_TRIPS', 20000)  # max distance between data in meters
+        self.FCD_TRIPS_MAX_DELTA_PROGR = self.config_reader.getfloat("FCD_TRIPS_MAX_DELTA_PROGR", 'FCD_TRIPS', 20000)  # max delta progression in meters
         
         # OUPTUT
         self.OUTPUT_AGG_INT = self.config_reader.getfloat("OUTPUT_AGG_INT", 'OUTPUT', 15)
@@ -172,6 +180,7 @@ class IniClass:
 
         for section, name, value in self.config_reader.items():
             if not hasattr(self, name.upper()):
+                logging.warning(f"Setting {section}:{name.upper()} not found in IniClass, setting it to {value}")
                 setattr(self, name.upper(), value)
 
         

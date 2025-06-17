@@ -69,7 +69,10 @@ class ConfigReader:
 
     def getboolean(self, name, section='DEFAULT', default=None):
         value = self.get(name, section, default)
+        if isinstance(value, bool):
+            return value
         return value.lower() in ('true', '1', 'yes') if value is not None else default
+        
 
     def getfloat(self, name, section='DEFAULT', default=None):
         value = self.get(name, section, default)
