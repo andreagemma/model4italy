@@ -81,12 +81,12 @@ class BaseDriver:
         path: str,
         filters: Optional[dict] = None,
         dtype: Optional[dict] = None
-    ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
+    ) -> Union[pd.DataFrame, gpd.GeoDataFrame, dict]:
         raise NotImplementedError("Il driver deve implementare 'import_dataframe'.")
 
     def export_dataframe(
         self,
-        df: Union[pd.DataFrame, gpd.GeoDataFrame],
+        df: Union[pd.DataFrame, gpd.GeoDataFrame, dict],
         path: str,
         mode: str = "w",
         partitionby: Optional[List[str]] = None
@@ -193,7 +193,13 @@ class BaseDriver:
             geometries = df[geometry_column]
 
         gdf = gpd.GeoDataFrame(df.copy(), geometry=geometries)
-        gdf.set_crs(crs, inplace=True)
+        if crs is not None:
+            if gdf.crs is None:
+                gdf.set_crs(crs, inplace=True)
+            else:
+                gdf.to_crs(crs, inplace=True)
+        
+
         return gdf    
     @staticmethod
     def to_dataframe(df: Union[pd.DataFrame, gpd.GeoDataFrame]) -> pd.DataFrame:

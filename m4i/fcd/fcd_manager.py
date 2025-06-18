@@ -1,4 +1,5 @@
 from collections import namedtuple
+from .map_matching import MapMatching
 from ..connectors import Loader
 from ..connectors import Writer
 from .. import ParamsParser
@@ -17,33 +18,19 @@ import json
 from shapely.geometry import LineString
 from shapely import to_wkb, to_wkt, to_geojson
 from pytz import timezone
-
+from math import ceil
 
 
 class FCDManager(BaseM4IModel):
 
     def __init__(self, loader: Loader, writer: Writer, ipc: IPC, **kwargs):
         super().__init__(loader=loader, writer=writer, ipc=ipc, **kwargs)
+        self.mm: MapMatching  = None
         
 
-    def load_fcd_by_timestamp(self, t_start: datetime, t_end: datetime, crs_data=None):
-        t_start = to_datetime_auto(t_start)
-        t_end = to_datetime_auto(t_end)
-        self.log.info(f"Loading fcd data between {t_start} and {t_end}")
-        dtype = self.parser.get_dtype("fcd")
-        df_fcd = self.loader.load(
-                    path="params.fcd",
-                    filters=[("timestamp",">=",t_start.strftime("%Y-%m-%d %H:%M:%S")), ("timestamp","<=",t_end.strftime("%Y-%m-%d %H:%M:%S"))],
-                    dtype=dtype,
-                    )        
-        df_fcd = gpd.GeoDataFrame(df_fcd, crs=crs_data)
-        if (crs_data or self.crs_data) != self.crs_calc:
-            df_fcd = df_fcd.to_crs(self.crs_calc)
-        return df_fcd
-
-    def load_fcd_by_timestamp(self, t_start: datetime, t_end: datetime, crs_data=None):
-        t_start = to_datetime_auto(t_start).tz_localize(self.ini.TZ_LOCAL)
-        t_end = to_datetime_auto(t_end).tz_localize(self.ini.TZ_LOCAL)  # Ensure timezone-naive for comparison
+    def load_fcd_by_timestamp(self, t_start: datetime, t_end: datetime, crs_data=None, crs_calc=None) -> gpd.GeoDataFrame:
+        t_start = to_datetime_auto(t_start, tz_localize=self.ini.FCD_SERVER_TZ_DATA)
+        t_end = to_datetime_auto(t_end,tz_localize=self.ini.FCD_SERVER_TZ_DATA)
         self.log.info(f"Loading fcd data between {t_start} and {t_end}")
         dtype = self.parser.get_dtype("fcd")
         df_fcd = self.loader.load(
@@ -51,14 +38,21 @@ class FCDManager(BaseM4IModel):
                     filters=[("timestamp",">=",t_start.strftime("%Y-%m-%d %H:%M:%S%z")), ("timestamp","<=",t_end.strftime("%Y-%m-%d %H:%M:%S%z"))],
                     dtype=dtype,
                     )        
+        # if geomertry is empty build with x and y and crs_data
+        if "geometry" not in df_fcd.columns or df_fcd["geometry"].isnull().all():
+            if "x" in df_fcd.columns and "y" in df_fcd.columns:
+                df_fcd["geometry"] = gpd.points_from_xy(df_fcd["x"], df_fcd["y"])
+            else:
+                raise ValueError("No geometry or x/y columns found in FCD data.")
         df_fcd = gpd.GeoDataFrame(df_fcd, crs=crs_data)
-        if (crs_data or self.crs_data) != self.crs_calc:
-            df_fcd = df_fcd.to_crs(self.crs_calc)
+        df_fcd["timestamp"] = pd.to_datetime(df_fcd["timestamp"],errors="coerce").dt.tz_localize(self.ini.FCD_SERVER_TZ_DATA)        
+        if crs_data != crs_calc:
+            df_fcd = df_fcd.to_crs(crs_calc)
         return df_fcd
     
     def build_trips(self, 
                  df_fcd: Union[pd.DataFrame, gpd.GeoDataFrame], 
-                 tz_data: Optional[str]= None,
+                 #tz_data: Optional[str]= None,
                  crs_data: Optional[str] = None,
                  crs_calc: Optional[str] = None,
                  signal_break_max_dt: Optional[float] = None, signal_break_dt: Optional[float] = None, 
@@ -78,7 +72,7 @@ class FCDManager(BaseM4IModel):
                  add_truncated_trips: bool = False,
                ) -> Generator[Tuple[pd.DataFrame,pd.DataFrame], None, None]:
         self.df_fcd = df_fcd
-        self.tz_data = tz_data or self.ini.TZ_DATA
+        #self.tz_data = tz_data or self.ini.FCD_SERVER_TZ_DATA
         self.crs_calc = crs_calc or self.ini.FCD_SERVER_FCD_CRS_CALC
         self.crs_data = crs_data or self.ini.FCD_SERVER_FCD_CRS_DATA
         self.signal_break_max_dt = signal_break_max_dt if signal_break_max_dt is None else self.ini.FCD_TRIPS_SIGNAL_BREAK_MAX_DT 
@@ -100,7 +94,7 @@ class FCDManager(BaseM4IModel):
         self.t_end = to_datetime_auto(t_end) if t_end is not None else None
         self.add_truncated_trips = add_truncated_trips
 
-        DEBUG = True
+        DEBUG = False
         def process_single_vehicle(id_group, vehicle_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
             params = to_namedtuple(self.to_dict())
             return FCDManager._process_single_vehicle(params, vehicle_df, DEBUG)
@@ -113,11 +107,30 @@ class FCDManager(BaseM4IModel):
         df_fcd["y"] = df_fcd.geometry.y
         df_fcd = pd.DataFrame(df_fcd)
         df_fcd.drop(columns=["geometry"], inplace=True, errors="ignore")
-        df_fcd["timestamp"] = df_fcd["timestamp"].dt.tz_convert("Etc/UTC")
+        df_fcd["timestamp"] = df_fcd["timestamp"].dt.tz_convert("UTC")
         
         tasks = list(df_fcd.groupby("id_veh"))
+        df_trips:pd.DataFrame = None
+        df_fcd_trunced:pd.DataFrame = None
+        ret_df_trips:pd.DataFrame = None
+        ret_df_fcd_trunced:pd.DataFrame = None
         
-        for df_trips, df_fcd_trunced in Parallel.execute(process_single_vehicle, tasks, n_workers=1 if DEBUG else None):
+        for df_trips, df_fcd_trunced in Parallel.execute(process_single_vehicle, tasks, n_workers=1 if DEBUG else self.parser.ini.FCD_TRIPS_CPUS):
+            if df_trips is not None and len(df_trips) > 0:
+                df_trips["dt_o"] = df_trips["dt_o"].dt.tz_convert(self.ini.FCD_SERVER_TZ_DATA)
+                df_trips["dt_d"] = df_trips["dt_d"].dt.tz_convert(self.ini.FCD_SERVER_TZ_DATA)
+                if ret_df_trips is None:
+                    ret_df_trips = df_trips
+                else:
+                    ret_df_trips = pd.concat([ret_df_trips, df_trips], ignore_index=True)
+            if df_fcd_trunced is not None and len(df_fcd_trunced) > 0:
+                df_fcd_trunced["timestamp"] = df_fcd_trunced["timestamp"].dt.tz_localize("UTC").dt.tz_convert(self.ini.FCD_SERVER_TZ_DATA)
+                if ret_df_fcd_trunced is None:
+                    ret_df_fcd_trunced = df_fcd_trunced
+                else:
+                    ret_df_fcd_trunced = pd.concat([ret_df_fcd_trunced, df_fcd_trunced], ignore_index=True)
+            
+
             yield df_trips, df_fcd_trunced
         
 
@@ -126,8 +139,6 @@ class FCDManager(BaseM4IModel):
 
     def update_fcd(self, new_fcd):
         self.fcd.update(new_fcd)
-
-
     
     @staticmethod
     def _process_single_vehicle(params: namedtuple, vehicle_df: pd.DataFrame, DEBUG:bool = False) -> Tuple[pd.DataFrame,pd.DataFrame]:    
@@ -454,7 +465,7 @@ class FCDManager(BaseM4IModel):
             df[numeric_columns] = df[numeric_columns].fillna(np.nan)
 
             df =df.astype({"id_trip": 'Int64', "id_veh": str, params.field_group: 'Int32',
-                "dt_o": "datetime64[ns, Etc/UTC]", "dt_d": "datetime64[ns, Etc/UTC]", "tt": np.float64,
+                "dt_o": "datetime64[ns, UTC]", "dt_d": "datetime64[ns, UTC]", "tt": np.float64,
                 "dist": np.float64,"avg_speed": np.float64,
                 "id_fcds": object, "progr_o": np.float64, "id_prev": 'Int64', "id_next": 'Int64',
                 "p_before": np.float64, "p_after": np.float64, "checkstate": str, "geometry": str})        
@@ -466,4 +477,80 @@ class FCDManager(BaseM4IModel):
             df_truncated_fcds = pd.DataFrame(truncated_fcds, columns=truncated_fcds[0]._fields)
         else:
             df_truncated_fcds = pd.DataFrame(colummns=vehicle_df.columns).astype(vehicle_df.dtypes.to_dict())
+        df_truncated_fcds.drop(columns=["ts"], errors="ignore", inplace=True)
         return df, df_truncated_fcds
+    
+    def map_matching_fcd(self, df_fcd: gpd.GeoDataFrame, df_links, links_id_col, links_direction_col) -> gpd.GeoDataFrame:        
+        chunksize = chunksize = ceil(len(df_fcd) / Parallel.get_num_cpus(self.parser.ini.FCD_MAP_MATCHING_CPUS))
+        tasks = [df_fcd.iloc[i:i + chunksize] for i in range(0, len(df_fcd), chunksize)]
+        self.mm = MapMatching(links_gdf=df_links, links_id_col=links_id_col, links_direction_col=links_direction_col)
+
+        def fn(tasks, crs, mm, max_distance, max_angle):
+
+            ret = None
+            if len(tasks) == 0:
+                return None
+            for df in tasks:
+                tmp = mm.match(gps_gdf=df,
+                        max_distance=max_distance, 
+                        max_angle=max_angle, 
+                        fcd_id_col="id_fcd",
+                        fcd_dir_col="heading",
+                        fcd_state_col="engine", 
+                        all_matches=True)
+                tmp = tmp.merge(df, on="id_fcd", how="left")                
+                if ret is None:
+                    if tmp is not None and tmp.shape[0] > 0:
+                        ret = tmp
+                else:
+                    if tmp is not None and tmp.shape[0] > 0:
+                        ret = pd.concat([ret, tmp], ignore_index=True)        
+            if ret is None or ret.shape[0] == 0:
+                return None
+  
+            ret = gpd.GeoDataFrame(ret)
+            return ret
+        
+
+        ret_mm = None
+        for df_mm in Parallel.execute(fn, 
+                                      tasks=tasks,
+                                      crs=self.parser.ini.FCD_SERVER_FCD_CRS_DATA, 
+                                      mm=self.mm,
+                                      max_distance=self.parser.ini.FCD_MAP_MATCHING_MAX_DISTANCE, 
+                                      max_angle=self.parser.ini.FCD_MAP_MATCHING_MAX_ANGLE,
+                                      n_workers=self.parser.ini.FCD_MAP_MATCHING_CPUS):
+            if ret_mm is None:
+                if df_mm is not None and df_mm.shape[0] > 0:
+                    ret_mm = df_mm                
+            else:
+                if ret_mm is not None and ret_mm.shape[0] > 0:
+                    ret_mm = pd.concat([ret_mm, df_mm], ignore_index=True)      
+        return ret_mm
+
+    def match_fcd(self, fcd_data: pd.DataFrame, old_fcd_data: pd.DataFrame) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
+        """
+        Match FCD data to the road network using Map Matching algorithm.
+        """
+        #estraggo i nuovi fcd e li matcho unendonli con i vecchi e ricalcolo i trips
+        if old_fcd_data is not None:
+            old_fcd_data["new"] = False
+        fcd_data["new"] = True
+        df_fcd, df_trips = self.build_paths.match_fcd(fcd_data, old_fcd_data)
+        if df_fcd is None or df_trips is None:
+            self.tic.info("No FCDs or trips to match")
+            return None, None
+        self.df_fcd = df_fcd 
+        # se i trips sono cambiati (dt_d diverso) allora li inserisco tra i trip da calcolare
+        df_trips["new"] = True
+        n_trips = df_trips.shape[0]        
+        if self.df_trips is not None:
+            df_trips.set_index('id_trip', inplace=True, drop=True)            
+            merged = df_trips.merge(self.df_trips.set_index('id_trip', drop=True), on="id_trip", how='left', suffixes=('_new','_old'))
+            changed_ids = merged.loc[merged['dt_d_new'] != merged['dt_d_old']].index
+            updated_rows = df_trips.loc[changed_ids].reset_index(drop=False)            
+            self.df_trips = pd.concat([self.df_trips,updated_rows]).drop_duplicates(subset=["id_trip"], keep="last")
+            #self.df_trips.reset_index(inplace=True)
+        else:
+            self.df_trips = df_trips
+        return self.df_fcd, self.df_trips    

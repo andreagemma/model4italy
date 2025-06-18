@@ -69,13 +69,15 @@ class PandasDriver(BaseDriver):
 
     def export_dataframe(
         self,
-        df: pd.DataFrame,
+        df: Union[pd.DataFrame, geopandas.GeoDataFrame, dict],
         path: str,
         mode: str = "w",
         partitionby: Optional[List[str]] = None,
         template: str = "{filename}-{partition}-{i}",
         **kwargs
     ):
+        if isinstance(df, dict):
+            df = pd.DataFrame.from_dict(df)
         if isinstance(df, geopandas.GeoDataFrame):
             tmp = pd.DataFrame(df.drop("geometry", axis=1, errors="ignore"))
             tmp["geometry"] = df.geometry.to_wkt()

@@ -6,7 +6,7 @@
         },
         "output": {
             "connector": "FileWriter",
-            "location": "./dati/output/{description}"            
+            "location": "./dati/output/{description}/{simulation_id}"            
         },
         "modes": [
             {
@@ -86,17 +86,18 @@
                 }
             }
         ],
-        "aggregated_results": "{simulation_id}_aggregated_results.parquet",
-        "paths": "{simulation_id}_paths.parquet",
-        "rt_paths": "{simulation_id}_rt_paths.parquet",        
-        "statistics": "{simulation_id}_stats.csv", 
+        "aggregated_results": "aggregated_results.parquet",
+        "paths": "paths.parquet",
+        "rt_paths": "rt_paths.parquet",        
+        "statistics": "stats.csv", 
         "state": "./dati/output/{description}/state",
+        "params": "params.json", 
         "fcd": {
             "connector": "DBLoader",
             "location": "postgresql+psycopg://postgres:lDvdc15dcd5@192.168.133.80:5432/fcd_mobito",
             "src": "eur.fcdmm",
             "crs": "EPSG:4326",
-            "tz_data": "Etc/UTC",
+            "tz_data": "UTC",
             "mapping": {
                 "id_fcd": "id_fcd",
                 "id_trip": "id_trip",

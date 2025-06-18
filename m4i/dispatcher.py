@@ -56,6 +56,11 @@ class Dispatcher():
             )
         self.loader: Loader = Loader(parser=self.parser)
         self.writer: Writer = Writer(parser=self.parser)
+        if self.writer.has("params.params"):            
+            try:
+                self.writer.write(self.parser.get_dict(), "params.params", mode="w")
+            except Exception as ex:
+                self.log.error(f"Error writing params.json: {ex}")
     @property
     def ipc(self) -> IPC:
         if self._ipc is None:
@@ -89,9 +94,9 @@ class Dispatcher():
                 self.run_online()                
             elif self.op == "save_state":
                 self.run_save_state()
-            elif self.op == "rt_server":
+            elif self.op == "fcd_server_online":
                 self.run_rt_server()
-            elif self.op == "rt_server_period":
+            elif self.op == "fcd_server_offline":
                 self.run_rt_server_period()
             elif self.op == "ipc":
                 self.run_ipc_client()                

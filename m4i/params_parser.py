@@ -1,4 +1,5 @@
 from __future__ import annotations
+import copy
 import datetime
 from typing import Union, Any, Iterable, Callable
 import json
@@ -44,6 +45,14 @@ class ParamsParser:
         self.fields:dict = self.init_fields()
         self.ini:IniClass = settings
         self.update_params()
+
+    def get_dict(self) -> dict:
+        from copy import deepcopy
+        settings = self.ini.get_dict()
+        settings.update(deepcopy(self.params["settings"]))
+        params = deepcopy(self.params)
+        params["settings"] = settings
+        return params
 
     @staticmethod
     def from_file(params_path: str="params.ini", settings_path: str="settings.ini") -> ParamsParser:

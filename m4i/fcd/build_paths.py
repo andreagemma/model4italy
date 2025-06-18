@@ -238,112 +238,9 @@ class BuildPaths:
                 self.df_links = self.df_links.to_crs(self.crs_calc)
         else:
             self.df_links = df_links
-        self.mm = MapMatching(links_gdf=self.df_links, links_id_col="id", link_direction_col=None)
+        #self.mm = MapMatching(links_gdf=self.df_links, links_id_col="id", links_direction_col=None)
         #self.log.info(f"Loaded {self.df_links.shape[0]} links")
-    
-    def load_fcd_by_timestamp(self, t_start: datetime, t_end: datetime, crs_data=None):
-        #self.log.info(f"Loading fcd data")
-        dtype = self.parser.get_dtype("fcd")
-        df_fcd = self.loader.load(path="params.fcd",
-                     filters=[("timestamp",">=",t_start.strftime("%Y-%m-%d %H:%M:%S")), ("timestamp","<=",t_end.strftime("%Y-%m-%d %H:%M:%S")),
-                              #("id_trip","=", "c6495aa3d08d936a5ae4e6bc89a7606df924b68e")
-                              #"id_trip" = '9aec771c30c102d77a039efcee6b72bdcc85ef9a'
-                              ],
-                     dtype=dtype,
-                     )
-        
-        df_fcd = gpd.GeoDataFrame(df_fcd, crs=crs_data or self.crs_data)
-        if (crs_data or self.crs_data) != self.crs_calc:
-            df_fcd = df_fcd.to_crs(self.crs_calc)
-        return df_fcd
-
-    def match_fcd(self, df_fcd: gpd.GeoDataFrame, df_fcd_old: gpd.GeoDataFrame) -> Tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:        
-        grp = df_fcd.groupby("id_trip")
-        tasks = [(id_trip, df, None) for id_trip, df in grp if len(df) > 0]
-        if df_fcd_old is not None and df_fcd_old.shape[0] > 0:
-            grp1 = df_fcd_old.groupby("id_trip")
-            tasks = [(id_trip, df, grp1.get_group(id_trip) if id_trip in grp1.groups else None) for id_trip, df, _ in tasks]
-
-        #self.log.info(f"Loaded {df_fcd.shape[0]} FCD records")
-        #self.log.info(f"Loaded {len(tasks)} trips")
-                
-        def fn(tasks, crs, mm, max_distance, max_angle):
-
-            ret = None
-            if len(tasks) == 0:
-                return None, None
-            for id_trip,df,df_fcd_old in tasks:
-                tmp = mm.match(gps_gdf=df,
-                        max_distance=max_distance, 
-                        max_angle=max_angle, 
-                        fcd_id_col="id_fcd",
-                        fcd_dir_col="heading",
-                        fcd_state_col="engine", 
-                        all_matches=True)
-                tmp = tmp.merge(df, on="id_fcd", how="left")                
-                #print(tmp.head())
-                if ret is None:
-                    if tmp is not None and tmp.shape[0] > 0:
-                        ret = tmp
-                else:
-                    if tmp is not None and tmp.shape[0] > 0:
-                        ret = pd.concat([ret, tmp], ignore_index=True)        
-            if ret is None or ret.shape[0] == 0:
-                return None, None              
-            #print(ret.head())          
-  
-            ret = gpd.GeoDataFrame(ret)
-            if df_fcd_old is not None and df_fcd_old.shape[0] > 0:
-                #print("ret", ret.shape[0])
-                #print("df_fcd_old", df_fcd_old.shape[0])
-                ret = pd.concat([ret, df_fcd_old], ignore_index=True).drop_duplicates(subset=["id_fcd"], keep="last")
-                #print("ret1", ret.shape[0])
-                #ret = ret[~ret.duplicated(subset=["id_fcd"], keep="last")]
-            #print(ret.head())
-            ret.sort_values(by=["id_trip","timestamp"], ascending=[True,True], inplace=True)      
-            def make_line(points):
-                coords =[pt.coords[0] for pt in points]
-                if len(coords) == 1:
-                    # duplico la singola coordinata per avere almeno 2 punti
-                    coords = coords * 2
-                return coords
-            def make_tt(x):
-                return (x.max() - x.min()).total_seconds()
-            grouped = (
-                ret.groupby("id_trip").agg(
-                    geometry = ('geometry', make_line),
-                    dt_o = ('timestamp', 'min'),
-                    dt_d = ('timestamp', 'max'),
-                    tt = ('timestamp', make_tt),
-                )
-            )
-            grouped["geometry"] = grouped["geometry"].apply(lambda x: LineString(x))
-            df_line = gpd.GeoDataFrame(grouped, geometry='geometry', crs=crs).reset_index()
-            df_line['length'] = df_line.geometry.length
-            return ret, df_line
-        
-
-        ret_mm = None
-        ret_line = None
-        for df_mm, df_line in Parallel.execute(fn, tasks=tasks,crs=self.crs_data, mm=self.mm, 
-                                               max_distance=self.max_distance, max_angle=self.max_angle,
-                                               n_workers=self.n_workers_mm):
-            if ret_mm is None:
-                if df_mm is not None and df_mm.shape[0] > 0:
-                    ret_mm = df_mm                
-            else:
-                if ret_mm is not None and ret_mm.shape[0] > 0:
-                    ret_mm = pd.concat([ret_mm, df_mm], ignore_index=True)      
-            if ret_line is None:
-                if df_line is not None and df_line.shape[0] > 0:
-                    ret_line = df_line
-            else:
-                if ret_line is not None and ret_line.shape[0] > 0:
-                    ret_line = pd.concat([ret_line, df_line], ignore_index=True)      
-        if df_fcd_old is not None and df_fcd_old.shape[0] > 0:   
-            ret_mm = pd.concat([df_fcd_old, ret_mm], ignore_index=True).drop_duplicates(subset=["id_fcd"], keep="last")
-        return ret_mm, ret_line
-        
+            
     def calculate_paths(self, df_links, df_fcd, df_trips, G):                
         
         def fn(tasks, df_links, G):
@@ -370,6 +267,8 @@ class BuildPaths:
                         trip=trip.geometry)
                     for path in paths.all_paths():
                         path["id_trip"] = trip.id_trip
+                        path["dt_o"] = trip.dt_o
+                        path["dt_d"] = trip.dt_d
                         path["t"] = int(int(trip.dt_o.timestamp()) - datetime.timestamp(trip.dt_o.replace(hour=0,minute=0,second=0, microsecond=0)) /60)
                     tot_paths.merge(paths)
                 except Exception as ex:

@@ -54,13 +54,15 @@ class GeoPandasDriver(BaseDriver):
 
     def export_dataframe(
         self,
-        df: gpd.GeoDataFrame,
+        df: Union[pd.DataFrame, gpd.GeoDataFrame, dict],
         path: str,
         mode: str = "w",
         partitionby: Optional[List[str]] = None,
         template: str = "{filename}-{partition}-{i}",
         **kwargs
     ):
+        if isinstance(df, dict):
+            df = pd.DataFrame.from_dict(df)
         crs = kwargs.pop("crs", None)
         df = BaseDriver.to_geodataframe(df, crs)
         index = kwargs.pop("index", False)

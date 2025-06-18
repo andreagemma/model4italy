@@ -23,7 +23,7 @@ class OfflineMapMatching(OP):
 
         self.map_matching = MapMatching(self.graph,
                                         links_id_col="idx",
-                                        link_direction_col=None,
+                                        links_direction_col=None,
                                     )
 
     def run(self):

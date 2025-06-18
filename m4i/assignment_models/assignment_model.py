@@ -235,7 +235,7 @@ class AssignmentModel(TaskBase):
                 saved = True
                 paths = self.get_paths_dataframe()
                 mode = "w" if self.interval==0 else "a"
-                saved = self.writer.write_paths(paths, mode=mode, partition=f"t")
+                saved = self.writer.write_paths(paths, mode=mode, partition=f"t", crs=self.loader.ini.CRS)
                 """
                 mode="w"
                 for t in range(self.real_time_start,self.real_time_end,self.delta_t):
@@ -276,7 +276,7 @@ class AssignmentModel(TaskBase):
                 ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400 ) / 60
                 mode = "w" if self.interval==0 else "a"
                 df["t"] = ds_t
-                saved = self.writer.write_agg_results(df, mode=mode, partition=f"t")
+                saved = self.writer.write_agg_results(df, mode=mode, partition=f"t", crs=self.loader.ini.CRS)
                 
                 """
                 mode = "w"

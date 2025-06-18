@@ -10,10 +10,10 @@ import logging
 from ..utils import Parallel
 
 class MapMatching:
-    def __init__(self, links_gdf, links_id_col="id",link_direction_col=None):
+    def __init__(self, links_gdf, links_id_col="id",links_direction_col=None):
         self.links_gdf = links_gdf
         self.links_id_col = links_id_col
-        self.link_direction_col = link_direction_col
+        self.link_direction_col = links_direction_col
         self._segments_gdf = None
         
     @property

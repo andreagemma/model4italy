@@ -11,8 +11,6 @@ class OfflineRTServer(OP):
         self.rt_server: RTServer = RTServer(parser=self.parser, ipc=self.ipc, loader=self.loader, writer=self.writer)         
 
     def run(self):
-        self.rt_server.elaborate_period(
+        self.rt_server.elaborate_offline(
             t_start=self.parser.get("date_start"), 
-            t_end=self.parser.get("date_end"), 
-            timeslice = self.ini.FCD_SERVER_FCD_TIMESLICE_OFFLINE,
-            horizon=self.ini.FCD_SERVER_FCD_HORIZON)
+            t_end=self.parser.get("date_end"))

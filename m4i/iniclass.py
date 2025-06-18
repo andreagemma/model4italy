@@ -4,7 +4,12 @@ from .utils import ConfigReader, generate_sqlalchemy_url
 import logging, os
 
 class IniClass:
-
+    def get_dict(self):
+        from copy import deepcopy
+        tmp = deepcopy(self.__dict__)
+        tmp.pop('config_reader', None)  # Rimuove il lettore di configurazione
+        return tmp
+    
     def __init__(self, ini_file='settings.ini', db_url=None, use_db=False, reload=True):
         # Inizializza il lettore di configurazione
         self.config_reader = ConfigReader(
@@ -118,12 +123,12 @@ class IniClass:
         self.FCD_SERVER_FCD_TIMESLICE_OFFLINE = self.config_reader.getint("FCD_SERVER_FCD_TIMESLICE_OFFLINE", 'FCD_SERVER', 120) # numero di iterazioni per la previsione offline
         self.FCD_SERVER_FCD_CRS_DATA = self.config_reader.get("FCD_SERVER_FCD_CRS_DATA", 'FCD_SERVER', "EPSG:4326") # CRS dei dati FCD
         self.FCD_SERVER_FCD_CRS_CALC = self.config_reader.get("FCD_SERVER_FCD_CRS_CALC", 'FCD_SERVER', "EPSG:6875") # CRS dei dati FCD
-        self.FCD_SERVER_EXPORT_IPC = self.config_reader.getboolean("FCD_SERVER_EXPORT_IPC", 'FCD_SERVER', True) # esporta i dati FCD su IPC
-        self.FCD_SERVER_EXPORT_SUPPORT = self.config_reader.getboolean("FCD_SERVER_EXPORT_SUPPORT", 'FCD_SERVER', False) # esporta i dati FCD su DB
+        self.FCD_SERVER_SHARE_DATA = self.config_reader.getboolean("FCD_SERVER_SHARE_DATA", 'FCD_SERVER', True) # esporta i dati FCD su IPC
+        self.FCD_SERVER_WRITE_OUTPUT = self.config_reader.getboolean("FCD_SERVER_WRITE_OUTPUT", 'FCD_SERVER', False) # esporta i dati FCD su DB
         self.FCD_SERVER_MAP_MATCHING = self.config_reader.getboolean("FCD_SERVER_MAP_MATCHING", 'FCD_SERVER', True) # abilita il map matching
         self.FCD_SERVER_ROUTING = self.config_reader.getboolean("FCD_SERVER_ROUTING", 'FCD_SERVER', True) # abilita il routing
         self.FCD_SERVER_TRIPS = self.config_reader.getboolean("FCD_SERVER_TRIPS", 'FCD_SERVER', True) # abilita la generazione dei viaggi
-
+        self.FCD_SERVER_TZ_DATA = self.config_reader.get("FCD_SERVER_TZ_DATA", 'FCD_SERVER', "UTC") # Timezone dei dati FCD
 
         self.FCD_MAP_MATCHING_CPUS = self.config_reader.getint("FCD_MAP_MATCHING_CPUS", 'FCD_MAP_MATCHING', 1) # numero di processi per il map matching
         self.FCD_MAP_MATCHING_MAX_DISTANCE = self.config_reader.getfloat("FCD_MAP_MATCHING_MAX_DISTANCE", 'FCD_MAP_MATCHING', 50) # distanza massima per il map matching in metri
@@ -134,6 +139,7 @@ class IniClass:
         self.FCD_ROUTING_END_TO_ZONE = self.config_reader.getboolean("FCD_ROUTING_END_TO_ZONE", 'FCD_ROUTING', False) # se True il path termina nella zona di arrivo
         self.FCD_ROUTING_AGGRATION_INTERVAL = self.config_reader.getint("FCD_ROUTING_AGGRATION_INTERVAL", 'FCD_ROUTING', 15) # intervallo di aggregazione in secondi
          
+        self.FCD_TRIPS_CPUS = self.config_reader.getint("FCD_TRIPS_CPUS", 'FCD_TRIPS', 1)  # numero di processi per la generazione dei viaggi
         self.FCD_TRIPS_SIGNAL_BREAK_MAX_DT = self.config_reader.getint("FCD_TRIPS_SIGNAL_BREAK_MAX_DT", 'FCD_TRIPS', 900)  # max time for signal break in seconds
         self.FCD_TRIPS_SIGNAL_BREAK_DT = self.config_reader.getint("FCD_TRIPS_SIGNAL_BREAK_DT", 'FCD_TRIPS', 300)  # time for signal break in seconds
         self.FCD_TRIPS_SIGNAL_BREAK_V = self.config_reader.getfloat("FCD_TRIPS_SIGNAL_BREAK_V", 'FCD_TRIPS', 0.5555555555555556)  # speed for signal break in m/s

@@ -1,10 +1,11 @@
 import ast
+import json
 from typing import Union, Optional, List, Generator, Tuple, Any, Callable, Iterable
 from numbers import Number
 from uuid import uuid4
 from math import ceil, inf
 import warnings
-from datetime import datetime, timedelta, MAXYEAR, date, time
+from datetime import datetime, timedelta, MAXYEAR, date, time, tzinfo
 from dateutil import parser
 
 import sys
@@ -150,19 +151,19 @@ def deserialize(data: bytes, compression: str = None) -> Any:
         obj = dill.loads(blosc.decompress(data))
     return obj
 
-def json_serialize(obj: Any, file_name: str):
+def json_serialize(obj: Any, file_name: str, indent: int = 4):
     import jsonpickle
-    f = open(file_name, "w")
-    json_obj = jsonpickle.encode(obj, make_refs=False)
-    f.write(json_obj)
-    f.close()
+    with open(file_name, "w") as f:
+        json_obj = jsonpickle.encode(obj, make_refs=False,indent=indent)
+        f.write(json_obj)
+        f.close()
 
 
 def json_load_file(file_name: str):
     import jsonpickle
-    f = open(file_name)
-    json_str = f.read()
-    obj = jsonpickle.decode(json_str)
+    with open(file_name) as f:
+        json_str = f.read()
+        obj = jsonpickle.decode(json_str)
     return obj
 
 
@@ -425,12 +426,14 @@ import psutil
 import re
 from typing import Optional, Union, Iterable
 import warnings
-
+import pytz
 
 def to_datetime_auto(t: Union[str,int, float,datetime, time, date], 
                      date_default: date=None, 
                      time_default: time=None, 
                      on_error:str='ignore',
+                     tz_localize: Optional[Union[str,tzinfo]] = None,
+                     tz_convert: Optional[Union[str,tzinfo]] = None,
                      unit = "seconds") -> Optional[datetime]:
     """
     Convert a string, number, datetime, time, or date to a datetime object.
@@ -446,6 +449,25 @@ def to_datetime_auto(t: Union[str,int, float,datetime, time, date],
     if time_default is None:
         time_default = datetime.fromtimestamp(0).time()  # Default to midnight (00:00:00)
 
+    def refine(dt: datetime):    
+        if dt is None:
+            return None
+        
+        if tz_localize is not None:
+            # if if naive
+            if dt.tzinfo is None:
+                if isinstance(tz_localize, str):
+                    tz = pytz.timezone(tz_localize)
+                else:
+                    tz = tz_localize
+                tz.localize(dt)
+        if tz_convert is not None:
+            if isinstance(tz_convert, str):
+                tz = pytz.timezone(tz_convert)
+            else:
+                tz = tz_convert
+            dt = dt.astimezone(tz)
+        return dt
     if isinstance(t, str) and t.strip():
             t=t.strip()
             if t.isnumeric():
@@ -454,14 +476,14 @@ def to_datetime_auto(t: Union[str,int, float,datetime, time, date],
             else:
                 try:
                     # Prova con dateutil (include anche orari puri)
-                    return parser.parse(t, fuzzy=True, default=datetime.combine(date_default, time_default))
+                    return refine(parser.parse(t, fuzzy=True, default=datetime.combine(date_default, time_default)))
                 except (ValueError, OverflowError):
                     pass
 
                 # Prova con formati espliciti
                 for fmt in DATETIME_KNOWN_FORMATS:
                     try:
-                        return datetime.strptime(t, fmt)
+                        return refine(datetime.strptime(t, fmt))
                     except ValueError:
                         continue
 
@@ -470,7 +492,7 @@ def to_datetime_auto(t: Union[str,int, float,datetime, time, date],
                 if len(digits) == 8:
                     for fmt in ("%Y%m%d", "%d%m%Y", "%m%d%Y"):
                         try:
-                            return datetime.strptime(digits, fmt)
+                            return refine(datetime.strptime(digits, fmt))
                         except ValueError:
                             continue
                 if on_error:
@@ -483,15 +505,15 @@ def to_datetime_auto(t: Union[str,int, float,datetime, time, date],
     elif isinstance(t, (int, float)):
         # Se è un numero, lo interpretiamo come timestamp (secondi dall'epoca)
         _kwargs = {unit: float(t)}
-        return datetime.combine(date_default, time_default) + timedelta(**_kwargs)
+        return refine(datetime.combine(date_default, time_default) + timedelta(**_kwargs))
     elif isinstance(t, datetime):
-        return t
+        return refine(t)
     elif isinstance(t, date):
         # Se è una data, la combiniamo con l'orario predefinito
-        return datetime.combine(t, time_default)
+        return refine(datetime.combine(t, time_default))
     elif isinstance(t, time):
         # Se è un orario, lo combiniamo con la data predefinita
-        return datetime.combine(date_default, t)    
+        return refine(datetime.combine(date_default, t))
     if on_error == 'raise':
         raise ValueError("Cannot parse {t} as a date")
     elif on_error == 'warn':

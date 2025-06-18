@@ -141,9 +141,16 @@ class Parallel:
             if not Parallel.dask_initialized:
                 try:
                     import dask
-                    from dask.distributed import Client
-                    Parallel.dask_cluster = dask.distributed.LocalCluster(n_workers=num_cpus, threads_per_worker=1, memory_limit="auto")
-                    Parallel.dask_client = Parallel.dask_cluster.get_client()
+                    from dask.distributed import Client, LocalCluster
+                    logging.getLogger("distributed").setLevel(logging.WARNING)
+                    logging.getLogger("dask").setLevel(logging.WARNING)
+
+                    Parallel.dask_cluster = LocalCluster(n_workers=num_cpus, 
+                                                         threads_per_worker=1, 
+                                                         memory_limit="auto", 
+                                                         processes=True,
+                                                         silence_logs=logging.ERROR)
+                    Parallel.dask_client = Client(Parallel.dask_cluster)
                     Parallel.dask_initialized = True
                 except:
                     Parallel.parallel_engine = Parallel.ENGINE_MULTITHREADING
@@ -159,6 +166,8 @@ class Parallel:
             if not Parallel.dask_initialized:
                 try:
                     import dask
+                    logging.getLogger("distributed").setLevel(logging.WARNING)
+                    logging.getLogger("dask").setLevel(logging.WARNING)
                     from dask.distributed import Client
                     Parallel.dask_client = Client(processes=False, threads_per_worker=num_cpus, n_workers=1)
                     Parallel.dask_initialized = True
@@ -256,7 +265,7 @@ class Parallel:
                 return fn(*args, **kwargs)
 
             delayed_results = [calculate(tasks=chunk,  **kwargs) for chunk in pair_chunks]
-            results = dask.compute(*delayed_results)
+            results = dask.compute(*delayed_results, scheduler='processes')
             for paths in results:
                 yield paths
 
