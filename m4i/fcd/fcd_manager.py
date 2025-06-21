@@ -1,4 +1,5 @@
 from collections import namedtuple
+import time
 from .map_matching import MapMatching
 from ..connectors import Loader
 from ..connectors import Writer
@@ -9,16 +10,17 @@ from ..utils import IPC, to_datetime_auto, to_timedelta_auto, to_namedtuple
 from ..utils.parallel import Parallel
 from ..base_m4i_model import BaseM4IModel
 from typing import Union, Optional, List, Generator, Tuple
-from datetime import datetime
+import datetime
 import pandas as pd
 import geopandas as gpd
 import numpy as np
 from math import hypot
 import json
 from shapely.geometry import LineString
-from shapely import to_wkb, to_wkt, to_geojson
+import shapely
 from pytz import timezone
 from math import ceil
+from datetime import timedelta, datetime
 
 
 class FCDManager(BaseM4IModel):
@@ -35,10 +37,14 @@ class FCDManager(BaseM4IModel):
         dtype = self.parser.get_dtype("fcd")
         df_fcd = self.loader.load(
                     path="params.fcd",
-                    filters=[("timestamp",">=",t_start.strftime("%Y-%m-%d %H:%M:%S%z")), ("timestamp","<=",t_end.strftime("%Y-%m-%d %H:%M:%S%z"))],
+                    filters=[("timestamp",">=",t_start.strftime("%Y-%m-%d %H:%M:%S%z")), ("timestamp","<=",t_end.strftime("%Y-%m-%d %H:%M:%S%z")),
+                             #("id_veh","=","29bd3380f5edb32b240267b06b9abc35bd92f796")
+                             ],
                     dtype=dtype,
                     )        
         # if geomertry is empty build with x and y and crs_data
+        if df_fcd is None or df_fcd.empty:                        
+            return df_fcd
         if "geometry" not in df_fcd.columns or df_fcd["geometry"].isnull().all():
             if "x" in df_fcd.columns and "y" in df_fcd.columns:
                 df_fcd["geometry"] = gpd.points_from_xy(df_fcd["x"], df_fcd["y"])
@@ -48,11 +54,14 @@ class FCDManager(BaseM4IModel):
         df_fcd["timestamp"] = pd.to_datetime(df_fcd["timestamp"],errors="coerce").dt.tz_localize(self.ini.FCD_SERVER_TZ_DATA)        
         if crs_data != crs_calc:
             df_fcd = df_fcd.to_crs(crs_calc)
+        df_fcd["new"]=True
+        df_fcd["x"] = df_fcd.geometry.x
+        df_fcd["y"] = df_fcd.geometry.y
         return df_fcd
     
     def build_trips(self, 
                  df_fcd: Union[pd.DataFrame, gpd.GeoDataFrame], 
-                 #tz_data: Optional[str]= None,
+                 tz_data: Optional[str]= None,
                  crs_data: Optional[str] = None,
                  crs_calc: Optional[str] = None,
                  signal_break_max_dt: Optional[float] = None, signal_break_dt: Optional[float] = None, 
@@ -68,15 +77,16 @@ class FCDManager(BaseM4IModel):
                  max_delta_progr:Optional[float] = None,
                  limited_to: Optional[List[str]] = None,
                  t_begin: Optional[datetime] = None,
+                 t_finish: Optional[datetime] = None,
+                 add_truncated_trips: bool = True,
                  t_end: Optional[datetime] = None,
-                 add_truncated_trips: bool = False,
                ) -> Generator[Tuple[pd.DataFrame,pd.DataFrame], None, None]:
         self.df_fcd = df_fcd
-        #self.tz_data = tz_data or self.ini.FCD_SERVER_TZ_DATA
+        self.tz_data = tz_data or self.ini.FCD_SERVER_TZ_DATA
         self.crs_calc = crs_calc or self.ini.FCD_SERVER_FCD_CRS_CALC
         self.crs_data = crs_data or self.ini.FCD_SERVER_FCD_CRS_DATA
-        self.signal_break_max_dt = signal_break_max_dt if signal_break_max_dt is None else self.ini.FCD_TRIPS_SIGNAL_BREAK_MAX_DT 
-        self.signal_break_dt = signal_break_dt if signal_break_dt is None else self.ini.FCD_TRIPS_SIGNAL_BREAK_DT
+        self.signal_break_max_dt = signal_break_max_dt if signal_break_max_dt is not None else self.ini.FCD_TRIPS_SIGNAL_BREAK_MAX_DT 
+        self.signal_break_dt = signal_break_dt if signal_break_dt is not None else self.ini.FCD_TRIPS_SIGNAL_BREAK_DT
         self.signal_break_v = signal_break_v if signal_break_v is not None else self.ini.FCD_TRIPS_SIGNAL_BREAK_V
         self.stop_o_ds = stop_o_ds if stop_o_ds is not None else self.ini.FCD_TRIPS_STOP_O_DS
         self.stop_d_ds = stop_d_ds if stop_d_ds is not None else self.ini.FCD_TRIPS_STOP_D_DS
@@ -91,25 +101,50 @@ class FCDManager(BaseM4IModel):
         self.max_delta_progr = max_delta_progr if max_delta_progr is not None else self.ini.FCD_TRIPS_MAX_DELTA_PROGR
         self.limited_to = limited_to
         self.t_begin = to_datetime_auto(t_begin) if t_begin is not None else None
-        self.t_end = to_datetime_auto(t_end) if t_end is not None else None
+        self.t_finish = to_datetime_auto(t_finish) if t_finish is not None else None
         self.add_truncated_trips = add_truncated_trips
+        self.t_end = to_datetime_auto(t_end) if t_end is not None else df_fcd["timestamp"].max()
 
         DEBUG = False
-        def process_single_vehicle(id_group, vehicle_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
-            params = to_namedtuple(self.to_dict())
-            return FCDManager._process_single_vehicle(params, vehicle_df, DEBUG)
+        class NTuple:
+            def __init__(self, **kwargs):
+                for k,v in kwargs.items():
+                    if isinstance(v,dict):
+                        self.__dict__[k]=NTuple(**v)
+                    else:
+                        self.__dict__[k]=v
+        params = NTuple(**{k:v for k,v in self.__dict__.items() if (not k.startswith("_")) and (v is None or isinstance(v, (int, float, str, bool, datetime, timedelta)))})
+        
+        
+        def process_single_vehicle(tasks: list[pd.DataFrame]) -> Tuple[pd.DataFrame, pd.DataFrame]:
+            ret_df_trips = None
+            ret_df_fcd_trunced = None
+            for vehicle_df in tasks:
+                df_trips, df_fcd_trunced = FCDManager._process_single_vehicle(params, vehicle_df, DEBUG)
+                if df_trips is not None and len(df_trips) > 0:
+                    if ret_df_trips is None:
+                        ret_df_trips = df_trips
+                    elif df_trips is not None and len(ret_df_trips) > 0:
+                        ret_df_trips = pd.concat([ret_df_trips, df_trips], ignore_index=True)
+
+                if df_fcd_trunced is not None and len(df_fcd_trunced) > 0:    
+                    if ret_df_fcd_trunced is None:
+                        ret_df_fcd_trunced = df_fcd_trunced
+                    elif df_fcd_trunced is not None and len(df_fcd_trunced) > 0:
+                        ret_df_fcd_trunced = pd.concat([ret_df_fcd_trunced, df_fcd_trunced], ignore_index=True)
+            return ret_df_trips, ret_df_fcd_trunced
+                
 
         df_fcd = df_fcd.copy()
-        df_fcd["x_or"] = df_fcd.geometry.x
-        df_fcd["y_or"] = df_fcd.geometry.y
-        df_fcd.set_crs(self.crs_calc, inplace=True)
-        df_fcd["x"] = df_fcd.geometry.x
-        df_fcd["y"] = df_fcd.geometry.y
+        if "x" not in df_fcd.columns or "y" not in df_fcd.columns:
+            df_fcd["x"] = df_fcd.geometry.x
+            df_fcd["y"] = df_fcd.geometry.y
         df_fcd = pd.DataFrame(df_fcd)
-        df_fcd.drop(columns=["geometry"], inplace=True, errors="ignore")
+        df_fcd["geometry"] = shapely.to_wkt(df_fcd["geometry"])
+        #df_fcd.drop(columns=["geometry"], inplace=True, errors="ignore")
         df_fcd["timestamp"] = df_fcd["timestamp"].dt.tz_convert("UTC")
         
-        tasks = list(df_fcd.groupby("id_veh"))
+        tasks = [df for _,df in df_fcd.groupby("id_veh")]
         df_trips:pd.DataFrame = None
         df_fcd_trunced:pd.DataFrame = None
         ret_df_trips:pd.DataFrame = None
@@ -124,14 +159,19 @@ class FCDManager(BaseM4IModel):
                 else:
                     ret_df_trips = pd.concat([ret_df_trips, df_trips], ignore_index=True)
             if df_fcd_trunced is not None and len(df_fcd_trunced) > 0:
-                df_fcd_trunced["timestamp"] = df_fcd_trunced["timestamp"].dt.tz_localize("UTC").dt.tz_convert(self.ini.FCD_SERVER_TZ_DATA)
+                if df_fcd_trunced["timestamp"].dt.tz is None:
+                    df_fcd_trunced["timestamp"] = df_fcd_trunced["timestamp"].dt.tz_localize("UTC")
+                df_fcd_trunced["timestamp"] = df_fcd_trunced["timestamp"].dt.tz_convert(self.ini.FCD_SERVER_TZ_DATA)
                 if ret_df_fcd_trunced is None:
                     ret_df_fcd_trunced = df_fcd_trunced
                 else:
                     ret_df_fcd_trunced = pd.concat([ret_df_fcd_trunced, df_fcd_trunced], ignore_index=True)
             
-
-            yield df_trips, df_fcd_trunced
+        if ret_df_trips is not None:
+            ret_df_trips=gpd.GeoDataFrame(ret_df_trips, crs=self.crs_calc, geometry=shapely.from_wkt(ret_df_trips["geometry"]))
+        if ret_df_fcd_trunced is not None:
+            ret_df_fcd_trunced=gpd.GeoDataFrame(ret_df_fcd_trunced, crs=self.crs_calc, geometry=shapely.from_wkt(ret_df_fcd_trunced["geometry"]))
+        return ret_df_trips, ret_df_fcd_trunced
         
 
     def set_fcd(self, fcd):
@@ -142,10 +182,14 @@ class FCDManager(BaseM4IModel):
     
     @staticmethod
     def _process_single_vehicle(params: namedtuple, vehicle_df: pd.DataFrame, DEBUG:bool = False) -> Tuple[pd.DataFrame,pd.DataFrame]:    
-              
+        start_cols = [c for c in vehicle_df.columns]
         vehicle_df["ts"]=vehicle_df["timestamp"].astype(int)/1000000000
         vehicle_df = vehicle_df.sort_values("ts")
-        
+        if "progr" not in vehicle_df.columns or vehicle_df["progr"].isnull().all():
+            # calculate euclidean progression if not present respect to previous point
+            vehicle_df["progr"] = np.sqrt((vehicle_df["x"].diff() ** 2) + (vehicle_df["y"].diff() ** 2)).fillna(0).cumsum()
+
+            
         ret: list = []  # results
         trip_fcds: list = []  # list of FCDs in a trip
 
@@ -276,9 +320,9 @@ class FCDManager(BaseM4IModel):
             if fcd_next is None and not new_trip:
                 new_trip = True
                 trip_fcds.append(fcd)
-                if params.add_truncated_trips:
-                    truncated_fcds.append([f for f in trip_fcds])
-                    FCD_TRIPS_fcds=[]
+                if params.add_truncated_trips and fcd.timestamp < params.t_end - timedelta(seconds=params.signal_break_max_dt):
+                    truncated_fcds.extend([f for f in trip_fcds])
+                    trip_fcds=[]
 
             if not new_trip:  # if no new_trip add fcd to current list
                 trip_fcds.append(fcd)
@@ -397,8 +441,7 @@ class FCDManager(BaseM4IModel):
 
                     tr = {
                         "id_trip": first_fcd.id_fcd,
-                        "id_veh": first_fcd.id_veh,
-                        params.field_group: first_fcd.__getattribute__(params.field_group),
+                        "id_veh": first_fcd.id_veh,                        
                         "dt_o": datetime.fromtimestamp(first_fcd.ts, timezone("UTC")).astimezone(timezone(params.tz_data)),
                         "dt_d": datetime.fromtimestamp(last_fcd.ts, timezone("UTC")).astimezone(timezone(params.tz_data)),
                         "t_o": first_fcd.ts,    
@@ -406,14 +449,14 @@ class FCDManager(BaseM4IModel):
                         "tt": last_fcd.ts - first_fcd.ts,
                         "dist": last_fcd.progr - first_fcd.progr,
                         "avg_speed": np.average([f.speed for f in trip_fcds]),
-                        "fcds": [[f.x_or,f.y_or,f.x,f.y] for f in trip_fcds],
+                        "fcds": [[f.x,f.y] for f in trip_fcds],
                         "id_fcds": [f.id_fcd for f in trip_fcds],
                         "progr_o": first_fcd.progr                   
                     }
                     #print(tr)
                     # calculate connection with previous trip and initialize fields for connection with next trip
                     tr["id_next"] = None
-                    tr["p_after"] = params.t_end - tr["t_d"] if params.t_end is not None else None
+                    tr["p_after"] = params.t_finish - tr["t_d"] if params.t_finish is not None else None
                     if len(ret) > 0 and ret[-1]["id_veh"] == tr["id_veh"]:
                         tr["id_prev"] = ret[-1]["id_trip"]
                         tr["p_before"] = tr["t_o"] - ret[-1]["t_d"]
@@ -422,10 +465,10 @@ class FCDManager(BaseM4IModel):
                         # connection between with last trip.
                         # the best position of the destination of the last trip is assumed 
                         # to be the first position of the new trip
-                        euc_dist = hypot(tr["fcds"][0][2] - ret[-1]["fcds"][-1][2], tr["fcds"][0][3] - ret[-1]["fcds"][-1][3])
+                        euc_dist = hypot(tr["fcds"][0][0] - ret[-1]["fcds"][-1][0], tr["fcds"][0][1] - ret[-1]["fcds"][-1][1])
                         if euc_dist <= params.max_distance_override:
-                            tr["fcds"][0][2] = ret[-1]["fcds"][-1][2]
-                            tr["fcds"][0][3] = ret[-1]["fcds"][-1][3]
+                            tr["fcds"][0][0] = ret[-1]["fcds"][-1][0]
+                            tr["fcds"][0][1] = ret[-1]["fcds"][-1][1]
                             checkstate["override"] = True
                     else:
                         tr["id_prev"] = None
@@ -455,7 +498,7 @@ class FCDManager(BaseM4IModel):
             else:
                 trip_fcds.append(fcd)
         if len(ret)==0:
-            df = pd.DataFrame(columns=["id_trip", "id_veh", params.field_group, 
+            df = pd.DataFrame(columns=["id_trip", "id_veh", 
                                     "dt_o", "dt_d", "tt", "dist", "avg_speed", 
                                     "id_fcds", "progr_o", "id_prev", "id_next", 
                                     "p_before", "p_after", "checkstate", "geometry"])
@@ -464,20 +507,20 @@ class FCDManager(BaseM4IModel):
             numeric_columns = df.select_dtypes(include=[np.number]).columns
             df[numeric_columns] = df[numeric_columns].fillna(np.nan)
 
-            df =df.astype({"id_trip": 'Int64', "id_veh": str, params.field_group: 'Int32',
+            df =df.astype({"id_trip": 'Int64', "id_veh": str, 
                 "dt_o": "datetime64[ns, UTC]", "dt_d": "datetime64[ns, UTC]", "tt": np.float64,
                 "dist": np.float64,"avg_speed": np.float64,
                 "id_fcds": object, "progr_o": np.float64, "id_prev": 'Int64', "id_next": 'Int64',
                 "p_before": np.float64, "p_after": np.float64, "checkstate": str, "geometry": str})        
-            df = df[['id_trip', 'id_veh', params.field_group, 
+            df = df[['id_trip', 'id_veh', 
                     'dt_o', 'dt_d', 'tt', 'dist', 'avg_speed', 
                     'id_fcds', 'progr_o', 'id_prev', 'id_next', 
                     'p_before', 'p_after', "checkstate", 'geometry']]        
         if params.add_truncated_trips and len(truncated_fcds) > 0:
             df_truncated_fcds = pd.DataFrame(truncated_fcds, columns=truncated_fcds[0]._fields)
         else:
-            df_truncated_fcds = pd.DataFrame(colummns=vehicle_df.columns).astype(vehicle_df.dtypes.to_dict())
-        df_truncated_fcds.drop(columns=["ts"], errors="ignore", inplace=True)
+            df_truncated_fcds = pd.DataFrame(columns=vehicle_df.columns).astype(vehicle_df.dtypes.to_dict())
+        df_truncated_fcds = df_truncated_fcds[start_cols]
         return df, df_truncated_fcds
     
     def map_matching_fcd(self, df_fcd: gpd.GeoDataFrame, df_links, links_id_col, links_direction_col) -> gpd.GeoDataFrame:        

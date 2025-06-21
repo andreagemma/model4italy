@@ -1,4 +1,5 @@
 import logging
+from .utils.util import nested_dict_from_key_value_list
 
 def main():    
     import argparse
@@ -10,9 +11,9 @@ def main():
         parser.add_argument('-p', '--params', default='params.json', help='JSON file with parameters (default: params.json)')
         parser.add_argument('-d', '--params_data', help='JSON file with data parameters (default: params_data.json)')
         parser.add_argument('-c', '--config', default='settings.ini', help='Configuration file (default: settings.ini)')
-        parser.add_argument('-o', '--op', help='Operation. Override JSON setting (default: None)')
         parser.add_argument('-m', '--monitor', help='Folder of results of monitor process. If not specified, the process is not monitored')
-
+        parser.add_argument('-o', '--option', action='append', help='Option parameter. Override JSON setting.')
+        parser.add_argument('-e', '--env', action='append', help='Override Enviroment Variables.')
         subparsers = parser.add_subparsers(dest='command', help='Sub-command help')
 
         # Subparser for the "run" command
@@ -47,7 +48,19 @@ def main():
         # Set default command to 'run' if no command is provided
         if args.command is None:
             args.command = 'run'
-
+        if args.env:
+            for env in args.env:
+                key, value = env.split('=', 1)
+                os.environ[key] = value        
+        options = {}
+        if args.option:
+            for option in args.option:
+                try:
+                    key, value = option.split('=', 1)
+                except:
+                    raise Exception(f"Invalid option format: {option}. Use key:subkey:subsubkey=value format.")
+                options[key] = value
+            options = nested_dict_from_key_value_list(options)
         if args.command == 'init_db':
             init_db(
                 ini_file=args.config,
@@ -64,7 +77,7 @@ def main():
                 run(ini_file=args.config,
                 params=args.params,
                 params_data=args.params_data,
-                op=args.op)
+                options=options)
                 
             elif args.command == 'server':
                 run_server(ini_file=args.config,
@@ -169,7 +182,7 @@ def open_db(ini_file="settings.ini"):
     Logger.setEngine(DB.get_engine())   
     return config
 
-def run(ini_file="settings.ini", params="params.json", params_data="params_data.json", op=None):
+def run(ini_file="settings.ini", params="params.json", params_data="params_data.json", options: dict=None):
     import os
     from .dispatcher import Dispatcher
 
@@ -179,7 +192,7 @@ def run(ini_file="settings.ini", params="params.json", params_data="params_data.
     else:
         if os.path.exists("params_data.json"):
             params = ["params_data.json", params]
-    Dispatcher(params=params, ini=config, op=op).run()       
+    Dispatcher(params=params, options=options, ini=config).run()       
 
 def run_server(ini_file="settings.ini", host=None, port=None, debug=None):
     """

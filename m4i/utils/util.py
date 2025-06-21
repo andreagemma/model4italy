@@ -407,11 +407,13 @@ DATETIME_KNOWN_FORMATS = [
     "%Y/%m/%d %H:%M",
     "%Y-%m-%dT%H:%M",
     "%Y/%m/%dT%H:%M",
+    "%-H:%M",
     "%H:%M",
     "%H:%M:%S"
 ]
 
 TIMEDELTA_KNOWN_FORMATS = [
+    "%-H:%M",
     "%H:%M",
     "%H:%M:%S"
     "%H%M",
@@ -1054,3 +1056,177 @@ def to_namedtuple(dict_obj):
     import json
     from collections import namedtuple
     return json.loads(json.dumps(dict_obj), object_hook=lambda d: namedtuple("X", d.keys())(*d.values()) if isinstance(d, dict) else d)        
+
+
+from string import Formatter
+def get_parametric_name(name, **kwargs):
+    if isinstance(name, str):
+        keys=[i[1] for i in Formatter().parse(name)  if i[1] is not None and i[1] not in kwargs]
+        #print(keys)
+        if keys:
+            kwargs=kwargs.copy()
+            for k in keys:
+                kwargs[k]="{"+k+"}"            
+        new_name=None
+        while True:
+            new_name = name.format(**kwargs)
+            if name==new_name:
+                break
+            name=new_name
+    elif isinstance(name, dict):
+        name = {k: get_parametric_name(v, **kwargs) for k, v in name.items()}
+    elif isinstance(name, list):
+        name = [get_parametric_name(n, **kwargs) for n in name]
+    elif isinstance(name, tuple):
+        name = tuple(get_parametric_name(n, **kwargs) for n in name)
+    elif isinstance(name, set):
+        name = {get_parametric_name(n, **kwargs) for n in name}
+    return name
+
+def ravel_dict(d, parent_key='', sep='_'):
+    """
+    Flatten a nested dictionary into a single-level dictionary with concatenated keys.
+    
+    :param d: The dictionary to flatten.
+    :param parent_key: The base key to use for the flattened keys.
+    :param sep: The separator to use between concatenated keys.
+    :return: A flattened dictionary.
+    """
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(ravel_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+def nested_dict_from_key_value_list(pairs):
+    """
+    Convert a list of key-value pairs into a nested dictionary.
+        data = [
+        ("a", 1),
+        ("b:c", 2),
+        ("b:d", 3),
+        ("e:f:g", 4)
+    ]
+
+    output = nested_dict_from_key_value_list(data)
+
+    print(output)
+    {
+        'a': 1,
+        'b': {
+            'c': 2,
+            'd': 3
+        },
+        'e': {
+            'f': {
+                'g': 4
+            }
+        }
+    }
+
+    """
+    result = {}
+    for key, value in pairs.items():
+        parts = key.split(":")
+        current = result
+        for part in parts[:-1]:
+            current = current.setdefault(part, {})
+        current[parts[-1]] = value
+    return result
+
+def deep_update(d, u):
+    """
+    Update a dictionary recursively with another dictionary.
+    if a key in the second dictionary is a dictionary itself, it will merge it with the corresponding key in the first dictionary.
+    If the key is not present in the first dictionary, it will be added.
+    :param d: The original dictionary to update.
+    :param u: The dictionary with updates.
+    :return: The updated dictionary.
+    """
+    if not isinstance(d, dict) or not isinstance(u, dict):
+        raise ValueError("Both arguments must be dictionaries.")
+    if u is None or len(u) == 0:
+        return d
+    for k, v in u.items():
+        if isinstance(v, dict) and isinstance(d.get(k), dict):
+            deep_update(d[k], v)
+        else:
+            d[k] = v
+
+def pd_concat(df_list, ignore_index=True, sort=False, **kwargs):
+    import pandas as pd
+    import numpy as np
+    def get_extended_dtype(dtype):
+        """
+        Mappa i dtype numpy standard nei corrispettivi pandas estesi.
+        """
+        if np.issubdtype(dtype, np.integer):
+            return "Int64"
+        elif np.issubdtype(dtype, np.floating):
+            return "Float64"
+        elif np.issubdtype(dtype, np.bool_):
+            return "boolean"
+        elif np.issubdtype(dtype, np.object_):
+            return "string"
+        else:
+            return "object"
+    dfs = [df for df in df_list if df is not None]
+    if not dfs:
+        return None
+
+    non_empty = [df for df in dfs if not df.empty]
+    empty = [df for df in dfs if df.empty]
+
+    if not non_empty:
+        return empty[0].copy() if empty else None
+
+    all_cols = []
+    for df in non_empty:
+        for col in df.columns:
+            if col not in all_cols:
+                all_cols.append(col)
+    resolved_dtypes = {}
+
+    for col in all_cols:
+        candidate_types = []
+        for df in non_empty:
+            if col in df.columns:
+                series = df[col]
+                if series.notna().any():
+                    try:
+                        candidate_types.append(series.dropna().iloc[0])
+                    except IndexError:
+                        pass
+
+        if candidate_types:
+            result_dtype = np.result_type(*[type(val) for val in candidate_types])
+            resolved_dtypes[col] = get_extended_dtype(result_dtype)
+        else:
+            resolved_dtypes[col] = "string"
+
+    casted = []
+    for df in non_empty:
+        df = df.copy()
+        for col in set(all_cols) - set(df.columns):
+            df[col] = pd.NA
+        df = df[list(all_cols)]
+
+        for col in df.columns:
+            try:
+                df[col] = df[col].astype(resolved_dtypes[col], copy=False)
+            except Exception:
+                df[col] = df[col].astype("string")
+        casted.append(df)
+
+    return pd.concat(casted, ignore_index=ignore_index, sort=sort, **kwargs)
+
+def file_ordered_list(cartella, estensioni=None, reverse=False):
+    p = Path(cartella)
+    files = [
+        f for f in p.rglob('*')
+        if f.is_file() and (estensioni is None or f.suffix.lower() in estensioni)
+    ]
+    return sorted(files, key=lambda x: x.stat().st_mtime, reverse=reverse)

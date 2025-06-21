@@ -5,6 +5,7 @@ from ..simulators import BaseSimulator, MicroSimulator
 from ..assignment_models import MSA
 from ..assignment_models import AssignmentModel
 
+
 class DynamicAssignment(OP):
 
     def __init__(self, loader: Loader, writer: Writer, **kwargs):

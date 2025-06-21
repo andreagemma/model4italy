@@ -13,23 +13,23 @@ from typing import Generator, Any
 from pathlib import Path
 import polars as pl
 import glob
+import geopandas as gpd
+
 class PandasDriver(BaseDriver):
 
-    @property
-    def name(self) -> str:
+    @classmethod
+    def name(cls) -> str:
         return "pandas"
 
-    @property
-    def pattern(self) -> List[str]:
+    @classmethod
+    def pattern(cls) -> List[str]:
         return [
             r"\.csv$",
             r"\.xlsx?$",
             r"\.parquet$",
             r"\.feather$",
-            r"\.pkl$",
-            r"\.pickle$",
         ]
-
+    
     def import_dataframe(
         self,
         path: str,

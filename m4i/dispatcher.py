@@ -11,34 +11,31 @@ from .fcd.rt_server import RTServer
 from .utils import Parallel
 
 from datetime import datetime
+from .base_m4i_model import BaseM4IModel
 
-class Dispatcher():
+class Dispatcher(BaseM4IModel):
     
-    def __init__(self, params, ini, op:str = None, execution: Execution=None):
+    def __init__(self, params, ini, options:dict = None, execution: Execution=None):
         self.t_start: int = time.time()
-        self.parser: ParamsParser = ParamsParser(params=params, settings=ini)
-        if op:
-            self.parser.set_value("op", op)
+        self.parser: ParamsParser = ParamsParser(params=params, settings=ini, options=options)
         self.execution: Execution = execution
         self.execution_id: int = execution.id if execution else None
-        self.log: Logger = None
 
-        params = self.parser.params
         if self.execution_id is None:
             self.execution = Execution.create_execution(params=params)        
             self.execution_id = self.execution.id
-            self.log = Logger.getLogger(self.__class__.__name__, execution_id=self.execution_id)
-            self.log.info("Execution created")
-        else:
-            self.log = Logger.getLogger(self.__class__.__name__, execution_id=self.execution_id)
+
+        self.parser.set_value("execution_id", self.execution_id)
+        self.parser.update_date(dt=datetime.now(), name="execution")
+        
+
+        super().__init__(parser=self.parser, execution=execution)
 
         if self.execution_id is None:
             self.log.info(f"Executing...")
         else:
             self.log.info(f"Executing ({self.execution_id})")
-        self.parser.set_value("execution_id", self.execution_id)
-        self.parser.set_default("date_simulation",datetime.now().strftime("%Y-%m-%d"))
-        self.parser.set_default("time_simulation",datetime.now().strftime("%H:%M:%S"))
+
 
         self.op = self.parser.get("op")
         self._ipc = None

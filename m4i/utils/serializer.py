@@ -156,7 +156,23 @@ class Serializer:
         elif compression == "snappy":
             return pickle.loads(snappy.decompress(data))
                 
+    @staticmethod
+    def save(obj: Any, path: str, compression: str=None, clevel:int=5):
+        """
+        Save an object to a file with optional compression.
+        """
+        compressed_data = Serializer.serialize(obj, compression=compression, clevel=clevel)
+        with open(path, 'wb') as f:
+            f.write(compressed_data)
 
+    @staticmethod
+    def load(path: str, compression: str=None) -> Any:
+        """
+        Load an object from a file with optional decompression.
+        """
+        with open(path, 'rb') as f:
+            data = f.read()
+        return Serializer.deserialize(data, compression=compression)
 
 
 if __name__ == "__main__":

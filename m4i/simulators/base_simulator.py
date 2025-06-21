@@ -4,16 +4,14 @@ from ..connectors import Loader
 from ..graphs import KPathList
 from abc import ABC, abstractmethod
 from ..log import Logger
-from ..taskbase import TaskBase
+from ..base_m4i_model import BaseM4IModel
 
-class BaseSimulator(TaskBase):
+class BaseSimulator(BaseM4IModel):
     
     
     def __init__(self,loader: Loader, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.loader: Loader = loader        
-        self.log: Logger = Logger.getLogger("SIM", execution_id=self.loader.execution_id)
-    
+        super().__init__(loader=loader, **kwargs)
+        
     @abstractmethod
     def update_performance(self, tstart: int, tend: int):
         pass

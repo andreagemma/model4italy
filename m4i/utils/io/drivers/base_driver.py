@@ -67,14 +67,17 @@ class BaseDriver:
     
     def __init__(self, **kwargs):
         self._init_kwargs = kwargs
+    
+    priority: int = 0
 
-    @property
-    def name(self) -> str:
+    @classmethod
+    def name(cls) -> str:
         raise NotImplementedError("Il driver deve implementare 'name'.")
 
-    @property
-    def pattern(self) -> Union[str, List[Union[str, Tuple[str, dict]]]]:
+    @classmethod
+    def pattern(cls) -> List[Union[str, re.Pattern]]:
         raise NotImplementedError("Il driver deve implementare 'pattern'.")
+        
 
     def import_dataframe(
         self,
@@ -160,6 +163,7 @@ class BaseDriver:
                 
         else:
             raise FileNotFoundError(f"Il percorso '{path}' non esiste.")
+   
     @staticmethod
     def is_geo(df: Union[pd.DataFrame, gpd.GeoDataFrame]) -> bool:
         if isinstance(df, gpd.GeoDataFrame):
@@ -168,6 +172,7 @@ class BaseDriver:
         elif isinstance(df, pd.DataFrame):
             return any(col in df.columns for col in ['geometry', 'geom'])
         return False
+    
     @staticmethod
     def to_geodataframe(df: Union[pd.DataFrame, gpd.GeoDataFrame], crs: Union[str, int] = "EPSG:4326") -> gpd.GeoDataFrame:
         if isinstance(df, gpd.GeoDataFrame):
@@ -201,6 +206,7 @@ class BaseDriver:
         
 
         return gdf    
+    
     @staticmethod
     def to_dataframe(df: Union[pd.DataFrame, gpd.GeoDataFrame]) -> pd.DataFrame:
         """

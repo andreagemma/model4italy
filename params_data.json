@@ -2,11 +2,11 @@
     "params": {
         "input": {
             "connector": "FileLoader",
-            "location": "./dati/eur/files"
+            "location": "./dati/eur2/files"
         },
         "output": {
             "connector": "FileWriter",
-            "location": "./dati/output/{description}/{simulation_id}"            
+            "location": "./dati/output/{description}/{simulation_id}/{day_type_simulation}"            
         },
         "modes": [
             {
@@ -86,9 +86,12 @@
                 }
             }
         ],
-        "aggregated_results": "aggregated_results.parquet",
-        "paths": "paths.parquet",
-        "rt_paths": "rt_paths.parquet",        
+        "aggregated_results": { "src": "aggregated_results.parquet", "partition_cols": ["t"] },
+        "paths":"path.parquet",
+        "fcd_paths": { "src": "fcd_paths.geoparquet", "partition_cols": ["t"] },
+        "fcd_trips": { "src": "fcd_trips.geoparquet", "partition_cols": ["t"] },
+        "fcd_fcd": { "src": "fcd_fcd.geoparquet", "partition_cols": ["t"] },
+        "fcd_graph": { "src": "graph/fcd_graph.pkl", "partition_cols": ["t_base"]  },
         "statistics": "stats.csv", 
         "state": "./dati/output/{description}/state",
         "params": "params.json", 
@@ -100,7 +103,7 @@
             "tz_data": "UTC",
             "mapping": {
                 "id_fcd": "id_fcd",
-                "id_trip": "id_trip",
+                "id_veh": "id_trip",
                 "heading": "heading",
                 "timestamp": "dt",
                 "engine": "engine",

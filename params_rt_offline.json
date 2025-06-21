@@ -1,10 +1,9 @@
 {
     "simulation_id": 29,
-    "description": "Demo",
-    "date_simulation": "2024-05-07",
-    "start": "07:00",
-    "end": "07:30",  
-    "op": "assignment",
+    "description": "Demo_FCDServer_Offline",
+    "start": "2024-05-01 00:00:00",
+    "end": "2024-06-01 02:00:00",   
+    "op": "fcd_server_offline",
     "scenario_id": 1,
     "settings": {
         "MSA_MAX_ITE": 1,

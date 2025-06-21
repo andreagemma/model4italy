@@ -41,7 +41,11 @@ class Loader(BaseLoader):
 
     def __init__(self, parser: ParamsParser, logger: Logger = None):
         self.execution_id = parser.get("execution_id")
-        self.log = logger or Logger.getLogger(self.__class__.__name__, execution_id=self.execution_id)
+        logger_name = f"{parser.ini.LOG_NAME}.{self.__class__.__name__}"
+        if self.execution_id is None:
+            self.log = logger or Logger.getLogger(logger_name)
+        else:
+            self.log = logger or Logger.getLogger(logger_name, execution_id=self.execution_id)
 
         self._origins: list[int] = None
         self._destinations: list[int] = None
@@ -95,15 +99,18 @@ class Loader(BaseLoader):
         ClassLoader = Loader.get_cls_by_name(cls_name)
         loader = ClassLoader()
         parameters = copy.deepcopy(parameters)
+        """
         for k, v in parameters.items():
             if isinstance(v, (str, int, float)):
                 parameters[k] = self.parser.get_parametric_name(v)
-        
+        """
         mapping = parameters.get("mapping")
         if filters is not None:
             filters = rename_filters(filters=filters, rename=mapping)
         if dtype is not None:
             dtype_inverse = {mapping.get(k, k): v for k, v in dtype.items()}
+        else:
+            dtype_inverse = None
 
         df = loader.load_dataset(parameters=parameters, filters=filters, dtype=dtype_inverse)
         if df is None:

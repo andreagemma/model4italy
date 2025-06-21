@@ -36,7 +36,7 @@ class Writer(ABC):
         self.log = Logger.getLogger(self.__class__.__name__, execution_id=self.execution_id)
         self.ini: IniClass = self.parser.ini
 
-    def _write_dataset(self, df: Union[pd.DataFrame, gpd.GeoDataFrame], parameters, mode=None, dtype=None, partition=None, **kwargs) -> bool:
+    def _write_dataset(self, df: Union[pd.DataFrame, gpd.GeoDataFrame], parameters, mode=None, dtype=None, **kwargs) -> bool:
         """
         Write a dataset based on the provided parameters and mode.
         Arguments:
@@ -59,10 +59,17 @@ class Writer(ABC):
             writer: BaseWriter  = ClassWriter()
 
             parameters = copy.deepcopy(parameters)
+            additional_fields = parameters.get("additional_fields", None)
+            if additional_fields:
+                for additional_field in additional_fields:
+                    name = self.parser.get_parametric_name("{"+additional_field+"}")
+                    if name != "{"+additional_field+"}":
+                        df[additional_field] = name
+            """
             for k, v in parameters.items():
                 if isinstance(v, (str, int, float)):
                     parameters[k] = self.parser.get_parametric_name(v)
-            
+            """
             if dtype is not None:
                 df=self.parser.apply_dtype(df=df, dtype=dtype, copy=False)
 
@@ -76,7 +83,9 @@ class Writer(ABC):
                         df.set_crs(crs, inplace=True)
                     elif df.crs != crs:
                         df.to_crs(crs, inplace=True)
-            ret = writer.write_dataset(df,parameters=parameters, mode=mode, partition=partition, ini=self.ini, **kwargs)
+
+            partition_cols = parameters.get("partition_cols", None)
+            ret = writer.write_dataset(df,parameters=parameters, mode=mode, partition_cols=partition_cols, **kwargs)
             if ret == False:
                 self.log.warning(f"Failed to write dataset for {parameters}")
                 return False
@@ -104,32 +113,29 @@ class Writer(ABC):
     def has(self, name):
         return self.parser.get(name) is not None
 
-    def write_agg_results(self, results: gpd.GeoDataFrame, mode=None, partition=None, **kwargs):
+    def write_agg_results(self, results: gpd.GeoDataFrame, mode=None, **kwargs):
         kwargs["df"] = results
         kwargs["dtype"] = self.parser.get_dtype("aggregated_results")
-        kwargs["parameters"] = self.parser.get_output_parameters("params.aggregated_results")
+        kwargs["parameters"] = self.parser.get_output_parameters("params.aggregated_results", df=results)
         kwargs["mode"] = mode
-        kwargs["partition"] = partition
-        try:
-            kwargs["partition_cols"] = [s.split("=")[0] for s in partition.split(",")] if partition is not None else None
-        except Exception as e:
-            kwargs["partition_cols"] = None
         return self._write_dataset(**kwargs)
 
     
-    def write_paths(self, results: gpd.GeoDataFrame, mode=None, partition=None, **kwargs):
+    def write_paths(self, results: gpd.GeoDataFrame, mode=None, **kwargs):
         kwargs["df"] = results
         kwargs["dtype"] = self.parser.get_dtype("paths")
-        kwargs["parameters"] = self.parser.get_output_parameters("params.paths")
+        kwargs["parameters"] = self.parser.get_output_parameters("params.paths", df=results)
         kwargs["mode"] = mode
+        """
         kwargs["partition"] = partition
         try:
             kwargs["partition_cols"] = [s.split("=")[0] for s in partition.split(",")] if partition is not None else None
         except Exception as e:
             kwargs["partition_cols"] = None
+        """
         return self._write_dataset(**kwargs)
 
-    def write(self, results: gpd.GeoDataFrame, path:str=None, parameters:dict=None, mode=None, partition=None, **kwargs):
+    def write(self, results: gpd.GeoDataFrame, path:str=None, parameters:dict=None, mode=None, **kwargs):
         """
         Carica un dataset in base ai parametri forniti, ai filtri e al tipo di dato specificato.
 
@@ -155,12 +161,13 @@ class Writer(ABC):
         """                
         if parameters is None:
             if path:
-                parameters = self.parser.get_output_parameters(path)
+                parameters = self.parser.get_output_parameters(path, df=results)
             else:
                 raise KeyError("key 'parameters' not found in execution parameters")        
         kwargs["df"] = results
         kwargs["parameters"] = parameters
         kwargs["mode"] = mode
+        """
         if partition is not None:
             if isinstance(partition, str):
                 kwargs["partition"] = partition
@@ -174,4 +181,5 @@ class Writer(ABC):
                     kwargs["partition_cols"] = [s.split("=")[0] for s in partition] if partition is not None else None
                 except Exception as e:
                     kwargs["partition_cols"] = None
+        """
         return self._write_dataset(**kwargs)

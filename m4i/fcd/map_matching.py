@@ -118,7 +118,7 @@ class MapMatching:
                     lambda x: pd.Series({
                         'mm_link_prob': x['prob'].sum(),
                         'mm_pos': x.loc[x['prob'].idxmax(), 'matched_pos']
-                    })).reset_index().rename(columns={"id_link":"mm_id_link"})
+                    }), include_groups=False).reset_index().rename(columns={"id_link":"mm_id_link"})
                 matched_results[-1]['all_matches'] = df_all_matches.sort_values("mm_link_prob", ascending=False ).to_dict(orient='records')
         if len(matched_results) == 0:
             if all_matches:                

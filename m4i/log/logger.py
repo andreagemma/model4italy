@@ -38,6 +38,8 @@ class Logger:
         """Return a logger with the specified name."""
         #execution_id_str=f"({execution_id})" if execution_id is not None else ''
         name = name or Logger.log_name
+        #if not name.startswith(Logger.log_name):
+        #    name = f"{Logger.log_name}.{name}"
         if name in Logger.loggers:
             ret = Logger.loggers[name]
             return ret
@@ -89,8 +91,8 @@ class Logger:
                     if isinstance(h, DBHandler):
                         logger.removeHandler(h)                
 
-    @staticmethod
-    def initLogger(level=logging.DEBUG, console=True, file=False, db=False, dir_log=None, engine: Engine=None, log_name='', format=None, execution_format=None):
+    @classmethod
+    def initLogger(cls, level=logging.DEBUG, console=True, file=False, db=False, dir_log=None, engine: Engine=None, log_name='', format=None, execution_format=None):
         Logger.loggers.clear()
         Logger.format = format if format is not None else Logger.format
         Logger.execution_format = execution_format if execution_format is not None else Logger.execution_format
@@ -182,5 +184,5 @@ class Logger:
             os.makedirs(Logger.dir_log)
 
         logging.config.dictConfig(Logger.params)
-        logging.debug("Logger configured correctly")
+        Logger.getLogger(cls.__name__).debug("Logger configured correctly")
 

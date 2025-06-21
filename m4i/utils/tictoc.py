@@ -707,7 +707,53 @@ class TicToc:
             l: logging.Logger = self.log if logger is None else logger
             l.debug(self.get_info(counter=counter, tot=tot, iformat=iformat, dt_format=dt_format, **kwargs))
         return self
-
+    def warning(self,iformat=None, counter: Optional[Union[int, float]] = None, tot: Optional[Union[int, float]] = None,              
+              dt_format="%Y-%m-%d %H:%M:%S",
+              logger: logging.Logger = None,
+              n_rows=None,
+              **kwargs) -> TicToc:
+        """
+        The `debug` function logs information about the progress of a task, including the counter, total,
+        elapsed time, speed, remaining time, and other optional parameters.
+        
+        :param counter: The `counter` parameter is used to track the progress of a task. It can be an
+        integer or a float
+        :type counter: Optional[Union[int, float]]
+        :param tot: The `tot` parameter represents the total number of iterations or items that you are
+        processing. It is used to calculate the progress percentage and estimate the remaining time
+        :type tot: Optional[Union[int, float]]
+        :param iformat: The `iformat` parameter is used to specify the format of the information message
+        that will be logged. It is a string that can contain placeholders for various values such as the
+        counter, total, elapsed time, speed, etc. These placeholders will be replaced with their
+        corresponding values when the message is logged
+        all placeholder that you ca use in messages iformat
+            counter, i
+            tot
+            elapsed_time*, et* with * as _s,_m,_h,_d,_str
+            elapsed_origin_time*, eot* with * as _s,_m,_h,_d,_str
+            speed*, v* with * as _s,_m,_h,_d,_str
+            remaining_time*, rt* with * as _s,_m,_h,_d,_str
+            total_time*, tt* with * as _s,_m,_h,_d,_str
+            end_time*, end* with * as _str
+            start_time*, start* with * as _str
+            origin_time*, origin* with * as _str
+            and all other kwargs defined        
+        :param dt_format: The `dt_format` parameter is used to specify the format of the datetime values
+        that will be displayed in the log messages. By default, it is set to "%Y-%m-%d %H:%M:%S", which
+        represents the format "YYYY-MM-DD HH:MM:SS", defaults to %Y-%m-%d %H:%M:%S (optional)
+        :param logger: The `logger` parameter is an optional parameter of type `logging.Logger`. It
+        allows you to specify a custom logger object to use for logging the information. If no logger is
+        provided, the method will use the default logger object `self.log`
+        :type logger: logging.Logger
+        :param n_rows: The parameter `n_rows` is used to specify the number of rows after which the
+        information should be logged. If `n_rows` is `None` or the current counter value is divisible by
+        `n_rows`, the information will be logged
+        :return: The method `info` returns the instance of the class `TicToc` (self).        
+        """
+        if n_rows is None or counter % n_rows == 0:
+            l: logging.Logger = self.log if logger is None else logger
+            l.warning(self.get_info(counter=counter, tot=tot, iformat=iformat, dt_format=dt_format, **kwargs))
+        return self
     def get_info(self,iformat=None, counter: Optional[Union[int, float, str]] = None, tot: Optional[Union[int, float]] = None,                 
                  dt_format="%Y-%m-%d %H:%M:%S",
                  logger: logging.Logger = None,

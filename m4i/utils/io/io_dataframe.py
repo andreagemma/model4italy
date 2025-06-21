@@ -5,45 +5,50 @@ import warnings
 from typing import Dict, List, Optional, Type, Union, Tuple
 import pandas as pd
 import geopandas as gpd
+from m4i.graphs.paths.k_path_container import KPathContainer
 from .drivers import BaseDriver
 
 class IO_DataFrame:
-    def __init__(self):
-        self._patterns: Dict[str, re.Pattern] = {}
-        self._pattern_to_driver: Dict[str, BaseDriver] = {}
-        self._load_all_drivers()
+    def __init__(self, **kwargs):
+        self._patterns: Dict[re.Pattern, re.Pattern] = {}
+        self._pattern_to_driver: Dict[re.Pattern, BaseDriver] = {}
+        self._load_all_drivers(**kwargs)
 
-    def register_driver(self, driver_cls: Type[BaseDriver], pattern: Union[str, List[Union[str, Tuple[str, dict]]]], kwargs: Optional[dict] = None):
+    def register_driver(self, driver_cls: Type[BaseDriver], kwargs: Optional[dict] = None):
+        pattern: Union[str,re.Pattern, List[Union[str, Tuple[str, dict],re.Pattern]]] = driver_cls.pattern()
+        name: str = driver_cls.name()
         kwargs = kwargs or {}
-        driver = driver_cls(**kwargs)
+        if name in kwargs:
+            driver = driver_cls(**kwargs["name"])
+        else:
+            driver = driver_cls()
 
         patterns = pattern if isinstance(pattern, list) else [pattern]
         for pat in patterns:
+            if isinstance(pat, str):
+                pat = re.compile(pat)
             if isinstance(pat, re.Pattern):
                 if pat in self._pattern_to_driver:
                     warnings.warn(f"Il pattern '{pat}' è già registrato. Il driver precedente verrà sovrascritto.")
                 self._pattern_to_driver[pat] = driver
                 self._patterns[pat] = pat
-            elif isinstance(pat, tuple):
-                regex, pat_kwargs = pat
-                self.register_driver(driver_cls, regex, {**kwargs, **pat_kwargs})
             else:
-                compiled = re.compile(pat)
-                if pat in self._pattern_to_driver:
-                    warnings.warn(f"Il pattern '{pat}' è già registrato. Il driver precedente verrà sovrascritto.")
-                self._pattern_to_driver[pat] = driver
-                self._patterns[pat] = compiled
-
-    def _load_all_drivers(self):
+                warnings.warn(f"Il pattern '{pat}' non è una stringa o un oggetto re.Pattern valido. Ignorato.")
+                
+    def _load_all_drivers(self, **kwargs):
         from . import drivers
-        for _, modname, ispkg in pkgutil.iter_modules(drivers.__path__):
-            if not ispkg:
-                module = importlib.import_module(f".drivers.{modname}", package=__package__)
-                for attr in dir(module):
-                    obj = getattr(module, attr)
-                    if isinstance(obj, type) and issubclass(obj, BaseDriver) and obj is not BaseDriver:
-                        pattern = obj().pattern
-                        self.register_driver(obj, pattern)
+        # estrae i pacakges dei driver
+        modules = [modname for _, modname, ispkg in pkgutil.iter_modules(drivers.__path__) if not ispkg]        
+        # li importa dinamicamente
+        modules = [importlib.import_module(f".drivers.{modname}", package=__package__) for modname in modules]
+        # estrae le classi dai moduli importati
+        classes = [getattr(module, attr) for module in modules for attr in dir(module) if isinstance(getattr(module, attr), type)]
+        # filtra le classi per quelle che sono sottoclassi di BaseDriver
+        classes = [c for c in classes if issubclass(c, BaseDriver) and c is not BaseDriver]   
+        # ordina le classi in base alla priorità     
+        classes = sorted(classes, key=lambda x: x.priority, reverse=True)
+        for cls in classes:
+            self.register_driver(cls, **kwargs)
 
     def _detect_driver(self, path: str) -> BaseDriver:
         path = path.lower()
@@ -77,7 +82,7 @@ class IO_DataFrame:
         kwargs.pop("filters", None)
         kwargs.pop("dtype", None)
         df = driver.import_dataframe(path, filters=filters, dtype=dtype, **kwargs)
-        if force_geodataframe is not None:
+        if force_geodataframe is not None and isinstance(df, pd.DataFrame):
             if force_geodataframe and not isinstance(df, gpd.GeoDataFrame):
                 df = gpd.GeoDataFrame(df)
             elif not force_geodataframe and isinstance(df, gpd.GeoDataFrame):
@@ -91,7 +96,6 @@ class IO_DataFrame:
         driver: str=None,
         mode: str = "w",
         partitionby: Optional[List[str]] = None,
-        force_partitioning: Optional[bool] = None,
         kwargs_driver: Optional[dict] = None,
         **kwargs
     ):

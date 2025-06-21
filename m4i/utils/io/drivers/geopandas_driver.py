@@ -16,12 +16,12 @@ import warnings
 import glob
 class GeoPandasDriver(BaseDriver):
 
-    @property
-    def name(self) -> str:
+    @classmethod
+    def name(cls) -> str:
         return "geopandas"
 
-    @property
-    def pattern(self) -> List[str]:
+    @classmethod
+    def pattern(cls) -> List[str]:
         return [
             r"\.shp$",
             r"\.gpkg$",
@@ -72,8 +72,7 @@ class GeoPandasDriver(BaseDriver):
         if mode == "w":
             remove_path(path)
             mode="a"
-        if partitionby is None or len(partitionby)==0:            
-            
+        if partitionby is None or len(partitionby)==0:                        
             if path.lower().endswith(".geoparquet"):
                 df.to_parquet(path, index=index, **kwargs)
             elif path.lower().endswith(".shp"):

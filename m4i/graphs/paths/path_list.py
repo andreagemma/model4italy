@@ -80,5 +80,6 @@ class PathList(PathContainer):
             else:
                 logging.warning(f"Path not found in PathList. Key: {key}.")
             
-    
+    def clear(self):
+        self["paths"].clear()
     

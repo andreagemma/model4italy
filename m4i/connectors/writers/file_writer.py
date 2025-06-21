@@ -22,14 +22,20 @@ from .. import Loader
 from ... import IniClass
 from ...log import Logger
 from ...utils import IO_DataFrame
+import warnings
 class FileWriter(BaseWriter):
 
     def __init__(self):
         super().__init__()
 
-    def write_dataset(self, df: Union[pd.DataFrame, gpd.GeoDataFrame], parameters, mode=None, partition=None, partition_cols=None, crs: str= None, **kwargs) -> bool:
+    def write_dataset(self, df: Union[pd.DataFrame, gpd.GeoDataFrame], 
+                      parameters, 
+                      mode=None, 
+                      partition_cols=None, 
+                      crs: str= None, 
+                      **kwargs) -> bool:
         if df is None:
-            self.log.warning(f"No dataset to write for {parameters}")
+            warnings.warn(f"No dataset to write for {parameters}")
             return False
         
         location = parameters.get("location")
@@ -40,12 +46,6 @@ class FileWriter(BaseWriter):
         extension = filename.split('.')[-1]#.lower()
         extension = f".{extension}"  # Aggiunge il punto
 
-        if partition is not None and extension.lower() not in (".parquet",".geoparquet"):
-            #location = join(filename,partition)
-            #filename = os.path.basename(filename)
-            #filename = join(location,filename)
-            pass
-
         location = os.path.dirname(filename)
             
         if os.path.exists(location) and os.path.isfile(location):
@@ -53,7 +53,6 @@ class FileWriter(BaseWriter):
         os.makedirs(location, exist_ok=True)       
         iod = IO_DataFrame()
         iod.export_dataframe(df,path=filename, mode=mode, partitionby=partition_cols,kwargs_driver={"crs":crs})
-        #export_dataframe(df, filename, mode=mode, crs=crs, partition=partition, partition_cols=partition_cols, **kwargs)
         return True
         
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 import copy
 import datetime
+import operator
+import time
 from typing import Union, Any, Iterable, Callable
 import json
 import ast
@@ -10,13 +12,60 @@ from shapely.geometry import LineString, MultiLineString, Point, Polygon, MultiP
 from shapely.geometry.base import BaseGeometry
 import os
 from collections import namedtuple
-from .utils import util
+from m4i.utils.util import get_parametric_name
+from .utils import util, deep_update
 from .iniclass import IniClass
+from datetime import datetime, timedelta
+from .utils import to_datetime_auto
+
 
 class ParamsParser:
     """
     A class to parse parameters from a string.
     """
+
+    def update_date(self, dt=None, name="simulation", override=False, time=True, date=True) -> None:
+        if dt:
+            dt = to_datetime_auto(dt)
+        now = dt or datetime.now()
+        if override:
+            if date:
+                self.set_value(f"date_{name}", now.strftime("%Y-%m-%d"))
+                self.set_value(f"day_type_{name}", ParamsParser.day_type(now))
+                self.set_value(f"dow_{name}", now.isoweekday() % 7)
+            if time:
+                self.set_value(f"time_{name}", now.strftime("%H:%M:%S"))
+            if date and time:
+                self.set_value(f"datetime_{name}", now.strftime("%Y-%m-%d %H:%M:%S"))
+            self.set_value(f"ts_{name}", int(round(now.timestamp() / 60)))
+            self.set_value(f"t_{name}", now.hour * 60 + now.minute)
+        else:
+            if date:
+                self.set_default(f"date_{name}", now.strftime("%Y-%m-%d"))
+                self.set_default(f"day_type_{name}", ParamsParser.day_type(now))
+                self.set_default(f"dow_{name}", now.isoweekday() % 7)
+            if time:
+                self.set_default(f"time_{name}", now.strftime("%H:%M:%S"))
+            if date and time:
+                self.set_default(f"datetime_{name}", now.strftime("%Y-%m-%d %H:%M:%S"))
+            self.set_default(f"ts_{name}", int(round(now.timestamp() / 60)))
+            self.set_default(f"t_{name}", now.hour * 60 + now.minute)
+    
+    @staticmethod
+    def day_type(dt: Union[str,datetime]) -> str:
+        dt = to_datetime_auto(dt)
+        wd = dt.isoweekday() % 7
+        if wd == 0:
+            return "sunday"
+        elif wd == 1:
+            return "monday"
+        elif wd == 5:
+            return "friday"
+        elif wd == 6:
+            return "saturday"
+        else:
+            return "weekday"
+        
     @staticmethod
     def params_to_dict(params: Union[str,dict, list,tuple]) -> dict:
         if isinstance(params, str):
@@ -40,8 +89,9 @@ class ParamsParser:
         if not isinstance(params, dict):    
             raise ValueError("Invalid parameters: %s" % params)        
         return params
-    def __init__(self, params: Union[str,dict, list,tuple], settings: IniClass=None):
+    def __init__(self, params: Union[str,dict, list,tuple], settings: IniClass=None, options: dict = None):        
         self.params:dict = ParamsParser.params_to_dict(params)
+        deep_update(self.params, options)
         self.fields:dict = self.init_fields()
         self.ini:IniClass = settings
         self.update_params()
@@ -66,15 +116,34 @@ class ParamsParser:
         return parser
     
     def update_params(self):
-        if "start" in self.params:
-            self.set_value("start",util.min2hhmm(util.hhmm2min(self.get("start"))))
-            self.set_value("t_start",util.hhmm2min(self.get("start")))
-        if "end" in self.params:
-            self.set_value("end",util.min2hhmm(util.hhmm2min(self.get("end"))))
-            self.set_value("t_end",util.hhmm2min(self.get("end")))
+        if "date_simulation" not in self.params:
+            date_simulation = datetime.now()
+            #self.set_value("date",datetime.datetime.now().strftime("%Y-%m-%d"))
+        else:         
+            date_simulation = to_datetime_auto(self.get("date_simulation"))
+        if "start" not in self.params:
+            time_start = datetime.now()
+        else:
+            time_start = to_datetime_auto(self.get("start"))
         
-        if "date" not in self.params:
-            self.set_value("date",datetime.datetime.now().strftime("%Y-%m-%d"))
+        if "end" not in self.params:
+            time_end = datetime.now() + timedelta(minutes=60)
+        else:
+            time_end = to_datetime_auto(self.get("end"))
+
+        dt = datetime.combine(date_simulation.date(), time_start.time())        
+        self.update_date(dt=dt, name="simulation", override=True, time=True, date=True)            
+        self.update_date(dt=time_start, name="start", override=True, time=True, date=True)
+        self.update_date(dt=time_end, name="end", override=True, time=True, date=True)
+        """
+        #if "start" in self.params:
+            #self.set_value("start",util.min2hhmm(util.hhmm2min(self.get("start"))))
+            #self.set_value("t_start",util.hhmm2min(self.get("start")))
+        if "end" in self.params:
+            
+            #self.set_value("end",util.min2hhmm(util.hhmm2min(self.get("end"))))
+            #self.set_value("t_end",util.hhmm2min(self.get("end")))
+        """
             
 
         settings = self.get("settings",copy=False)
@@ -371,11 +440,12 @@ class ParamsParser:
             "fcd": [
                 {"name": "id_fcd", "type": is_str, "dtype": "string", "required": True},
                 {"name": "id_trip", "type": is_str, "dtype": "string", "required": True},
-                {"name": "id_Veh", "type": is_str, "dtype": "string", "required": True},
+                {"name": "id_veh", "type": is_str, "dtype": "string", "required": True},
                 {"name": "timestamp", "type": is_str_datetime, "dtype": "datetime64[ns]", "required": True},
                 {"name": "engine", "type": is_int, "dtype": "Int8", "required": True},
                 {"name": "speed", "type": is_float, "dtype": "Float32", "required": True},
                 {"name": "heading", "type": is_float, "dtype": "Float32", "required": True},
+                {"name": "progr", "type": is_float, "dtype": "Float32", "required": True},
                 {"name": "lon", "type": is_float, "dtype": "Float64", "required": False, "default": lambda row: row["geometry"].coords[0] if pd.notna(row["geometry"]) else None},
                 {"name": "lat", "type": is_float, "dtype": "Float64", "required": False, "default": lambda row: row["geometry"].coords[1] if pd.notna(row["geometry"]) else None},
                 {"name": "geometry", "type": is_point, "dtype": "geometry", "required": False, "default": lambda row: Point(row["lon"], row["lat"]) if pd.notna(row["lon"]) and pd.notna(row["lat"]) else None},
@@ -439,7 +509,16 @@ class ParamsParser:
             return base_mapping
         else:
             raise ValueError(f"Unknown name: {name}")
+        
+    def get_additional_field(self, name: str, mapping) -> dict:
 
+        if name in self.fields:
+            fields = set(f["name"] for f in self.fields[name])            
+            additional_fields = [k for k in mapping.keys() if k not in fields]
+            return additional_fields
+        else:
+            raise ValueError(f"Unknown name: {name}")
+        
     def get_dtype(self, name: str) -> dict:
         if name in self.fields:
             fields = self.fields[name]
@@ -472,7 +551,7 @@ class ParamsParser:
 
         return base_param
 
-    def get_output_parameters(self, name_or_params: str = None, index: int = None) -> dict:
+    def get_output_parameters(self, name_or_params: str = None, index: int = None, df:pd.DataFrame=None) -> dict:
         if isinstance(name_or_params, dict):
             parameters = name_or_params
         elif isinstance(name_or_params, str):
@@ -489,12 +568,17 @@ class ParamsParser:
         base_param.setdefault("location", None)
         base_param.setdefault("mapping", {})
         base_param.setdefault("op", None)
+        if df is not None and isinstance(df, (pd.DataFrame, gpd.GeoDataFrame)):
+            base_param.setdefault("additional_fields", [c for c in df.columns])
+        else:
+            base_param.setdefault("additional_fields", [])
 
         name_category = name_or_params.split(".")[-1]
         if name_category in self.fields:
             mapping = self.get_mapping(name_category, base_param["mapping"])
+            additional_fields = self.get_additional_field(name_category, mapping)
             base_param["mapping"] = mapping
-
+            base_param["additional_fields"] = additional_fields
         return base_param
 
     def get(self, path: str, *args, copy=True, default=None) -> Any:
@@ -511,26 +595,21 @@ class ParamsParser:
             elif isinstance(value, (list, tuple)) and key.isdigit():
                 value = value[int(key)]
             else:
-                return default
+                return self.get_parametric_name(default)
         if copy and isinstance(value, (dict, list)):
             if isinstance(value, dict):
                 value = value.copy()
             elif isinstance(value, list):
                 value = value.copy()
         if value is None:
-            return default
-        return value
+            return self.get_parametric_name(default)
+        return self.get_parametric_name(value)
+
 
     def get_parametric_name(self, name, **kwargs):
+        from .utils import ravel_dict, get_parametric_name
         kwargs = kwargs or self.params
-        if isinstance(name, str):
-            kwargs = kwargs.copy()
-            for k, v in self.params.items():
-                if isinstance(v, (float, int, str)):
-                    kwargs.setdefault(k, v)
-            name = name.format(**kwargs)
-        elif isinstance(name, dict):
-            name = {k: self.get_parametric_name(v, **kwargs) for k, v in name.items()}
+        name = get_parametric_name(name, **kwargs)
         return name
 
     @staticmethod

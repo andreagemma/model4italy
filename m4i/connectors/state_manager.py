@@ -81,7 +81,7 @@ class StateManager(object):
         kwargs.setdefault("index",False)
         kwargs.setdefault("partition",partition)
         
-        location = self.parser.get_parametric_name(location, **kwargs)
+        #location = self.parser.get_parametric_name(location, **kwargs)
 
         os.makedirs(location, exist_ok=True)
         location = join(location, name+self.default_ext)

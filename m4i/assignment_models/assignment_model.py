@@ -24,10 +24,10 @@ from ..log import Logger
 from ..utils import save_dict, load_dict, getsize
 from ..utils.ipc import IPC
 from ..database import Execution
-from ..taskbase import TaskBase
+from ..base_m4i_model import BaseM4IModel
 import numpy as np
 
-class AssignmentModel(TaskBase):
+class AssignmentModel(BaseM4IModel):
 
     def __init__(
         self,
@@ -45,17 +45,12 @@ class AssignmentModel(TaskBase):
         load_state_paths: bool = False,
         save_state_paths: bool = False,
         save_ass_matrix: bool = False,
-        log: Logger = None,
         ipc: IPC = None,
         max_rel_gap: float = None,
         max_ite: int = None,
         **kwargs
         ):
-        super().__init__(**kwargs)
-        self.log = log or Logger.getLogger(self.__class__.__name__, execution_id=loader.parser.get("execution_id"))
-        self.ipc = ipc
-        self.loader: Loader = loader
-        self.writer: Writer = writer
+        super().__init__(loader=loader, writer=writer, ipc=ipc)
         self.loader.load_from_ipc(ipc=self.ipc)
         self.max_ite: int = max_ite
         self.max_rel_gap: float = max_rel_gap
@@ -102,7 +97,6 @@ class AssignmentModel(TaskBase):
 
         self.infos: dict = []
         self.m_paths: KPathList = None
-        self.tic: int = None
         self.tic_end: int = None
 
         self.current_time_start: int = None
@@ -235,7 +229,7 @@ class AssignmentModel(TaskBase):
                 saved = True
                 paths = self.get_paths_dataframe()
                 mode = "w" if self.interval==0 else "a"
-                saved = self.writer.write_paths(paths, mode=mode, partition=f"t", crs=self.loader.ini.CRS)
+                saved = self.writer.write_paths(paths, mode=mode, crs=self.loader.ini.CRS)
                 """
                 mode="w"
                 for t in range(self.real_time_start,self.real_time_end,self.delta_t):
@@ -276,7 +270,7 @@ class AssignmentModel(TaskBase):
                 ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400 ) / 60
                 mode = "w" if self.interval==0 else "a"
                 df["t"] = ds_t
-                saved = self.writer.write_agg_results(df, mode=mode, partition=f"t", crs=self.loader.ini.CRS)
+                saved = self.writer.write_agg_results(df, mode=mode, crs=self.loader.ini.CRS)
                 
                 """
                 mode = "w"
@@ -316,6 +310,7 @@ class AssignmentModel(TaskBase):
         self.current_t_starts = [self.delta_t * i for i in range(self.current_num_intervals)]
 
         self.G.resize_attributes(new_total_time=self.current_num_intervals * self.delta_t, offset=self.current_i_start * self.delta_t)
+        self.G["t_base"] = self.current_time_start
         self.m_paths = KPathList()
         if self.load_state_paths:
             self.log.info("Loading state (Paths)...")            

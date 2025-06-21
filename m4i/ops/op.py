@@ -15,10 +15,8 @@ class OP(BaseM4IModel):
             self.execution = Execution.create_execution(params=self.parser.params)        
             self.execution_id = self.execution.id
             self.loader.execution_id = self.execution_id
-            self.log = Logger.getLogger(self.__class__.__name__, execution_id=self.execution_id)
             self.log.info("Execution created")
-        else:
-            self.log = Logger.getLogger(self.__class__.__name__, execution_id=self.execution_id)
+            super().__init__(loader=loader, writer=writer, ipc=ipc, **kwargs)
 
     def run():
         pass

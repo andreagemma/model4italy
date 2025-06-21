@@ -242,18 +242,18 @@ class BuildPaths:
         #self.log.info(f"Loaded {self.df_links.shape[0]} links")
             
     def calculate_paths(self, df_links, df_fcd, df_trips, G):                
-        
+        DEBUG = False
         def fn(tasks, df_links, G):
             #warnings.filterwarnings("ignore", category=RuntimeWarning, append=True)
             tot_paths = PathList()
             for trip, df_fcd in tasks:
                 try:
-                    if hasattr(trip,"id_zone_o") and trip.id_zone_o is not None:
+                    if hasattr(trip,"id_zone_o") and pd.notna(trip.id_zone_o):
                         source= int(trip.id_zone_o)
                     else:
                         pto = Point(trip.geometry.coords[0])
                         source = nearest_point_row(df_links=df_links, fcd=df_fcd.iloc[0], pt= pto)
-                    if hasattr(trip,"id_zone_d") and trip.id_zone_d is not None:
+                    if hasattr(trip,"id_zone_d") and pd.notna(trip.id_zone_d):
                         target = int(trip.id_zone_d)
                     else:
                         ptd = Point(trip.geometry.coords[-1])
@@ -283,7 +283,7 @@ class BuildPaths:
         tot_paths = PathList()
         grp = df_fcd.groupby("id_trip")
         tasks = [(trip, grp.get_group(trip.id_trip).iloc[[0,-1],:]) for trip in tasks]
-        for paths in Parallel.execute(fn, tasks=tasks,df_links=df_links, G=G, n_workers=self.n_workers_pm):
+        for paths in Parallel.execute(fn, tasks=tasks,df_links=df_links, G=G, n_workers=1 if DEBUG else self.n_workers_pm):
             if paths is not None and len(paths) > 0:
                 tot_paths.merge(paths)
         return tot_paths

@@ -307,7 +307,7 @@ class DB:
                 cursor.execute("PRAGMA journal_mode=DELETE;")
                 cursor.close()             
         DB._session_factory = scoped_session(sessionmaker(bind=DB._engine))
-        DB.log = Logger.getLogger("DB_INIT")
+        DB.log = Logger.getLogger("DB")
         DB.log.info("Database opened successfully.")
 
     @staticmethod

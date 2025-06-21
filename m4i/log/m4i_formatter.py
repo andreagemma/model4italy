@@ -12,7 +12,7 @@ class M4IFormatter(TimeFormatter):
         self.execution_format = execution_format or self._fmt
 
     def format(self, record):
-        if hasattr(record, 'execution_id'):
+        if hasattr(record, 'execution_id') and record.execution_id is not None:
             self._style._fmt = self.execution_format
         else:
             self._style._fmt = self._fmt
