@@ -1150,10 +1150,12 @@ def deep_update(d, u):
     :param u: The dictionary with updates.
     :return: The updated dictionary.
     """
-    if not isinstance(d, dict) or not isinstance(u, dict):
-        raise ValueError("Both arguments must be dictionaries.")
     if u is None or len(u) == 0:
         return d
+    if d is None or len(d) == 0:
+        return u    
+    if not isinstance(d, dict) or not isinstance(u, dict):
+        raise ValueError("Both arguments must be dictionaries.")
     for k, v in u.items():
         if isinstance(v, dict) and isinstance(d.get(k), dict):
             deep_update(d[k], v)
