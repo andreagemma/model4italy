@@ -160,8 +160,9 @@ class FCDManager(BaseM4IModel):
                     ret_df_trips = pd.concat([ret_df_trips, df_trips], ignore_index=True)
             if df_fcd_trunced is not None and len(df_fcd_trunced) > 0:
                 if df_fcd_trunced["timestamp"].dt.tz is None:
-                    df_fcd_trunced["timestamp"] = df_fcd_trunced["timestamp"].dt.tz_localize("UTC")
-                df_fcd_trunced["timestamp"] = df_fcd_trunced["timestamp"].dt.tz_convert(self.ini.FCD_SERVER_TZ_DATA)
+                    df_fcd_trunced["timestamp"] = df_fcd_trunced["timestamp"].dt.tz_localize(self.ini.FCD_SERVER_TZ_DATA)
+                else:
+                    df_fcd_trunced["timestamp"] = df_fcd_trunced["timestamp"].dt.tz_convert(self.ini.FCD_SERVER_TZ_DATA)
                 if ret_df_fcd_trunced is None:
                     ret_df_fcd_trunced = df_fcd_trunced
                 else:
@@ -498,6 +499,8 @@ class FCDManager(BaseM4IModel):
             else:
                 trip_fcds.append(fcd)
         if len(ret)==0:
+            if trip_fcds is not None:
+                truncated_fcds.extend([f for f in trip_fcds])
             df = pd.DataFrame(columns=["id_trip", "id_veh", 
                                     "dt_o", "dt_d", "tt", "dist", "avg_speed", 
                                     "id_fcds", "progr_o", "id_prev", "id_next", 

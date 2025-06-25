@@ -457,12 +457,16 @@ def to_datetime_auto(t: Union[str,int, float,datetime, time, date],
         
         if tz_localize is not None:
             # if if naive
+            if isinstance(tz_localize, str):
+                tz = pytz.timezone(tz_localize)
+            else:
+                tz = tz_localize
             if dt.tzinfo is None:
-                if isinstance(tz_localize, str):
-                    tz = pytz.timezone(tz_localize)
-                else:
-                    tz = tz_localize
-                tz.localize(dt)
+                dt=tz.localize(dt)
+            else:
+                if tz!= dt.tzinfo:
+                    dt=tz.localize(dt.replace(tzinfo=None))
+                    warnings.warn("Datetime is already timezone-aware, localizing may lead to unexpected results.")
         if tz_convert is not None:
             if isinstance(tz_convert, str):
                 tz = pytz.timezone(tz_convert)

@@ -76,12 +76,12 @@ class PandasDriver(BaseDriver):
         template: str = "{filename}-{partition}-{i}",
         **kwargs
     ):
+        kwargs.pop("crs",None)
         if isinstance(df, dict):
             df = pd.DataFrame.from_dict(df)
         if isinstance(df, geopandas.GeoDataFrame):
             tmp = pd.DataFrame(df.drop("geometry", axis=1, errors="ignore"))
-            tmp["geometry"] = df.geometry.to_wkt()
-            kwargs.pop("crs")
+            tmp["geometry"] = df.geometry.to_wkt()            
             df = tmp
         index = kwargs.pop("index", False)
         if partitionby is None or len(partitionby)==0:

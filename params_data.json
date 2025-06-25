@@ -6,7 +6,7 @@
         },
         "output": {
             "connector": "FileWriter",
-            "location": "./dati/output/{description}/{simulation_id}/{day_type_simulation}"            
+            "location": "./dati/output/{description}/{simulation_id}"            
         },
         "modes": [
             {
@@ -88,17 +88,18 @@
         ],
         "aggregated_results": { "src": "aggregated_results.parquet", "partition_cols": ["t"] },
         "paths":"path.parquet",
-        "fcd_paths": { "src": "fcd_paths.geoparquet", "partition_cols": ["t"] },
-        "fcd_trips": { "src": "fcd_trips.geoparquet", "partition_cols": ["t"] },
-        "fcd_fcd": { "src": "fcd_fcd.geoparquet", "partition_cols": ["t"] },
-        "fcd_graph": { "src": "graph/fcd_graph.pkl", "partition_cols": ["t_base"]  },
+        "fcd_paths": { "src": "fcd_paths.geoparquet", "partition_cols": ["day_type", "t"], "mapping": {"day_type": "{day_type_simulation}"}, "mode":"wa"},
+        "fcd_trips_": { "src": "fcd_trips.geoparquet", "partition_cols": ["day_type", "t"], "mapping": {"day_type": "{day_type_simulation}"}, "mode":"wa" },
+        "fcd_fcd_": { "src": "fcd_fcd.geoparquet", "partition_cols": ["day_type", "t"], "mapping": {"day_type": "{day_type_simulation}", "mode":"wa"}},
+        "fcd_graph": { "src": "fcd_graph.parquet", "partition_cols": ["day_type", "t_base"], "mapping": {"day_type": "{day_type_simulation}", "mode":"wa"}},
         "statistics": "stats.csv", 
         "state": "./dati/output/{description}/state",
-        "params": "params.json", 
+        "params": "../params_{simulation_id}.json", 
         "fcd": {
             "connector": "DBLoader",
             "location": "postgresql+psycopg://postgres:lDvdc15dcd5@192.168.133.80:5432/fcd_mobito",
             "src": "eur.fcdmm",
+            "index_col": "id_fcd",
             "crs": "EPSG:4326",
             "tz_data": "UTC",
             "mapping": {

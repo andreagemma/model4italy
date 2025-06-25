@@ -24,7 +24,7 @@ class ParamsParser:
     A class to parse parameters from a string.
     """
 
-    def update_date(self, dt=None, name="simulation", override=False, time=True, date=True) -> None:
+    def update_date(self, dt=None, name="simulation", override=True, time=True, date=True) -> None:
         if dt:
             dt = to_datetime_auto(dt)
         now = dt or datetime.now()
@@ -99,7 +99,7 @@ class ParamsParser:
     def get_dict(self) -> dict:
         from copy import deepcopy
         settings = self.ini.get_dict()
-        settings.update(deepcopy(self.params["settings"]))
+        settings.update(deepcopy(self.params.get("settings", {})))
         params = deepcopy(self.params)
         params["settings"] = settings
         return params
@@ -514,7 +514,7 @@ class ParamsParser:
 
         if name in self.fields:
             fields = set(f["name"] for f in self.fields[name])            
-            additional_fields = [k for k in mapping.keys() if k not in fields]
+            additional_fields = {k:v for k, v in mapping.items() if k not in fields}
             return additional_fields
         else:
             raise ValueError(f"Unknown name: {name}")
@@ -567,18 +567,25 @@ class ParamsParser:
             base_param["src"] = parameters
         base_param.setdefault("location", None)
         base_param.setdefault("mapping", {})
+        additional_fields = base_param.get("additional_fields", {})
         base_param.setdefault("op", None)
         if df is not None and isinstance(df, (pd.DataFrame, gpd.GeoDataFrame)):
-            base_param.setdefault("additional_fields", [c for c in df.columns])
-        else:
-            base_param.setdefault("additional_fields", [])
-
+            mapping = base_param.get("mapping", {})
+            for c in df.columns:
+                if c not in mapping:
+                    additional_fields[c]=c
+                else:
+                    additional_fields[c] = mapping[c]
+            for k,v in mapping.items():
+                if k not in df.columns:
+                    additional_fields[k] = v
+        base_param.setdefault("additional_fields", additional_fields)
         name_category = name_or_params.split(".")[-1]
         if name_category in self.fields:
             mapping = self.get_mapping(name_category, base_param["mapping"])
             additional_fields = self.get_additional_field(name_category, mapping)
             base_param["mapping"] = mapping
-            base_param["additional_fields"] = additional_fields
+            base_param["additional_fields"].update(additional_fields)
         return base_param
 
     def get(self, path: str, *args, copy=True, default=None) -> Any:

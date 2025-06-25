@@ -7,6 +7,7 @@ Created on Thu Jun 24 19:11:39 2021
 from __future__ import annotations
 
 
+import operator
 import pandas as pd
 import numpy as np
 import geopandas as gpd
@@ -19,6 +20,7 @@ import ast
 from importlib import import_module
 from abc import ABC, abstractmethod
 
+import warnings
 from ..params_parser import ParamsParser
 from ..utils.util import serialize
 from ..utils.decorators import stat_results
@@ -59,12 +61,11 @@ class Writer(ABC):
             writer: BaseWriter  = ClassWriter()
 
             parameters = copy.deepcopy(parameters)
-            additional_fields = parameters.get("additional_fields", None)
+            additional_fields = parameters.get("additional_fields", {})
             if additional_fields:
-                for additional_field in additional_fields:
-                    name = self.parser.get_parametric_name("{"+additional_field+"}")
-                    if name != "{"+additional_field+"}":
-                        df[additional_field] = name
+                for additional_field, v in additional_fields.items():
+                    if additional_field not in df.columns:
+                        df[additional_field] = v
             """
             for k, v in parameters.items():
                 if isinstance(v, (str, int, float)):
@@ -85,6 +86,14 @@ class Writer(ABC):
                         df.to_crs(crs, inplace=True)
 
             partition_cols = parameters.get("partition_cols", None)
+            if parameters.get("mode",None) is not None:
+                m = parameters.get("mode")
+                if m in ["wa","aw","a"]:
+                    mode = m
+                elif m in ["w"]:
+                    warnings.warn(f"Mode {m} is not possibile as parameters for dataset {parameters} are not set to append. Using 'a','wa' mode instead.")
+                else:
+                    raise ValueError(f"Invalid mode {m} for dataset {parameters}")  
             ret = writer.write_dataset(df,parameters=parameters, mode=mode, partition_cols=partition_cols, **kwargs)
             if ret == False:
                 self.log.warning(f"Failed to write dataset for {parameters}")

@@ -5,13 +5,13 @@ import warnings
 from typing import Dict, List, Optional, Type, Union, Tuple
 import pandas as pd
 import geopandas as gpd
-from m4i.graphs.paths.k_path_container import KPathContainer
 from .drivers import BaseDriver
 
 class IO_DataFrame:
     def __init__(self, **kwargs):
         self._patterns: Dict[re.Pattern, re.Pattern] = {}
         self._pattern_to_driver: Dict[re.Pattern, BaseDriver] = {}
+        self._drivers: Dict[str, BaseDriver] = {}
         self._load_all_drivers(**kwargs)
 
     def register_driver(self, driver_cls: Type[BaseDriver], kwargs: Optional[dict] = None):
@@ -22,7 +22,7 @@ class IO_DataFrame:
             driver = driver_cls(**kwargs["name"])
         else:
             driver = driver_cls()
-
+        self._drivers[name] = driver
         patterns = pattern if isinstance(pattern, list) else [pattern]
         for pat in patterns:
             if isinstance(pat, str):
@@ -70,7 +70,16 @@ class IO_DataFrame:
 
         if not driver:
             driver = self._detect_driver(path)
-
+        else:            
+            if isinstance(driver, str):
+                driver = self._drivers.get(driver, None)
+            elif isinstance(driver, BaseDriver):
+                driver = driver
+            else:
+                raise ValueError(f"Il driver deve essere una stringa o un'istanza di BaseDriver, ma è di tipo {type(driver)}.")
+            if driver is None:
+                raise ValueError(f"Driver is None.")
+            
         if not driver:
             raise ValueError(f"Driver non registrato per '{path}'.")
         if kwargs_driver is None:
@@ -101,6 +110,15 @@ class IO_DataFrame:
     ):
         if not driver:
             driver = self._detect_driver(path)
+        else:            
+            if isinstance(driver, str):
+                driver = self._drivers.get(driver, None)
+            elif isinstance(driver, BaseDriver):
+                driver = driver
+            else:
+                raise ValueError(f"Il driver deve essere una stringa o un'istanza di BaseDriver, ma è di tipo {type(driver)}.")
+            if driver is None:
+                raise ValueError(f"Driver is None.")
 
         if not driver:
             raise ValueError(f"Driver non registrato per '{path}'.")
