@@ -104,12 +104,16 @@ class PathsClustering(BaseM4IModel):
         grp = df.groupby(["source", "target"])
         ret = None
         total_tasks = list(grp)
+        counts = 0
         for i, tmp in enumerate(Parallel.execute(fn, total_tasks)):    
-            self.log.debug(f"Processed {len(tmp[['source','target']].unique())}/{len(total_tasks)} tasks")
             if ret is None and tmp is not None and not tmp.empty:
                 ret = tmp
             else:
                 ret = pd.concat([ret,tmp], ignore_index=True)
+            if tmp is not None and not tmp.empty:
+                counts += tmp[['source','target']].drop_duplicates().shape[0]
+            if ret is not None and not ret.empty:
+                self.log.debug(f"Processed {counts}/{len(total_tasks)} tasks")
         ret.reset_index(drop=True, inplace=True)
         if ret is not None:
             ret = gpd.GeoDataFrame(ret, crs=crs_data, geometry=ret.geometry)

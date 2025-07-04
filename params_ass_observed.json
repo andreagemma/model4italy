@@ -1,5 +1,5 @@
 {
-    "simulation_id": 2,
+    "simulation_id": 1,
     "description": "Demo",
     "date_simulation": "2024-05-07",
     "start": "07:00",
@@ -10,6 +10,7 @@
         "MSA_MAX_ITE": 10,
         "MSA_K": 3,
         "MSA_SPP_NUMCPUS": 0,
-        "MSA_K_BALANCING": 1
+        "MSA_K_BALANCING": 2,
+        "USE_OBSERVED_PATHS": true  
     }
 }

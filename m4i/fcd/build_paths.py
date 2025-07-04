@@ -242,7 +242,7 @@ class BuildPaths:
         #self.log.info(f"Loaded {self.df_links.shape[0]} links")
             
     def calculate_paths(self, df_links, df_fcd, df_trips, G):                
-        DEBUG = False
+        DEBUG = True
         def fn(tasks, df_links, G):
             #warnings.filterwarnings("ignore", category=RuntimeWarning, append=True)
             tot_paths = PathList()

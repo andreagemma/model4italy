@@ -1,0 +1,66 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        }, 
+        {
+            "name": "Assignment",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}${pathSeparator}model4italy.py",  // Replace with your module name
+            "args": [
+                "-p", "params_ass.json"
+            ],            
+            "console": "integratedTerminal"
+        },         
+        {
+            "name": "init_db",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}${pathSeparator}model4italy.py",  // Replace with your module name
+            "args": [
+                "init_db"
+            ],
+            "console": "integratedTerminal"
+        }, 
+        {
+            "name": "fcd_server_online",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}${pathSeparator}model4italy.py",  // Replace with your module name
+            "args": [
+                "-o", "op=fcd_server_online"
+            ],
+            "console": "integratedTerminal"
+        }, 
+        {
+            "name": "fcd_server_offline",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}${pathSeparator}model4italy.py",  // Replace with your module name
+            "args": [
+                "-p", "params_rt_offline.json"
+            ],
+            "console": "integratedTerminal"
+        }, 
+        {
+            "name": "fcd_server_paths_clustering",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}${pathSeparator}model4italy.py",  // Replace with your module name
+            "args": [
+                "-p", "params_rt_offline_clustering.json"
+            ],
+            "console": "integratedTerminal"
+        }
+    ]
+}

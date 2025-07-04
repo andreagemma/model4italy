@@ -80,8 +80,8 @@ class MSA(AssignmentModel):
         return super().calc_task_steps() + len(self.global_intervals)* ( ite_con_cammini*2 + ite_senza_cammini)
         
     def run_assignment(self):
-        calc_paths = (not self.load_state_graph) or self.m_paths.is_empty()
-        k_calculated = self.m_paths.k_paths()
+        calc_paths = (not self.load_state_graph) #or self.m_paths.is_empty()
+        k_calculated = 0#self.m_paths.k_paths()
         
         for iteration in range(0, self.max_ite):
             self.iteration = iteration
@@ -92,7 +92,7 @@ class MSA(AssignmentModel):
             if calc_paths:
                 if k_calculated < self.max_k:
                     self.log.info("Ite: %s - Calculating paths (k=%d)...", iteration, k_calculated + 1)
-                    self.calculate_paths(k_calculated)                    
+                    self.calculate_paths()                    
                     k_calculated += 1                
                 if iteration < self.max_k:
                     self.log.info("Ite: %s - Preloading (k=%d)...", iteration, k_calculated)
@@ -132,7 +132,7 @@ class MSA(AssignmentModel):
             for (o, d, t_start, mode), k_paths in self.m_paths.all_kpaths():
                 f = self.ODs[mode][o, d, self.current_time_start + t_start] * self.eq_factors.get(mode, 1)
                 if self.loader.ini.MSA_K_BALANCING>0:
-                    k = iteration - len(k_paths) + self.loader.ini.MSA_K_BALANCING
+                    k = max(iteration - len(k_paths),0) + self.loader.ini.MSA_K_BALANCING
                 else:
                     k = iteration + 1
                 for path in k_paths:
@@ -146,7 +146,7 @@ class MSA(AssignmentModel):
                 if f > 0:
                     best = min(k_paths, key=lambda path: path["tot_cost"])
                     if self.loader.ini.MSA_K_BALANCING>0:
-                        k = iteration - len(k_paths) + self.loader.ini.MSA_K_BALANCING
+                        k = max(iteration - len(k_paths),0) + self.loader.ini.MSA_K_BALANCING
                     else:
                         k = iteration + 1
                     best["path_flow"] += f / k

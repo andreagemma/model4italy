@@ -356,6 +356,7 @@ class AssignmentModel(BaseM4IModel):
                             tmp["mode"] = mode
                             df_paths=pd.concat([df_paths, tmp], ignore_index=True, sort=False)
                         df_paths.dropna(subset=["mode"], inplace=True)
+                        df_paths = df_paths[df_paths["source"].isin(self.loader.origins) & df_paths["target"].isin(self.loader.destinations)]
 
                         self.m_paths.add_from_dataframe(df_paths)
                     
@@ -388,8 +389,9 @@ class AssignmentModel(BaseM4IModel):
             self.log.info("Assignment completed for maximum number of iterations")
 
     def run_assignment(self):
-        calc_paths = (not self.load_state_graph) or self.m_paths.is_empty()
-        k_calculated = self.m_paths.k_paths()
+        raise NotImplementedError("This method should be implemented in subclasses")
+        calc_paths = (not self.load_state_graph) # or self.m_paths.is_empty()
+        k_calculated = 0
         
         for iteration in range(0, self.max_ite):
             self.iteration = iteration
@@ -400,7 +402,7 @@ class AssignmentModel(BaseM4IModel):
             if calc_paths:
                 if k_calculated < self.max_k:
                     self.log.info("Ite: %s - Calculating paths (k=%d)...", iteration, k_calculated + 1)
-                    self.calculate_paths(k_calculated)                    
+                    self.calculate_paths()                    
                     k_calculated += 1                
                 if iteration < self.max_k:
                     self.log.info("Ite: %s - Preloading (k=%d)...", iteration, k_calculated)
@@ -538,7 +540,7 @@ class AssignmentModel(BaseM4IModel):
         
         
 
-    def calculate_paths(self, k):
+    def calculate_paths(self):
         self.task_step_done(f"{min2hhmm(self.current_time_start)}-{min2hhmm(self.current_time_end)} - Iteration: {self.iteration}/{self.max_ite} - Calculating paths")
         n_cpu = self.loader.ini.MSA_SPP_NUMCPUS        
 
@@ -556,7 +558,7 @@ class AssignmentModel(BaseM4IModel):
                                  n_workers=n_cpu)
 
         self.log.info("Ite: %s - Paths calculated", self.iteration)        
-        self.m_paths.merge(ret, k)
+        self.m_paths.merge(ret)
         
         #print(getsize(self.m_paths)/1024/1024,len(self.m_paths["paths"]),len(self.m_paths["ull"]))
 

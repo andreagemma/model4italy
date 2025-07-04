@@ -7,7 +7,7 @@
         },
         "output": {
             "connector": "FileWriter",
-            "location": "./dati/output/{description}/{simulation_id}"
+            "location": "./dati/output/{description}/{scenario_id}"
         },
         "modes": [
             {
@@ -126,8 +126,8 @@
                 }
             }
         ],
-        "aggregated_results": "aggregated_results.shp",
-        "paths": "path.geoparquet",
+        "aggregated_results": "aggregated_results_{simulation_id}.geoparquet",
+        "paths": "path_{simulation_id}.geoparquet",
         "fcd_paths": {
             "src": "fcd_paths.geoparquet",
             "additional_fields": {
@@ -137,12 +137,8 @@
         "fcd_paths_clustered": {
             "src": "fcd_paths_clustered.geoparquet"            
         },
-        "fcd_trips_": {
+        "fcd_trips": {
             "src": "fcd_trips.geoparquet",
-            "partition_cols": [
-                "day_type",
-                "t"
-            ],
             "additional_fields": {
                 "day_type": "{day_type_simulation}"
             },

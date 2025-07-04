@@ -1,6 +1,5 @@
 {
-    "simulation_id": 30,
     "description": "Demo",
     "op": "fcd_server_paths_clustering",
-    "scenario_id": 1
+    "scenario_id": 30
 }
