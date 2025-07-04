@@ -952,7 +952,7 @@ def import_dataframe(file_path, filters=None, dtype={}, driver=None,**kwargs):
             '.pickle': lambda x: pandas.read_pickle(x),
         })
     except:
-        passm4i/connectors/loaders/file_loader.py
+        pass
     try:
         import geopandas
         import_methods_gpd.update({
