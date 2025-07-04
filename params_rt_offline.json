@@ -1,7 +1,7 @@
 {
     "simulation_id": 30,
-    "description": "Demo_FCDServer_Offline",
-    "start": "2024-05-24 06:00:00",
+    "description": "Demo",
+    "start": "2024-05-01 00:00:00",
     "end": "2024-06-01 02:00:00",   
     "op": "fcd_server_offline",
     "scenario_id": 1

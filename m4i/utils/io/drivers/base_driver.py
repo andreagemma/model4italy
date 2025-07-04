@@ -1,3 +1,4 @@
+import datetime
 import re
 import typing
 import pandas as pd
@@ -98,9 +99,20 @@ class BaseDriver:
     
     @staticmethod
     def adapt_dtype(df, dtype: Optional[dict] = None, copy=True) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
-        if dtype is not None:
-            dtype = {k: v for k, v in dtype.items() if k in df.columns}
-            df = df.astype(dtype, copy=copy)
+        if dtype is None:
+            return df
+        try:
+            if isinstance(dtype, dict):
+                dtype = {k: v for k, v in dtype.items() if k in df.columns}
+                #remove dtype definition if dtype is a datetime
+                for col in df.columns:
+                    if pd.api.types.is_datetime64_any_dtype(df[col]) and col in dtype:
+                        del dtype[col]
+                df=df.astype(dtype, copy=copy)            
+            else:
+                df = df.astype(dtype, copy=copy)
+        except Exception as e:
+            raise ValueError(f"Invalid dtype: {dtype}") from e
         return df
     
     @staticmethod
@@ -131,7 +143,7 @@ class BaseDriver:
         :param kwargs: Argomenti keyword per la funzione.
         :return: DataFrame o GeoDataFrame con le partizioni elaborate.
         """
-        grp = df.groupby(partitionby)
+        grp = df.groupby(partitionby, observed=False)
         for name, group in grp:
             func((name, partitionby, group), *args, **kwargs)
 
@@ -174,7 +186,7 @@ class BaseDriver:
         return False
     
     @staticmethod
-    def to_geodataframe(df: Union[pd.DataFrame, gpd.GeoDataFrame], crs: Union[str, int] = "EPSG:4326") -> gpd.GeoDataFrame:
+    def to_geodataframe(df: Union[pd.DataFrame, gpd.GeoDataFrame], crs: Union[str, int] = "EPSG:4326", raise_error=False) -> Union[gpd.GeoDataFrame, pd.DataFrame]:
         if isinstance(df, gpd.GeoDataFrame):
             if df.geometry.name in df.columns:
                 return df.set_crs(crs, allow_override=True) if df.crs is None else df
@@ -186,7 +198,10 @@ class BaseDriver:
                 break
 
         if geometry_column is None:
-            raise ValueError("DataFrame non contiene una colonna 'geometry' o 'geom'.")
+            if raise_error:
+                raise ValueError("DataFrame non contiene una colonna 'geometry' o 'geom'.")
+            else:
+                return df
 
         # Determina il tipo di geometria e converte se necessario
         sample = df[geometry_column].dropna().iloc[0]
@@ -203,8 +218,6 @@ class BaseDriver:
                 gdf.set_crs(crs, inplace=True)
             else:
                 gdf.to_crs(crs, inplace=True)
-        
-
         return gdf    
     
     @staticmethod
@@ -214,11 +227,74 @@ class BaseDriver:
         Se esiste una colonna geometrica, viene convertita in WKT.
         """
         if isinstance(df, gpd.GeoDataFrame):
-            df = df.copy()
-            if df.geometry.name in df.columns:
-                df[df.geometry.name] = df.geometry.apply(lambda geom: wkt_dumps(geom) if geom is not None else None)
-            return pd.DataFrame(df)
+            tmp = pd.DataFrame(df.drop("geometry", axis=1, errors="ignore"))
+            tmp["geometry"] = df.geometry.to_wkt()            
+            df = tmp
+            return df
         elif isinstance(df, pd.DataFrame):
             return df
         else:
             raise TypeError("Input non valido: atteso pd.DataFrame o gpd.GeoDataFrame")
+        
+
+    def get_filename(path, 
+                     partitionBy=None,
+                     partition_values=None, 
+                     mode="w",
+                     template="{filename}-{i}") -> str:
+        import shutil
+        import tempfile
+        from pathlib import Path
+        from ... import remove_path
+        from datetime import datetime
+        from uuid import uuid4
+        from os import getpid
+        import glob
+
+        filename = os.path.basename(path)
+        extension = os.path.splitext(filename)[1]
+        if partitionBy and partition_values:
+            partitions_hive = [str(p) + "=" + str(v) for p,v in zip(partitionBy, partition_values)]
+        else:
+            partitions_hive = []
+        if partitions_hive:
+            path= os.path.join(path,*partitions_hive)
+
+        d = datetime.now()
+        date = d.strftime("%Y%m%d%H%M%S")
+        timestamp = d.timestamp()
+        uid = str(uuid4())
+        pid = getpid()
+
+        if not os.path.exists(path):
+            file_name = template.format(
+                filename=os.path.splitext(filename)[0],
+                date = date, 
+                uid=uid,pid=pid, 
+                timestamp=timestamp,
+                partition='-'.join((str(x) for x in partition_values)) if partition_values else "",
+                partitions_hive='-'.join(partitions_hive) if partitions_hive else "",
+                i="0",
+            )            
+            return os.path.join(path, file_name + extension)
+
+
+        file_name = template.format(
+            filename=os.path.splitext(filename)[0],
+            date = date, 
+            uid=uid,pid=pid, 
+            timestamp=timestamp,
+            partition='-'.join((str(x) for x in partition_values)) if partition_values else "",
+            partitions_hive='-'.join(partitions_hive) if partitions_hive else "",
+            i="*",
+        )
+        i = len(glob.glob(os.path.join(path,f"{file_name}{extension}")))
+        file_name = file_name = template.format(
+            filename=os.path.splitext(filename)[0],
+            date = date, uid=uid,pid=pid, timestamp=timestamp,
+            partition='-'.join((str(x) for x in partition_values)) if partition_values else "",
+            partitions_hive='-'.join(partitions_hive) if partitions_hive else "",
+            i=str(int(i) + 1),
+        )
+        new_file = os.path.join(path, file_name + extension)
+        return new_file

@@ -98,19 +98,17 @@ class OfflineMapMatching(OP):
             if self.ipc.get("_df_links") is not None:
                 self.tic.info("Loading df_links from IPC...")
                 self.df_links = self.ipc.get("_df_links")
-                self.df_links = gpd.GeoDataFrame(self.df_links, crs=self.parser.ini.FCD_SERVER_FCD_CRS_DATA).to_crs(self.parser.ini.FCD_SERVER_FCD_CRS_CALC)
+                self.df_links = gpd.GeoDataFrame(self.df_links, crs=self.parser.ini.CRS_CALC)
             if self.ipc.get("_df_nodes") is not None:
                 self.tic.info("Loading df_nodes from IPC...")
                 self.df_nodes = self.ipc.get("_df_nodes")
-                self.df_nodes = gpd.GeoDataFrame(self.df_nodes, crs=self.parser.ini.FCD_SERVER_FCD_CRS_DATA).to_crs(self.parser.ini.FCD_SERVER_FCD_CRS_CALC)
+                self.df_nodes = gpd.GeoDataFrame(self.df_nodes, crs=self.parser.ini.CRS_CALC)
             if self.ipc.get("_df_turns") is not None:
                 self.tic.info("Loading df_turns from IPC...")
                 self.df_turns = self.ipc.get("_df_turns")
 
         if self.df_links is None or self.df_nodes is None or self.df_turns is None:
-            self.df_links, self.df_nodes, self.df_turns = self.loader.load_df_graph()
-            self.df_nodes = gpd.GeoDataFrame(self.df_nodes, crs=self.parser.ini.FCD_SERVER_FCD_CRS_DATA).to_crs(self.parser.ini.FCD_SERVER_FCD_CRS_CALC)
-            self.df_links = gpd.GeoDataFrame(self.df_links, crs=self.parser.ini.FCD_SERVER_FCD_CRS_DATA).to_crs(self.parser.ini.FCD_SERVER_FCD_CRS_CALC)
+            self.df_links, self.df_nodes, self.df_turns = self.loader.load_df_graph()            
         self.graph = self.loader.load_graph(df_links=self.df_links, df_nodes=self.df_nodes, df_turns=self.df_turns)
         id_links = set(l["idx"] for l in self.graph.get_all_links())
         self.df_links = self.df_links[self.df_links["id"].isin(id_links)]

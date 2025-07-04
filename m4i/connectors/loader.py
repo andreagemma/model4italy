@@ -7,6 +7,7 @@ Created on Thu Jun 24 19:11:39 2021
 from __future__ import annotations
 
 
+import operator
 import pandas as pd
 import numpy as np
 import geopandas as gpd
@@ -23,6 +24,8 @@ from itertools import product
 from importlib import import_module
 from os.path import join
 
+import warnings
+import websockets.sync.client
 from ..utils.util import to_datetime_auto
 from ..matrix import MatrixODT, MatrixOD
 from ..graphs import DynamicGraph, DynamicTimeArrayAttribute, DynamicCallableAttribute, KPathList, Path, KPathContainer
@@ -111,36 +114,82 @@ class Loader(BaseLoader):
             dtype_inverse = {mapping.get(k, k): v for k, v in dtype.items()}
         else:
             dtype_inverse = None
-
-        df = loader.load_dataset(parameters=parameters, filters=filters, dtype=dtype_inverse)
+        kwargs = copy.deepcopy(parameters)
+        kwargs.pop("connector", None)
+        kwargs.pop("mapping", None)
+        kwargs.pop("filters", None)
+        kwargs.pop("partition_cols", None)
+        kwargs.pop("additional_fields", None)
+        kwargs.pop("src", None)
+        kwargs.pop("location", None)
+        kwargs.pop("source", None)
+        df = loader.load_dataset(parameters=parameters, filters=filters, dtype=dtype_inverse,**kwargs)
         if df is None:
             return None
         if mapping:            
             df = self.parser.apply_mapping(df=df, mapping=mapping)
-
+        if additional_fields := parameters.get("additional_fields", None):
+            if isinstance(additional_fields, dict):                
+                for k, v in additional_fields.items():
+                    if k in df.columns:
+                        continue
+                    if isinstance(v, str) and v.startswith("expression:"):
+                        v = v.replace("expression:", "")
+                        df[k] = df.eval(v)
+                    elif isinstance(v, str) and v.startswith("lambda:"):
+                        v = v.replace("lambda:", "")
+                        df[k] = df.apply(lambda x: eval(v), axis=1)
+                    else:
+                        df[k] = v
+            elif isinstance(additional_fields, list):
+                for field in additional_fields:
+                    if isinstance(field, str):
+                        if field in df.columns:
+                            continue
+                        df[field] = None
+                    elif isinstance(field, dict):
+                        for k, v in field.items():
+                            if k in df.columns:
+                                continue
+                            df[k] = v
         if isinstance(df, gpd.GeoDataFrame): # se geodataframe trasforma o setta CRS e rinomina geometria
             crs = parameters.get("crs", None)
-            if crs is not None:
-                if df.crs is None:
+            if crs is not None:                
+                if df.crs is None:                    
                     df.set_crs(crs, inplace=True)                    
-            if df.crs is not None:
-                df.to_crs(self.ini.CRS_CALC, inplace=True)
-            else:
-                df.set_crs(self.ini.CRS, inplace=True).to_crs(self.ini.CRS_CALC, inplace=True)
+                elif df.crs != crs:
+                    warnings.warn(f"CRS of dataframe {df.crs} does not match expected CRS {crs}. Converting CRS for {parameters}.")
+            if df.crs is None:
+                warnings.warn(f"CRS of dataframe is None. Setting CRS to {self.ini.CRS} for {parameters}.")
+                df.set_crs(self.ini.CRS, inplace=True)                
+            df.to_crs(self.ini.CRS_CALC, inplace=True)
             if geometry:
                 if geometry != df.geometry.name:
                     df.rename_geometry(geometry, inplace=True)
+        elif isinstance(df, pd.DataFrame): # se dataframe ma esiste una colonna geometrica allora trasforma in geodataframe
+            if geometry is None:
+                geometry = parameters.get("mapping",{}).pop("geometry", None)
+            if geometry is None:
+                if "geometry" in df.columns:
+                    geometry = "geometry"
+            if geometry and geometry in df.columns:
+                # check if is WKB type (bytes) or WKT type (text) or GeoJSON type  (text bwith json format)
+                if pd.api.types.is_string_dtype(df[geometry]):
+                    if df[geometry].str.startswith("{").any():
+                        df["geometry"] = df[geometry].apply(from_geojson)
+                    else:
+                        df["geometry"] = df[geometry].apply(from_wkt)
+                elif pd.api.types.is_object_dtype(df[geometry]) and df[geometry].apply(lambda x: isinstance(x, bytes)).any():
+                    df["geometry"] = df[geometry].apply(from_wkb)
+                crs = parameters.get("crs", self.ini.CRS)
+                df = gpd.GeoDataFrame(df, geometry=geometry, crs=self.ini.CRS)
+                df.to_crs(self.ini.CRS_CALC, inplace=True)
             else:
                 df = pd.DataFrame(df)
-        elif isinstance(df, pd.DataFrame): # se dataframe ma esiste una colonna geometrica allora trasforma in geodataframe
-            if geometry:
-                if pd.api.types.is_string_dtype(df[geometry]):
-                    df[geometry]=from_wkb(df[geometry])
-                df = gpd.GeoDataFrame(df, geometry=geometry, crs=self.ini.CRS)
-            else:
-                return pd.DataFrame(df)
 
-        df=self.parser.apply_dtype(df=df, dtype=dtype, copy=False)  
+        df=self.parser.apply_dtype(df=df, dtype=dtype, copy=False, 
+                                   tz_src=parameters.get("tz_data", self.ini.TZ_LOCAL),
+                                   tz_dest=self.ini.TZ_CALC)  
                               
         return df
             
@@ -173,10 +222,16 @@ class Loader(BaseLoader):
                                              unit='minutes')
         start = util.to_datetime_auto(self.parser.params.get("start", None), date_default=date_default,unit='minutes')
         end = util.to_datetime_auto(self.parser.params.get("end", None), date_default=date_default,unit='minutes')
-        if end<start:
+        if start is not None and end is not None and end<start:
             end += datetime.timedelta(days=1)
-        self.start = int(util.min_from_midnight(start))
-        self.end = int(util.min_from_midnight(end))
+        if start is not None:
+            self.start = int(util.min_from_midnight(start))
+        else:
+            self.start = None
+        if end is not None:
+            self.end = int(util.min_from_midnight(end))
+        else:
+            self.end = None
         
     def has(self, name):
         return self.parser.get(name) is not None
@@ -184,7 +239,7 @@ class Loader(BaseLoader):
     def load_dataset(self, parameters: dict, filters=None, dtype = None)-> Union[pd.DataFrame, gpd.GeoDataFrame, dict]:
         pass
 
-    def load(self, path: str=None, parameters: dict=None, filters=None, dtype=None, **kwargs) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
+    def load(self, path: str=None, parameters: dict=None, filters=None, dtype=None, from_output=False,**kwargs) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
         """
         Carica un dataset in base ai parametri forniti, ai filtri e al tipo di dato specificato.
 
@@ -209,10 +264,7 @@ class Loader(BaseLoader):
             Union[pd.DataFrame, gpd.GeoDataFrame]: Il dataset caricato, che può essere un pandas DataFrame o un GeoPandas GeoDataFrame, a seconda dell'esistenza di un campo geometrico.
         """        
         if parameters is None:
-            if path:
-                parameters = self.parser.get_input_parameters(path)
-            else:
-                raise KeyError("key 'parameters' not found in execution parameters")
+            parameters = self.parser.get_input_parameters(path, from_output=from_output)
             
         df = self._load_dataset(parameters=parameters, filters=filters, dtype=dtype, **kwargs)
         if df is None:
@@ -262,7 +314,7 @@ class Loader(BaseLoader):
         if df is None:
             raise Exception(f"load_nodes({parameters}) function return None value")
         self.parser.check_fields("nodes", df)
-        df = pd.DataFrame(df)
+        #df = pd.DataFrame(df)
         return df
 
 
@@ -272,7 +324,7 @@ class Loader(BaseLoader):
         if df is None:
             raise Exception(f"load_links({parameters}) function return None value")
         self.parser.check_fields("links", df)
-        df = pd.DataFrame(df)
+        #df = pd.DataFrame(df)
         return df
 
     def load_turns(self, parameters: dict, **kwargs) -> pd.DataFrame:
@@ -281,7 +333,7 @@ class Loader(BaseLoader):
         if df is None:
             raise Exception(f"load_turns({parameters}) function return None value")
         self.parser.check_fields("turns", df)
-        df = pd.DataFrame(df)
+        #df = pd.DataFrame(df)
         return df
 
     def load_zones(self, parameters: dict, **kwargs) -> pd.DataFrame:
@@ -290,7 +342,7 @@ class Loader(BaseLoader):
         if df is None:
             raise Exception(f"load_zones({parameters}) function return None value")
         self.parser.check_fields("zones", df)
-        df = pd.DataFrame(df)
+        #df = pd.DataFrame(df)
         return df
 
     

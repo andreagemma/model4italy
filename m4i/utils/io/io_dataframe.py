@@ -6,13 +6,18 @@ from typing import Dict, List, Optional, Type, Union, Tuple
 import pandas as pd
 import geopandas as gpd
 from .drivers import BaseDriver
+from ..util import remove_path
 
 class IO_DataFrame:
+
+    remove_path = remove_path
+    
     def __init__(self, **kwargs):
         self._patterns: Dict[re.Pattern, re.Pattern] = {}
         self._pattern_to_driver: Dict[re.Pattern, BaseDriver] = {}
         self._drivers: Dict[str, BaseDriver] = {}
         self._load_all_drivers(**kwargs)
+
 
     def register_driver(self, driver_cls: Type[BaseDriver], kwargs: Optional[dict] = None):
         pattern: Union[str,re.Pattern, List[Union[str, Tuple[str, dict],re.Pattern]]] = driver_cls.pattern()
@@ -56,7 +61,7 @@ class IO_DataFrame:
             if regex.search(path):
                 return self._pattern_to_driver[pat]
         raise ValueError(f"Nessun driver corrispondente al file '{path}'.")
-
+    
     def import_dataframe(
         self,
         path: str,

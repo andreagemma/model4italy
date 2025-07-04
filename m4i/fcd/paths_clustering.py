@@ -1,9 +1,11 @@
 import geopandas as gpd
+import pandas as pd
 import numpy as np
 import shapely
 from shapely.geometry import LineString
 from sklearn.cluster import AgglomerativeClustering, DBSCAN
 from dask.dataframe.utils import make_meta
+from ..utils.parallel import Parallel
 from ..base_m4i_model import BaseM4IModel
 import dask.dataframe
 import dask.dataframe as dd
@@ -20,9 +22,25 @@ def hausdorff_matrix(geoms):
             D[i, j] = D[j, i] = d
     return D
 
-def clustering(df):
-    df = gpd.GeoDataFrame(df, crs=4326, geometry=df.geometry.apply(shapely.from_wkb)).to_crs(epsg=6875)    
-    print("Clustering...")
+def clustering(df,crs_data, crs_calc):
+    if not isinstance(df, gpd.GeoDataFrame):
+        if df.geometry.dtype == 'object':
+            # Convert WKB to shapely geometries
+            df.geometry = df.geometry.apply(shapely.from_wkb)
+        elif df.geometry.dtype == 'bytes':
+            # Convert bytes to shapely geometries
+            df.geometry = df.geometry.apply(shapely.from_wkb)
+        elif df.geometry.dtype == 'str':
+            # Convert WKT to shapely geometries
+            df.geometry = df.geometry.apply(shapely.from_wkt)
+        elif df.geometry.dtype == 'geometry':
+            # Already in shapely geometry format
+            pass
+        df = gpd.GeoDataFrame(df, crs=crs_data, geometry=df.geometry).to_crs(crs_calc)    
+    else:
+        if df.crs is None:
+            df.set_crs(crs_data, inplace=True)
+        df = df.to_crs(crs_calc)
     # Calcola la matrice di Hausdorff
     D = hausdorff_matrix(df.geometry.values)
     
@@ -32,8 +50,12 @@ def clustering(df):
     # Aggiungi le etichette al GeoDataFrame
     df["k"] = model.fit_predict(D)
     # per ogni gruppo prendo quello con tot_cost minimo
+    agg = {c:(c,"first") for c in df.columns}
+    agg["n_paths"] = ("source", "count")
+    agg.pop("k", None)
     df = df.sort_values(by=['k', 'tot_cost'])
-    df = df.groupby('k').first().reset_index(drop=False)    
+    df = df.groupby('k').agg(**agg).reset_index(drop=False)    
+    df.drop(columns=['id_trip'], errors='ignore', inplace=True)
     return df
 
 class PathsClustering(BaseM4IModel):
@@ -42,18 +64,58 @@ class PathsClustering(BaseM4IModel):
         super().__init__(loader=loader, writer=writer, ipc=ipc, **kwargs)
 
     def run(self, df: Union[gpd.GeoDataFrame, dd.DataFrame]) -> gpd.GeoDataFrame:
-        self.log.info("Starting paths clustering...")
         if df is None:
             self
-        ddf: dd.DataFrame = dd.DataFrame(df)
+        """
+        ddf: dd.DataFrame = dd.from_pandas(df, npartitions=1)
         meta = make_meta(ddf)
         meta=meta.assign(k=0)
         cols = meta.columns.tolist()
-
+        crs_calc = self.loader.parser.ini.CRS_CALC
+        crs_data = self.loader.parser.ini.CRS
         def fn(df):
-            df = clustering(df)
+            df = clustering(df, crs_calc=crs_calc, crs_data=crs_data)
             return df[cols]
-        df = ddf.groupby(["source", "target"]).apply(fn, meta=meta, include_groups=True).compute()          
+        df = ddf.groupby(["source", "target"]).apply(fn, meta=meta, include_groups=True).compute()      
+        df = df.reset_index(drop=False)
+        self.writer.write(df, "params.fcd_paths_clustered", mode="w")    
         return df
-    
+        """
+        
+        crs_calc = self.loader.parser.ini.CRS_CALC
+        crs_data = self.loader.parser.ini.CRS
+        def fn(tasks):
+            ret = None
+            for name, df_group in tasks:
+                tmp= clustering(df_group, crs_calc=crs_calc, crs_data=crs_data)
+                if ret is None and tmp is not None and not tmp.empty:
+                    ret = tmp
+                else:
+                    ret = pd.concat([ret,tmp], ignore_index=True)
+            if ret is not None and not ret.empty:
+                if isinstance(ret, dd.DataFrame):
+                    ret = ret.compute()
+                if isinstance(ret, pd.DataFrame):
+                    ret = gpd.GeoDataFrame(ret, crs=crs_calc, geometry=ret.geometry)
+            if ret is not None and ret.crs is None:
+                ret.set_crs(crs_calc, inplace=True)
+            ret.to_crs(crs_data, inplace=True)
+            return ret
+        grp = df.groupby(["source", "target"])
+        ret = None
+        total_tasks = list(grp)
+        for i, tmp in enumerate(Parallel.execute(fn, total_tasks)):    
+            self.log.debug(f"Processed {len(tmp[['source','target']].unique())}/{len(total_tasks)} tasks")
+            if ret is None and tmp is not None and not tmp.empty:
+                ret = tmp
+            else:
+                ret = pd.concat([ret,tmp], ignore_index=True)
+        ret.reset_index(drop=True, inplace=True)
+        if ret is not None:
+            ret = gpd.GeoDataFrame(ret, crs=crs_data, geometry=ret.geometry)
+        if ret.crs is None:
+            ret.set_crs(crs_data, inplace=True)
+        ret.to_crs(crs_data, inplace=True)
+        self.writer.write(ret, "params.fcd_paths_clustered", mode="w")    
+        return ret
 

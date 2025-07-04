@@ -1,5 +1,6 @@
 import ast
 import json
+import sqlalchemy
 from typing import Union, Optional, List, Generator, Tuple, Any, Callable, Iterable
 from numbers import Number
 from uuid import uuid4
@@ -951,7 +952,7 @@ def import_dataframe(file_path, filters=None, dtype={}, driver=None,**kwargs):
             '.pickle': lambda x: pandas.read_pickle(x),
         })
     except:
-        pass
+        passm4i/connectors/loaders/file_loader.py
     try:
         import geopandas
         import_methods_gpd.update({
@@ -967,14 +968,31 @@ def import_dataframe(file_path, filters=None, dtype={}, driver=None,**kwargs):
   
     # Cerca il metodo corrispondente
     if extension in import_methods_pd:
-        df = import_methods_pd[extension](file_path, **kwargs) 
+        df = import_methods_pd[extension](file_path) 
+            
     elif extension in import_methods_gpd:
-        df = import_methods_gpd[extension](file_path, **kwargs) 
+        df = import_methods_gpd[extension](file_path)
+        crs = kwargs.pop("crs", None)
+        if crs is not None and df.crs is None:
+            df = geopandas.GeoDataFrame(df, crs=crs)
     else:
         df = import_methods_pd['.csv'](file_path, **kwargs)
 
     if dtype:
         dtype = {k: v for k, v in dtype.items() if k in df.columns}
+        if 'geometry' in dtype and extension not in import_methods_gpd:
+            geom_cols = [k for k, v in dtype.items() if v == 'geometry']
+            if geom_cols:
+                crs = kwargs.pop("crs", None)
+                if not crs:
+                    raise ValueError(f"CRS must be specified when importing geometry columns for file {file_path}.")
+                import geopandas
+                for col in geom_cols:
+                    if col in df.columns:
+                        geometry = geopandas.GeoSeries.from_wkt(df[col])
+                        df = geopandas.GeoDataFrame(df.drop(columns=[col]), geometry=geometry, crs=crs)
+                        break
+                
         df = df.astype(dtype, copy=True)       
     if where:
         df = df.query(where)

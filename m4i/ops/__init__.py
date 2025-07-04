@@ -6,6 +6,7 @@ from .online_simulator import OnlineSimulator
 from .offline_save_state import OfflineSaveState
 from .online_rt_server import OnlineRTServer
 from .offline_rt_server import OfflineRTServer
+from .paths_clustering import PathsClustering
 
 __all__ = [
     "OP",
@@ -15,5 +16,6 @@ __all__ = [
     "OnlineSimulator",
     "OfflineSaveState",
     "OnlineRTServer",
-    "OfflineRTServer"
+    "OfflineRTServer",
+    "PathsClustering"
 ]

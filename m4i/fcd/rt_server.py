@@ -46,8 +46,8 @@ class RTServer(BaseM4IModel):
                                       n_workers_pm=parser.ini.FCD_ROUTING_CPUS,
                                       max_distance=parser.ini.FCD_MAP_MATCHING_MAX_DISTANCE,
                                       max_angle=parser.ini.FCD_MAP_MATCHING_MAX_ANGLE,
-                                      crs_calc=parser.ini.FCD_SERVER_FCD_CRS_CALC,
-                                      crs_data=parser.ini.FCD_SERVER_FCD_CRS_CALC,
+                                      crs_calc=parser.ini.CRS,
+                                      crs_data=parser.ini.CRS_CALC,
                                       logger=logger,
                                       )
         self.fcd_manager = FCDManager(
@@ -80,6 +80,7 @@ class RTServer(BaseM4IModel):
         self.mode_paths="w"
         self.mode_graphs="w"
 
+                          
     def elaborate_offline(self, 
                          t_start: Union[str,int,datetime], 
                          t_end: Union[str,int,datetime]
@@ -87,13 +88,14 @@ class RTServer(BaseM4IModel):
         tic=self.tic.get().info("Elaborating offline...")
         assert isinstance(t_start, (str,int,datetime)), "t_start must be a string, int or datetime"
         assert isinstance(t_end, (str,int,datetime)), "t_end must be a string, int or datetime"
-        self.t_start = to_datetime_auto(t_start,unit="minutes", tz_localize=self.parser.ini.TZ_LOCAL, tz_convert=self.parser.ini.FCD_SERVER_TZ_DATA)
-        self.t_end = to_datetime_auto(t_end,unit="minutes", tz_localize=self.parser.ini.TZ_LOCAL, tz_convert=self.parser.ini.FCD_SERVER_TZ_DATA)
+        self.t_start = to_datetime_auto(t_start,unit="minutes", tz_localize=self.parser.ini.TZ_LOCAL, tz_convert=self.parser.ini.TZ_CALC)
+        self.t_end = to_datetime_auto(t_end,unit="minutes", tz_localize=self.parser.ini.TZ_LOCAL, tz_convert=self.parser.ini.TZ_CALC)
         self.horizon = to_timedelta_auto(self.parser.ini.FCD_SERVER_FCD_HORIZON, unit="minutes")
         self.timeslice = to_timedelta_auto(self.parser.ini.FCD_SERVER_FCD_TIMESLICE_OFFLINE, unit="minutes") 
         self.mode_trips="w"
         self.mode_fcd="w"
         self.mode_paths="w"
+        self.mode_graphs="w"
 
 
         ts = self.t_start
@@ -136,7 +138,7 @@ class RTServer(BaseM4IModel):
                          ):
         tic=self.tic.get().info("Elaborating online...")
         assert isinstance(t_end, (str,int,datetime)), "t_end must be a string, int or datetime"
-        self.t_end = to_datetime_auto(t_end,unit="minutes").tz_localize(self.parser.ini.TZ_LOCAL).tz_convert(self.parser.ini.FCD_SERVER_TZ_DATA)        
+        self.t_end = to_datetime_auto(t_end,unit="minutes").tz_localize(self.parser.ini.TZ_LOCAL).tz_convert(self.parser.ini.TZ_CALC)        
         self.horizon = to_timedelta_auto(self.parser.ini.FCD_SERVER_FCD_HORIZON, unit="minutes")
         self.timeslice = to_timedelta_auto(self.parser.ini.FCD_SERVER_FCD_TIMESLICE, unit="minutes") 
         self.mode="w"
@@ -218,15 +220,15 @@ class RTServer(BaseM4IModel):
     def load_graph(self) -> None:
         self.tic.info("Loading graph data...").tic()
         if self.zones is None:
-            self.zones = self.loader.zonization.to_crs(self.parser.ini.FCD_SERVER_FCD_CRS_CALC)
-        else:
-            self.zones = self.zones.to_crs(self.parser.ini.FCD_SERVER_FCD_CRS_CALC)
+            self.zones = self.loader.zonization
 
         if self.df_links is None or self.df_nodes is None or self.df_turns is None:
             self.df_links, self.df_nodes, self.df_turns = self.loader.load_df_graph()
-            self.df_nodes = gpd.GeoDataFrame(self.df_nodes, crs=self.parser.ini.FCD_SERVER_FCD_CRS_DATA).to_crs(self.parser.ini.FCD_SERVER_FCD_CRS_CALC)
-            self.df_links = gpd.GeoDataFrame(self.df_links, crs=self.parser.ini.FCD_SERVER_FCD_CRS_DATA).to_crs(self.parser.ini.FCD_SERVER_FCD_CRS_CALC)
-        self.graph:DynamicGraph = self.loader.load_graph(df_links=self.df_links, df_nodes=self.df_nodes, df_turns=self.df_turns)
+        self.graph:DynamicGraph = self.loader.load_graph(
+            df_links=self.df_links.fillna({"connector":0}), 
+            df_nodes=self.df_nodes.fillna({"centroid":0}), 
+            df_turns=self.df_turns)
+        
         
         self.graph["t_start"] = self.t
         t_base = self.graph["t_start"]
@@ -250,12 +252,11 @@ class RTServer(BaseM4IModel):
         Load FCD data from the database based on the given time range.
         """
         self.tic.info("Loading FCD data...").tic()
-        df_fcd = self.fcd_manager.load_fcd_by_timestamp(
-            t_start=t_start, t_end=t_end, 
-            crs_data=self.parser.ini.FCD_SERVER_FCD_CRS_DATA,crs_calc=self.parser.ini.FCD_SERVER_FCD_CRS_CALC ) 
+        df_fcd = self.fcd_manager.load_fcd_by_timestamp(t_start=t_start, t_end=t_end) 
         if df_fcd is None or df_fcd.empty:
             self.tic.warning("No FCD data found for the given time range")
             return df_fcd
+        df_fcd.dropna(subset=["heading"], inplace=True)
         #df_fcd["timestamp"] =df_fcd["timestamp"].dt.tz_convert(self.parser.ini.TZ_LOCAL)
         df_fcd["new"] = True
         #df_fcd["x"] = df_fcd.geometry.x
@@ -279,9 +280,13 @@ class RTServer(BaseM4IModel):
             old_df_trips["new"] = False
         
         if new_df_fcd is None or new_df_fcd.empty:
+            new_df_trips = None
+            old_df_fcd = None
             self.tic.info("No new FCD data to build trips")
         else:
-            new_df_trips, old_df_fcd = self.fcd_manager.build_trips(df_fcd=new_df_fcd, t_begin=None, t_finish=None, t_end=t_end)
+            new_df_trips, old_df_fcd = self.fcd_manager.build_trips(
+                df_fcd=new_df_fcd, 
+                t_begin=None, t_finish=None, t_end=t_end)
             self.tic.info("Built {trips} trips in {et} seconds (ramaining {fcd} FCDs)", 
                         trips=new_df_trips.shape[0] if new_df_trips is not None else 0, 
                         fcd=old_df_fcd.shape[0] if old_df_fcd is not None else 0)            
@@ -409,11 +414,11 @@ class RTServer(BaseM4IModel):
     def share_data(self) -> None:
         if self.ipc is not None:
             self.tic.info("Sharing data...").tic()
-            self.ipc.set_data(_df_links=pd.DataFrame(self.df_links.to_crs(self.parser.ini.CRS)),
-                              _df_nodes=pd.DataFrame(self.df_nodes.to_crs(self.parser.ini.CRS)), 
+            self.ipc.set_data(_df_links=pd.DataFrame(self.df_links),
+                              _df_nodes=pd.DataFrame(self.df_nodes), 
                               _df_turns=self.df_turns,                               
                               _paths=self.paths, 
-                              _zones=self.zones.to_crs(self.parser.ini.CRS))
+                              _zones=self.zones)
             self.tic.info("Shared data in {et} seconds")
         else:
             self.tic.info("IPC is not initialized. Cannot share data.")
@@ -501,7 +506,7 @@ class RTServer(BaseM4IModel):
         if graph is None:
             self.tic.info("No Graph to save")
             return False
-        self.graph["t_start"] = to_datetime_auto(self.graph["t_start"], tz_localize=self.parser.ini.FCD_SERVER_TZ_DATA, tz_convert=self.parser.ini.TZ_LOCAL)
+        self.graph["t_start"] = to_datetime_auto(self.graph["t_start"], tz_localize=self.parser.ini.TZ_CALC, tz_convert=self.parser.ini.TZ_LOCAL)
         t_base = self.graph["t_start"]
         t_base = (np.floor((t_base.hour * 60 + t_base.minute)/self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL) * self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL).astype("Int64") 
         self.graph["t_base"] = t_base
@@ -524,7 +529,7 @@ class RTServer(BaseM4IModel):
             self.tic.info("No Graph to save")
             return False
         updated_links = []
-        self.graph["t_start"] = to_datetime_auto(self.graph["t_start"], tz_localize=self.parser.ini.FCD_SERVER_TZ_DATA, tz_convert=self.parser.ini.TZ_LOCAL)
+        self.graph["t_start"] = to_datetime_auto(self.graph["t_start"], tz_localize=self.parser.ini.TZ_CALC, tz_convert=self.parser.ini.TZ_LOCAL)
         t_base = self.graph["t_start"]
         t_base = int(round(t_base.hour * 60 + t_base.minute + t_base.second / 60))
         self.graph["t_base"] = t_base
@@ -541,6 +546,9 @@ class RTServer(BaseM4IModel):
                 "t_base": t_base,
             })
         df = pd.DataFrame(updated_links)
+        if df.empty:
+            self.tic.info("No Graph to save")
+            return False
         if self.writer.has("params.fcd_graph"):
             self.writer.write(df,"params.fcd_graph", mode=mode)
         self.tic.info("Saved Graph in {et} seconds")

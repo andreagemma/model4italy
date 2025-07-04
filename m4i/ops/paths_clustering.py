@@ -17,7 +17,6 @@ class PathsClustering(OP):
 
     def run(self):
         self.log.info("Starting paths clustering...")
-        df = self.loader.load("params.fcd_paths")
+        df = self.loader.load("params.fcd_paths", from_output=True)
         df = self.paths_clustering.run(df)
-        self.writer.write(df, "params.paths_clustered", mode="w")
         self.log.info("Paths clustering completed.")

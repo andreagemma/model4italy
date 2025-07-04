@@ -76,8 +76,9 @@ class JsonWriter(BaseDriver):
             if os.path.exists(path):
                 if not os.path.isfile(path):
                     file = Path(path)
-                    temp_dir = tempfile.TemporaryDirectory()
-                    destinazione = temp_dir / file.name
+                    temp_dir = tempfile.TemporaryDirectory().name
+                    os.makedirs(temp_dir, exist_ok=True)
+                    destinazione = os.path.join(temp_dir , file.name)
                     shutil.move(str(file), destinazione)
                     remove_path(path)
                     path = os.path.join(path, os.path.basename(path))

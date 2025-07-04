@@ -6,6 +6,7 @@ from . import Path, KPathContainer
 import numpy as np
 
 
+
 class KPathList(KPathContainer):
 
     def __init__(self, **kwargs):
@@ -14,6 +15,20 @@ class KPathList(KPathContainer):
         self["type"] = self.__class__.__name__
         self.setdefault("paths", {})
         self.setdefault("ull", {}) # Unique Link List
+
+    def add_from_dataframe(self, df, **kwargs) -> KPathList:
+        import pandas as pd
+        df: pd.DataFrame = df if isinstance(df, pd.DataFrame) else pd.DataFrame(df)
+
+        grps = df.groupby(["source", "target", "t_start", "mode"])
+        for key,index in grps.groups.items():
+            group = df.loc[index,:].copy()
+            group.sort_values(by="tot_cost", inplace=True)            
+            for k, (_,  row) in enumerate(group.iterrows()):
+                args =row.to_dict()
+                args["k"]=k
+                path = Path.load_from_dict(args)
+                self.add_path(path, **kwargs)
 
     def add_path(self, to_add: Path, k: Optional[int] = None, **kwargs):
         to_add["links"] = self["ull"].setdefault(to_add["links"], to_add["links"])
@@ -26,6 +41,7 @@ class KPathList(KPathContainer):
             l.extend([None] * (k + 1 - len(l))) if len(l) < k + 1 else l
             l[k] = to_add
             to_add["k"] = k
+
 
     def get_sources(self, target: Optional[Hashable]=None, t_start: Optional[Number] = None, mode:Optional[str]=None, **kwargs) -> Tuple[Hashable]:
         return tuple(set([s for (s,t,ts,m) in map(lambda x: x.key(), self.all_paths()) if (t_start is None or ts==t_start) and (target is None or t==target) and (mode is None or m==mode)]))

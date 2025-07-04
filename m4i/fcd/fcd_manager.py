@@ -27,20 +27,23 @@ class FCDManager(BaseM4IModel):
 
     def __init__(self, loader: Loader, writer: Writer, ipc: IPC, **kwargs):
         super().__init__(loader=loader, writer=writer, ipc=ipc, **kwargs)
+        self.fcd_parameters = self.parser.get_input_parameters("params.fcd")
+        self.tz_data = self.fcd_parameters.get("tz_data", self.ini.TZ_LOCAL)
+
         self.mm: MapMatching  = None
         
 
-    def load_fcd_by_timestamp(self, t_start: datetime, t_end: datetime, crs_data=None, crs_calc=None) -> gpd.GeoDataFrame:
-        t_start = to_datetime_auto(t_start, tz_localize=self.ini.FCD_SERVER_TZ_DATA)
-        t_end = to_datetime_auto(t_end,tz_localize=self.ini.FCD_SERVER_TZ_DATA)
+    def load_fcd_by_timestamp(self, t_start: datetime, t_end: datetime) -> gpd.GeoDataFrame:
+        t_start = to_datetime_auto(t_start, tz_localize=self.tz_data)
+        t_end = to_datetime_auto(t_end,tz_localize=self.tz_data)
         self.log.info(f"Loading fcd data between {t_start} and {t_end}")
         dtype = self.parser.get_dtype("fcd")
         df_fcd = self.loader.load(
                     path="params.fcd",
-                    filters=[("timestamp",">=",t_start.strftime("%Y-%m-%d %H:%M:%S%z")), ("timestamp","<=",t_end.strftime("%Y-%m-%d %H:%M:%S%z")),
+                    filters=[("timestamp",">=",t_start.strftime("%Y-%m-%d %H:%M:%S%z")), ("timestamp","<",t_end.strftime("%Y-%m-%d %H:%M:%S%z")),
                              #("id_veh","=","29bd3380f5edb32b240267b06b9abc35bd92f796")
                              ],
-                    dtype=dtype,
+                    dtype=dtype,                    
                     )        
         # if geomertry is empty build with x and y and crs_data
         if df_fcd is None or df_fcd.empty:                        
@@ -50,10 +53,13 @@ class FCDManager(BaseM4IModel):
                 df_fcd["geometry"] = gpd.points_from_xy(df_fcd["x"], df_fcd["y"])
             else:
                 raise ValueError("No geometry or x/y columns found in FCD data.")
-        df_fcd = gpd.GeoDataFrame(df_fcd, crs=crs_data)
-        df_fcd["timestamp"] = pd.to_datetime(df_fcd["timestamp"],errors="coerce").dt.tz_localize(self.ini.FCD_SERVER_TZ_DATA)        
-        if crs_data != crs_calc:
-            df_fcd = df_fcd.to_crs(crs_calc)
+        #df_fcd = gpd.GeoDataFrame(df_fcd, crs=crs_data)
+        ts = pd.to_datetime(df_fcd["timestamp"],errors="coerce")
+        if ts.dt.tz is None:
+            df_fcd["timestamp"] = ts.dt.tz_localize(self.tz_data)
+        df_fcd["timestamp"] = ts.dt.tz_convert(self.tz_data)
+        #if crs_data != crs_calc:
+        #    df_fcd = df_fcd.to_crs(crs_calc)
         df_fcd["new"]=True
         df_fcd["x"] = df_fcd.geometry.x
         df_fcd["y"] = df_fcd.geometry.y
@@ -61,8 +67,6 @@ class FCDManager(BaseM4IModel):
     
     def build_trips(self, 
                  df_fcd: Union[pd.DataFrame, gpd.GeoDataFrame], 
-                 tz_data: Optional[str]= None,
-                 crs_data: Optional[str] = None,
                  crs_calc: Optional[str] = None,
                  signal_break_max_dt: Optional[float] = None, signal_break_dt: Optional[float] = None, 
                  signal_break_v: Optional[float] = None,
@@ -82,9 +86,7 @@ class FCDManager(BaseM4IModel):
                  t_end: Optional[datetime] = None,
                ) -> Generator[Tuple[pd.DataFrame,pd.DataFrame], None, None]:
         self.df_fcd = df_fcd
-        self.tz_data = tz_data or self.ini.FCD_SERVER_TZ_DATA
-        self.crs_calc = crs_calc or self.ini.FCD_SERVER_FCD_CRS_CALC
-        self.crs_data = crs_data or self.ini.FCD_SERVER_FCD_CRS_DATA
+        self.crs_calc = crs_calc or self.ini.CRS_CALC        
         self.signal_break_max_dt = signal_break_max_dt if signal_break_max_dt is not None else self.ini.FCD_TRIPS_SIGNAL_BREAK_MAX_DT 
         self.signal_break_dt = signal_break_dt if signal_break_dt is not None else self.ini.FCD_TRIPS_SIGNAL_BREAK_DT
         self.signal_break_v = signal_break_v if signal_break_v is not None else self.ini.FCD_TRIPS_SIGNAL_BREAK_V
@@ -142,7 +144,7 @@ class FCDManager(BaseM4IModel):
         df_fcd = pd.DataFrame(df_fcd)
         df_fcd["geometry"] = shapely.to_wkt(df_fcd["geometry"])
         #df_fcd.drop(columns=["geometry"], inplace=True, errors="ignore")
-        df_fcd["timestamp"] = df_fcd["timestamp"].dt.tz_convert("UTC")
+        #df_fcd["timestamp"] = df_fcd["timestamp"].dt.tz_convert("UTC")
         
         tasks = [df for _,df in df_fcd.groupby("id_veh")]
         df_trips:pd.DataFrame = None
@@ -152,17 +154,17 @@ class FCDManager(BaseM4IModel):
         
         for df_trips, df_fcd_trunced in Parallel.execute(process_single_vehicle, tasks, n_workers=1 if DEBUG else self.parser.ini.FCD_TRIPS_CPUS):
             if df_trips is not None and len(df_trips) > 0:
-                df_trips["dt_o"] = df_trips["dt_o"].dt.tz_convert(self.ini.FCD_SERVER_TZ_DATA)
-                df_trips["dt_d"] = df_trips["dt_d"].dt.tz_convert(self.ini.FCD_SERVER_TZ_DATA)
+                #df_trips["dt_o"] = df_trips["dt_o"].dt.tz_convert(self.ini.FCD_SERVER_TZ_DATA)
+                #df_trips["dt_d"] = df_trips["dt_d"].dt.tz_convert(self.ini.FCD_SERVER_TZ_DATA)
                 if ret_df_trips is None:
                     ret_df_trips = df_trips
                 else:
                     ret_df_trips = pd.concat([ret_df_trips, df_trips], ignore_index=True)
             if df_fcd_trunced is not None and len(df_fcd_trunced) > 0:
-                if df_fcd_trunced["timestamp"].dt.tz is None:
-                    df_fcd_trunced["timestamp"] = df_fcd_trunced["timestamp"].dt.tz_localize(self.ini.FCD_SERVER_TZ_DATA)
-                else:
-                    df_fcd_trunced["timestamp"] = df_fcd_trunced["timestamp"].dt.tz_convert(self.ini.FCD_SERVER_TZ_DATA)
+                #if df_fcd_trunced["timestamp"].dt.tz is None:
+                #    df_fcd_trunced["timestamp"] = df_fcd_trunced["timestamp"].dt.tz_localize(self.ini.FCD_SERVER_TZ_DATA)
+                #else:
+                #    df_fcd_trunced["timestamp"] = df_fcd_trunced["timestamp"].dt.tz_convert(self.ini.FCD_SERVER_TZ_DATA)
                 if ret_df_fcd_trunced is None:
                     ret_df_fcd_trunced = df_fcd_trunced
                 else:
@@ -443,8 +445,8 @@ class FCDManager(BaseM4IModel):
                     tr = {
                         "id_trip": first_fcd.id_fcd,
                         "id_veh": first_fcd.id_veh,                        
-                        "dt_o": datetime.fromtimestamp(first_fcd.ts, timezone("UTC")).astimezone(timezone(params.tz_data)),
-                        "dt_d": datetime.fromtimestamp(last_fcd.ts, timezone("UTC")).astimezone(timezone(params.tz_data)),
+                        "dt_o": first_fcd.timestamp,
+                        "dt_d": last_fcd.timestamp,
                         "t_o": first_fcd.ts,    
                         "t_d": last_fcd.ts,
                         "tt": last_fcd.ts - first_fcd.ts,
@@ -509,9 +511,9 @@ class FCDManager(BaseM4IModel):
             df = pd.DataFrame(ret).drop(columns=["t_o", "t_d","fcds"])
             numeric_columns = df.select_dtypes(include=[np.number]).columns
             df[numeric_columns] = df[numeric_columns].fillna(np.nan)
-
-            df =df.astype({"id_trip": 'Int64', "id_veh": str, 
-                "dt_o": "datetime64[ns, UTC]", "dt_d": "datetime64[ns, UTC]", "tt": np.float64,
+            tzname = df["dt_o"].iloc[0].tzname()
+            df = df.astype({"id_trip": 'Int64', "id_veh": str, 
+                "dt_o": f"datetime64[ns, {tzname}]", "dt_d": f"datetime64[ns, {tzname}]", "tt": np.float64,
                 "dist": np.float64,"avg_speed": np.float64,
                 "id_fcds": object, "progr_o": np.float64, "id_prev": 'Int64', "id_next": 'Int64',
                 "p_before": np.float64, "p_after": np.float64, "checkstate": str, "geometry": str})        
@@ -529,9 +531,9 @@ class FCDManager(BaseM4IModel):
     def map_matching_fcd(self, df_fcd: gpd.GeoDataFrame, df_links, links_id_col, links_direction_col) -> gpd.GeoDataFrame:        
         chunksize = chunksize = ceil(len(df_fcd) / Parallel.get_num_cpus(self.parser.ini.FCD_MAP_MATCHING_CPUS))
         tasks = [df_fcd.iloc[i:i + chunksize] for i in range(0, len(df_fcd), chunksize)]
-        self.mm = MapMatching(links_gdf=df_links, links_id_col=links_id_col, links_direction_col=links_direction_col)
-
-        def fn(tasks, crs, mm, max_distance, max_angle):
+        self.mm = MapMatching(links_gdf=df_links.query("connector==0"), links_id_col=links_id_col, links_direction_col=links_direction_col)
+        
+        def fn(tasks, mm, max_distance, max_angle):
 
             ret = None
             if len(tasks) == 0:
@@ -561,7 +563,6 @@ class FCDManager(BaseM4IModel):
         ret_mm = None
         for df_mm in Parallel.execute(fn, 
                                       tasks=tasks,
-                                      crs=self.parser.ini.FCD_SERVER_FCD_CRS_DATA, 
                                       mm=self.mm,
                                       max_distance=self.parser.ini.FCD_MAP_MATCHING_MAX_DISTANCE, 
                                       max_angle=self.parser.ini.FCD_MAP_MATCHING_MAX_ANGLE,

@@ -7,10 +7,10 @@
     "op": "assignment",
     "scenario_id": 1,
     "settings": {
-        "MSA_MAX_ITE": 6,
+        "MSA_MAX_ITE": 1,
         "MSA_K": 3,
         "MSA_SPP_NUMCPUS": 0,
         "MSA_K_BALANCING": 1,
-        "USE_OBSERVED_PATHS": true  
+        "USE_OBSERVED_PATHS": false  
     }
 }

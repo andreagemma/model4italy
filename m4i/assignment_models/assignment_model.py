@@ -8,6 +8,7 @@ import itertools
 import pdb
 import pandas as pd
 
+from m4i.utils.util import file_ordered_list
 from ..utils.tictoc import TicToc
 from ..utils.parallel import Parallel
 from ..connectors import StateManager
@@ -45,6 +46,8 @@ class AssignmentModel(BaseM4IModel):
         load_state_paths: bool = False,
         save_state_paths: bool = False,
         save_ass_matrix: bool = False,
+        load_off_line_paths: bool = True,
+        off_line_paths: str = "",
         ipc: IPC = None,
         max_rel_gap: float = None,
         max_ite: int = None,
@@ -81,6 +84,12 @@ class AssignmentModel(BaseM4IModel):
         self.load_state_graph = load_state_graph and self.state_manager.has_write_state()
         self.save_state_paths = save_state_paths and self.state_manager.has_write_state()
         self.load_state_paths = load_state_paths and self.state_manager.has_write_state()
+        if not off_line_paths:
+            self.off_line_paths = "params.fcd_paths_clustered"
+        else:
+            self.off_line_paths = off_line_paths
+        self.load_off_line_paths = load_off_line_paths and self.loader.has(self.off_line_paths)
+        
 
         self.OD: MatrixODT = None
         self.ODs: dict[str, MatrixODT] = None
@@ -268,6 +277,8 @@ class AssignmentModel(BaseM4IModel):
                 saved = True
                 df=self.get_aggregated_results_dataframe()
                 ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400 ) / 60
+                if df["time"].dt.tz is None:
+                    df["time"] = df["time"].dt.tz_localize(self.parser.ini.TZ_LOCAL)  
                 mode = "w" if self.interval==0 else "a"
                 df["t"] = ds_t
                 saved = self.writer.write_agg_results(df, mode=mode, crs=self.loader.ini.CRS)
@@ -328,6 +339,29 @@ class AssignmentModel(BaseM4IModel):
                         path["t_base"] = t-(t_start* self.delta_t)
                         self.m_paths.add_path(path)
             self.log.info("Loaded state (Paths)")
+        if self.load_off_line_paths:
+            self.log.info("Loading off-line paths...")
+            try:
+                tot_paths = self.loader.load(self.off_line_paths,filters=[("day_type","==",self.parser.get("day_type_simulation"))], from_output=True)
+                for t_start, t in enumerate(range(self.current_time_start,self.current_time_end,self.delta_t)):
+                    df_paths = tot_paths.query("t >= @t_start and t< @t").reset_index(drop=True)
+                    if df_paths is not None and not df_paths.empty:
+                        df_paths["t"] = t
+                        df_paths["t_start"] = t_start * self.delta_t
+                        df_paths["t_base"] = t - (t_start * self.delta_t)                        
+                        df_paths.astype({"t": "Int64", "t_start": "Int64", "t_base": "Int64", "day_type": "str"})                        
+                        df_no_mode = df_paths[df_paths["mode"].isna()]
+                        for mode in self.modes:                
+                            tmp = df_no_mode.copy()
+                            tmp["mode"] = mode
+                            df_paths=pd.concat([df_paths, tmp], ignore_index=True, sort=False)
+                        df_paths.dropna(subset=["mode"], inplace=True)
+
+                        self.m_paths.add_from_dataframe(df_paths)
+                    
+            except Exception as e:
+                self.log.error("Failed to load off-line paths:", exc_info=e, stack_info=True)
+            self.log.info("Loaded off-line paths")
             
         if self.simulator:
             self.simulator.set_paths(self.m_paths)
@@ -620,7 +654,7 @@ class AssignmentModel(BaseM4IModel):
         id_links = results["id_link"].unique()
         df_geometry = pd.DataFrame([[id_link,ST_Multi(G.get_link(id_link).get_value("geometry"))] for id_link in id_links], columns=["id_link","geometry"])
         results = results.merge(df_geometry, on="id_link")
-        results = gpd.GeoDataFrame(results, geometry="geometry" ,crs=self.loader.ini.CRS)
+        results = gpd.GeoDataFrame(results, geometry="geometry" ,crs=self.loader.ini.CRS_CALC)
         return results
         
     def get_paths_dataframe(self, t=None):
@@ -638,7 +672,7 @@ class AssignmentModel(BaseM4IModel):
         for geom in ("geom","geometry"):
             if geom in l:
                 results[geom]=[MultiLineString([multi_line_to_line(G.get_link(l_idx).get_value(geom)) for l_idx in links]) for links in results["links"]]
-                results = gpd.GeoDataFrame(results, geometry=geom ,crs=self.loader.ini.CRS)
+                results = gpd.GeoDataFrame(results, geometry=geom ,crs=self.loader.ini.CRS_CALC)
                 break
 
         return results

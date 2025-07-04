@@ -407,6 +407,7 @@ class ParamsParser:
                 {"name": "cycle", "type": is_number, "dtype": "Float32", "required": True},
                 {"name": "offset", "type": is_number, "dtype": "Float32", "required": True, "default": 0},
                 {"name": "phases", "type": [is_str, is_list], "dtype": "string", "required": True, "parser": parse_json},
+                {"name": "geometry", "type": is_point, "dtype": "geometry", "required": True},
                 
             ],
             "aggregated_results": [
@@ -526,7 +527,30 @@ class ParamsParser:
         else:
             raise ValueError(f"Unknown name: {name}")
         
-    def get_input_parameters(self, name_or_params: str, index: int = None) -> dict:
+    def get_output_parameters(self, name_or_params: str = None, index: int = None, df:pd.DataFrame=None, from_input=False) -> dict:
+        if from_input:
+            base = "params.input"
+        else:
+            base = "params.output"
+        ret = self.get_parameters(name_or_params=name_or_params, index=index, df=df, base=base)
+        if connector := ret.get("connector", None):
+            if connector.endswith("Loader"):
+                ret["connector"]= connector.replace("Loader", "Writer")
+        return ret
+    
+    def get_input_parameters(self, name_or_params: str, index: int = None, from_output=False) -> dict:
+        if from_output:
+            base = "params.output"
+        else:
+            base = "params.input"
+        ret = self.get_parameters(name_or_params=name_or_params, index=index, df=None, base=base)
+        if connector := ret.get("connector", None):
+            if connector.endswith("Writer"):
+                ret["connector"]= connector.replace("Writer", "Loader")
+        return ret
+
+
+    def get_parameters(self, name_or_params: str = None, index: int = None, df:pd.DataFrame=None, base="params.input") -> dict:
         if isinstance(name_or_params, dict):
             parameters = name_or_params
         elif isinstance(name_or_params, str):
@@ -535,32 +559,7 @@ class ParamsParser:
             return None
         elif isinstance(parameters, str):
             parameters = {"src": parameters}
-        base_param = self.get("params.input")
-        if isinstance(base_param, dict):
-            base_param.update(parameters)
-        elif isinstance(parameters, str):
-            base_param["src"] = parameters
-        base_param.setdefault("location", None)
-        base_param.setdefault("mapping", {})
-        base_param.setdefault("op", None)
-
-        name_category = name_or_params.split(".")[-1]
-        if name_category in self.fields:
-            mapping = self.get_mapping(name_category, base_param["mapping"])
-            base_param["mapping"] = mapping
-
-        return base_param
-
-    def get_output_parameters(self, name_or_params: str = None, index: int = None, df:pd.DataFrame=None) -> dict:
-        if isinstance(name_or_params, dict):
-            parameters = name_or_params
-        elif isinstance(name_or_params, str):
-            parameters = self.get(name_or_params, index)
-        if parameters is None:
-            return None
-        elif isinstance(parameters, str):
-            parameters = {"src": parameters}
-        base_param = self.get("params.output")
+        base_param = self.get(base)
         if isinstance(base_param, dict):
             base_param.update(parameters)
         elif isinstance(parameters, str):
@@ -569,6 +568,7 @@ class ParamsParser:
         base_param.setdefault("mapping", {})
         additional_fields = base_param.get("additional_fields", {})
         base_param.setdefault("op", None)
+        base_param.setdefault("tz_data", self.ini.TZ_LOCAL)
         if df is not None and isinstance(df, (pd.DataFrame, gpd.GeoDataFrame)):
             mapping = base_param.get("mapping", {})
             for c in df.columns:
@@ -636,23 +636,24 @@ class ParamsParser:
                 ret[k] = None
         return ret
     
-    def apply_dtype(self, df, dtype, copy=False):
+    def apply_dtype(self, df, dtype, copy=False, tz_src = None, tz_dest = None):
         if dtype is None:
             return df
         try:
             if isinstance(dtype, dict):
                 dtype = {k: v for k, v in dtype.items() if k in df.columns}
+                #remove dtype definition if dtype is a datetime
+                for col in df.columns:
+                    if pd.api.types.is_datetime64_any_dtype(df[col]) and col in dtype:
+                        del dtype[col]
                 df=df.astype(dtype, copy=copy)            
             else:
                 df = df.astype(dtype, copy=copy)
             for col in df.columns:
                 if pd.api.types.is_datetime64_any_dtype(df[col]):
                     if df[col].dt.tz is None:
-                        # naive → localize
-                        df[col] = df[col].dt.tz_localize(self.ini.TZ_LOCAL)
-                    else:
-                        # aware → convert
-                        df[col] = df[col].dt.tz_convert(self.ini.TZ_LOCAL)                
+                        df[col] = df[col].dt.tz_localize(tz_src or self.ini.TZ_LOCAL)
+                    df[col] = df[col].dt.tz_convert(tz_dest or self.ini.TZ_CALC)                
         except Exception as e:
             raise ValueError(f"Invalid dtype: {dtype}") from e
         return df

@@ -1,4 +1,5 @@
 {
+    "one": 0,
     "params": {
         "input": {
             "connector": "FileLoader",
@@ -6,7 +7,7 @@
         },
         "output": {
             "connector": "FileWriter",
-            "location": "./dati/output/{description}/{simulation_id}"            
+            "location": "./dati/output/{description}/{simulation_id}"
         },
         "modes": [
             {
@@ -24,77 +25,154 @@
             {
                 "mode": "c",
                 "matrices": [
-                    "mat_car.parquet"
+                    {
+                        "src": "mat_car.parquet",
+                        "mapping": {
+                            "o": "o",
+                            "d": "d",
+                            "timestamp": "timestamp",
+                            "value": "value"
+                        }
+                    }
                 ]
             }
         ],
-        "zones": "zones.shp",
+        "zones": {
+            "src": "zones.shp",
+            "mapping": {
+                "id": "id",
+                "geometry": "geometry"
+            }
+        },
         "supply": [
             {
                 "links": {
-                    "src":  "eur_links.shp",
+                    "src": "links.shp",
                     "mapping": {
                         "id": "id",
                         "from_node": "from_node",
                         "to_node": "to_node",
+                        "length": "length",
                         "v0": "v0",
-                        "connector": "connect",
-                        "lanes": "n_lanes"
+                        "connector": "connector",
+                        "lanes": "lanes",
+                        "alpha": "alpha",
+                        "rcr": "rcr",
+                        "capacity": "capacity",
+                        "modes": "modes"
                     }
                 },
-                "nodes": "eur_nodes.shp",
-                "turns": {
-                    "src": "turns_proh.csv",
+                "nodes": { "src":
+                    "nodes.shp",
                     "mapping": {
-                        "from_node": "fromnodeno",
-                        "to_node": "tonodeno",
-                        "via_node": "vianodeno"
+                        "id": "id",
+                        "centroid": "centroid",
+                        "modes": "modes",
+                        "geometry": "geometry"
+                    }
+                },
+                "turns": {
+                    "src": "turns.csv",
+                    "mapping": {
+                        "from_node": "from_node",
+                        "to_node": "to_node",
+                        "via_node": "via_node",
+                        "penalty": "penalty",
+                        "modes": "modes"
                     }
                 }
             }
         ],
-        "links_sets": [ {
-            "src": "links_sets.csv",
-            "mapping": {
-                "set": "id_set",
-                "id_link": "id_link"
-            }
-        }],
-        "events_no": [{
-            "src": "events.csv",
-            "mapping": {
-                "id_link_set": "id",
-                "type": "type",
-                "start": "start",
-                "end": "end",
-                "params": "params"
-            }
-        }],
-        "detectors": [{
-            "src": "detectors.shp",
-            "mapping": {
-                "id": "id"
-            }
-        }],
-        "traffic_lights": [ 
+        "links_sets": [
             {
-                "src": "sign_nodes.json",
+                "src": "links_sets.csv",
                 "mapping": {
-                    "id": "id",
-                    "type": "type",
-                    "phases": "phases"
+                    "id_set": "id_set",
+                    "id_link": "id_link"
                 }
             }
         ],
-        "aggregated_results": { "src": "aggregated_results.parquet", "partition_cols": ["t"] },
-        "paths":"path.parquet",
-        "fcd_paths": { "src": "fcd_paths.geoparquet", "partition_cols": ["day_type", "t"], "mapping": {"day_type": "{day_type_simulation}"}, "mode":"wa"},
-        "fcd_trips_": { "src": "fcd_trips.geoparquet", "partition_cols": ["day_type", "t"], "mapping": {"day_type": "{day_type_simulation}"}, "mode":"wa" },
-        "fcd_fcd_": { "src": "fcd_fcd.geoparquet", "partition_cols": ["day_type", "t"], "mapping": {"day_type": "{day_type_simulation}", "mode":"wa"}},
-        "fcd_graph": { "src": "fcd_graph.parquet", "partition_cols": ["day_type", "t_base"], "mapping": {"day_type": "{day_type_simulation}", "mode":"wa"}},
-        "statistics": "stats.csv", 
+        "events_no": [
+            {
+                "src": "events.csv",
+                "mapping": {
+                    "id_link_set": "id_link_set",
+                    "type": "type",
+                    "start": "start",
+                    "end": "end",
+                    "params": "params"
+                }
+            }
+        ],
+        "detectors": [
+            {
+                "src": "detectors.shp",
+                "mapping": {
+                    "id": "id",
+                    "id_link": "id_link"
+                }
+            }
+        ],
+        "traffic_lights": [
+            {
+                "src": "traffic_lights.csv",
+                "crs": "EPSG:4326",
+                "mapping": {
+                    "id": "id",
+                    "cycle": "cycle",
+                    "offset": "offset",
+                    "phases": "phases",
+                    "geometry":"geometry"
+                }
+            }
+        ],
+        "aggregated_results": "aggregated_results.shp",
+        "paths": "path.geoparquet",
+        "fcd_paths": {
+            "src": "fcd_paths.geoparquet",
+            "additional_fields": {
+                "day_type": "{day_type_simulation}"
+            }
+        },
+        "fcd_paths_clustered": {
+            "src": "fcd_paths_clustered.geoparquet"            
+        },
+        "fcd_trips_": {
+            "src": "fcd_trips.geoparquet",
+            "partition_cols": [
+                "day_type",
+                "t"
+            ],
+            "additional_fields": {
+                "day_type": "{day_type_simulation}"
+            },
+            "mode": "wa"
+        },
+        "fcd_fcd_": {
+            "src": "fcd_fcd.geoparquet",
+            "partition_cols": [
+                "day_type",
+                "t"
+            ],
+            "additional_fields": {
+                "day_type": "{day_type_simulation}",
+                "mode": "wa"
+            }
+        },
+        "fcd_graph": {
+            "src": "fcd_graph.parquet",
+            "partition_cols": [
+                "day_type",
+                "t_base"
+            ],
+            "additional_fields": {
+                "day_type": "{day_type_simulation}",
+                "mode": "wa"
+            }
+        },
+        "statistics": "stats.csv",
         "state": "./dati/output/{description}/state",
-        "params": "../params_{simulation_id}.json", 
+        "params": "../params_{simulation_id}.json",
         "fcd": {
             "connector": "DBLoader",
             "location": "postgresql+psycopg://postgres:lDvdc15dcd5@192.168.133.80:5432/fcd_mobito",

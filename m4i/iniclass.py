@@ -75,7 +75,7 @@ class IniClass:
         self.CRS = self.config_reader.get("CRS", 'GENERAL', "EPSG:4326")  # Coordinate Reference System
         self.CRS_CALC = self.config_reader.get("CRS_CALC", 'GENERAL', "EPSG:6875")  # Coordinate Reference System for calculation
         self.TZ_LOCAL = self.config_reader.get("TZ_LOCAL", 'GENERAL', "Europe/Rome")  # Timezone locale
-
+        self.TZ_CALC = self.config_reader.get("TZ_CALC", 'GENERAL', "UTC")  # Timezone for calculations
 
         # SIMULATOR
         self.SIMU_STEP = self.config_reader.getfloat("SIMU_STEP", 'SIMULATOR', 6)  # step di simulazione
@@ -100,6 +100,7 @@ class IniClass:
         self.LOAD_GRAPH = self.config_reader.getboolean("LOAD_GRAPH", 'ASSIGNMENT', False)
         self.SAVE_PATHS = self.config_reader.getboolean("SAVE_PATHS", 'ASSIGNMENT', False)
         self.LOAD_PATHS = self.config_reader.getboolean("LOAD_PATHS", 'ASSIGNMENT', False)
+        self.USE_OBSERVED_PATHS = self.config_reader.getboolean("USE_OBSERVED_PATHS", 'ASSIGNMENT', True)  # Indica se vengono usati i percorsi osservati
 
         # OD ESTIMATION
         self.OD_ESTIMATION_PRELOAD = self.config_reader.getint("OD_ESTIMATION_PRELOAD", 'OD_ESTIMATION', 60)
@@ -124,15 +125,12 @@ class IniClass:
         self.FCD_SERVER_FCD_HORIZON = self.config_reader.getint("FCD_SERVER_FCD_HORIZON", 'FCD_SERVER', 60) # orario di previsione in minuti
         self.FCD_SERVER_FCD_TIMESLICE = self.config_reader.getint("FCD_SERVER_FCD_TIMESLICE", 'FCD_SERVER', 15) # numero massimo di iterazioni per la previsione
         self.FCD_SERVER_FCD_TIMESLICE_OFFLINE = self.config_reader.getint("FCD_SERVER_FCD_TIMESLICE_OFFLINE", 'FCD_SERVER', 120) # numero di iterazioni per la previsione offline
-        self.FCD_SERVER_FCD_CRS_DATA = self.config_reader.get("FCD_SERVER_FCD_CRS_DATA", 'FCD_SERVER', "EPSG:4326") # CRS dei dati FCD
-        self.FCD_SERVER_FCD_CRS_CALC = self.config_reader.get("FCD_SERVER_FCD_CRS_CALC", 'FCD_SERVER', "EPSG:6875") # CRS dei dati FCD
         self.FCD_SERVER_SHARE_DATA_ONLINE = self.config_reader.getboolean("FCD_SERVER_SHARE_DATA_ONLINE", 'FCD_SERVER', True) # esporta i dati FCD su IPC
         self.FCD_SERVER_WRITE_OUTPUT = self.config_reader.getboolean("FCD_SERVER_WRITE_OUTPUT", 'FCD_SERVER', False) # esporta i dati FCD su DB
         self.FCD_SERVER_MAP_MATCHING = self.config_reader.getboolean("FCD_SERVER_MAP_MATCHING", 'FCD_SERVER', True) # abilita il map matching
         self.FCD_SERVER_ROUTING = self.config_reader.getboolean("FCD_SERVER_ROUTING", 'FCD_SERVER', True) # abilita il routing
         self.FCD_SERVER_TRIPS = self.config_reader.getboolean("FCD_SERVER_TRIPS", 'FCD_SERVER', True) # abilita la generazione dei viaggi
         self.FCD_SERVER_UPDATE_SPEED = self.config_reader.getboolean("FCD_SERVER_UPDATE_SPEED", 'FCD_SERVER', True) # calcola velocità media dei veicoli
-        self.FCD_SERVER_TZ_DATA = self.config_reader.get("FCD_SERVER_TZ_DATA", 'FCD_SERVER', "UTC") # Timezone dei dati FCD
 
         self.FCD_SPEED_AGGREGATION_INTERVAL = self.config_reader.getint("FCD_SPEED_AGGREGATION_INTERVAL", 'FCD_SERVER', 15) # intervallo di aggregazione della velocità in secondi
         self.FCD_MAP_MATCHING_CPUS = self.config_reader.getint("FCD_MAP_MATCHING_CPUS", 'FCD_MAP_MATCHING', 1) # numero di processi per il map matching

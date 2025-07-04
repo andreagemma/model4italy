@@ -10,6 +10,7 @@ from os.path import join
 from typing import Any
 import json
 from typing import Union
+from ...utils.io import IO_DataFrame
 
 from .base_loader import BaseLoader
 
@@ -28,7 +29,9 @@ class FileLoader(BaseLoader):
             with open(src,'r') as f:
                 content = json.load(f)
             return pd.DataFrame(content)
-        df = BaseLoader.import_dataframe_from_file(src, filters=filters, dtype=dtype, **kwargs)
+        iod = IO_DataFrame()
+        df = iod.import_dataframe(src, filters=filters, dtype=dtype, **kwargs)
+        #df = BaseLoader.import_dataframe_from_file(src, filters=filters, dtype=dtype, **kwargs)
         return df
     
     

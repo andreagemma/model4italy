@@ -258,8 +258,6 @@ Il file `settings.ini` contiene tutte le impostazioni di configurazione per Mode
 - **FCD_ROUTING_CPUS**: CPU per il path matching.
 - **FCD_MAP_MATCHING_MAX_DISTANCE**: Distanza massima per il map matching (in metri).
 - **FCD_MAP_MATCHING_MAX_ANGLE**: Angolo massimo per il map matching (in gradi).
-- **FCD_SERVER_FCD_CRS_DATA**: CRS dei dati FCD.
-- **FCD_SERVER_FCD_CRS_CALC**: CRS per i calcoli FCD.
 - **FCD_ROUTING_START_FROM_ZONE**: Abilita inizio cammini dal centroide.
 - **FCD_ROUTING_END_TO_ZONE**: Abilita fine cammini al centoride.
 - **FCD_ROUTING_AGGRATION_INTERVAL**: Intervallo di aggregazione cammini (in minuti).

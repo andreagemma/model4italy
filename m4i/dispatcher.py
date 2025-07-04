@@ -95,6 +95,8 @@ class Dispatcher(BaseM4IModel):
                 self.run_rt_server()
             elif self.op == "fcd_server_offline":
                 self.run_rt_server_period()
+            elif self.op == "fcd_server_paths_clustering":
+                self.run_rt_server_clustering()
             elif self.op == "ipc":
                 self.run_ipc_client()                
             else:
@@ -141,7 +143,11 @@ class Dispatcher(BaseM4IModel):
     def run_rt_server_period(self):
         op: OP = OfflineRTServer(loader=self.loader, writer=self.writer, ipc=self.ipc)  
         op.run()                     
-        
+
+    def run_rt_server_clustering(self):
+        op: OP = PathsClustering(loader=self.loader, writer=self.writer, ipc=self.ipc)  
+        op.run()   
+
     def run_ipc_client(self):
         if self.ipc is None:
             raise ValueError("IPC not initialized")

@@ -21,6 +21,11 @@ class Path(dict):
         dict.__setitem__(self, "tot_cost", tot_cost)
         dict.__setitem__(self, "links", tuple() if links is None else tuple(links))
 
+    @staticmethod
+    def load_from_dict(kwargs):
+        return Path(
+            **kwargs
+        )
     def key(self):
         return (dict.__getitem__(self,"source"),dict.__getitem__(self,"target"),dict.__getitem__(self,"t_start"),dict.__getitem__(self,"mode"))
     

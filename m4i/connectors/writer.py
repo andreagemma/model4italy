@@ -72,7 +72,9 @@ class Writer(ABC):
                     parameters[k] = self.parser.get_parametric_name(v)
             """
             if dtype is not None:
-                df=self.parser.apply_dtype(df=df, dtype=dtype, copy=False)
+                df=self.parser.apply_dtype(df=df, dtype=dtype, copy=False, 
+                                           tz_src=self.ini.TZ_CALC,
+                                           tz_dest=parameters.get("tz_data", self.ini.TZ_LOCAL))
 
             mapping = parameters.get("mapping")
             
@@ -144,7 +146,7 @@ class Writer(ABC):
         """
         return self._write_dataset(**kwargs)
 
-    def write(self, results: gpd.GeoDataFrame, path:str=None, parameters:dict=None, mode=None, **kwargs):
+    def write(self, results: gpd.GeoDataFrame, path:str=None, parameters:dict=None, mode=None, from_input=False, **kwargs):
         """
         Carica un dataset in base ai parametri forniti, ai filtri e al tipo di dato specificato.
 
@@ -170,7 +172,7 @@ class Writer(ABC):
         """                
         if parameters is None:
             if path:
-                parameters = self.parser.get_output_parameters(path, df=results)
+                parameters = self.parser.get_output_parameters(path, df=results, from_input=from_input)
             else:
                 raise KeyError("key 'parameters' not found in execution parameters")        
         kwargs["df"] = results
