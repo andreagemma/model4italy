@@ -43,7 +43,7 @@ class MatrixAss:
 
         self.delta_t = loader.delta_t
         self.n_intervals = n_intervals
-        self.pre_intervals = int(loader.ini.OD_ESTIMATION_PRELOAD / self.delta_t) if pre_intervals is None else pre_intervals
+        self.pre_intervals = int(loader.ini.OD_ESTIMATION_WHISKERS / self.delta_t) if pre_intervals is None else pre_intervals
 
         self.mats = {}
         self.d_mats = {}

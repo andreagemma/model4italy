@@ -26,6 +26,7 @@ from os.path import join
 
 import warnings
 import websockets.sync.client
+from m4i.utils.util import min2hhmm
 from ..utils.util import to_datetime_auto
 from ..matrix import MatrixODT, MatrixOD
 from ..graphs import DynamicGraph, DynamicTimeArrayAttribute, DynamicCallableAttribute, KPathList, Path, KPathContainer
@@ -87,7 +88,35 @@ class Loader(BaseLoader):
                               "_df_links", "_df_nodes", "_df_turns",
                               "dparams", "delta_t", "conv_tbl", "timestamps"]
         
-        
+    def recreate(self) -> Loader:
+        """
+        Create a clone of the current Loader instance.
+        :return: A new Loader instance with the same parameters and state.
+        """
+        new_loader = Loader(parser=self.parser.clone(), logger=self.log)
+        return new_loader
+    
+    def reset(self):
+        for attr in self.attr_to_share:
+            setattr(self, attr, None)
+        self.delta_t = self.ini.DELTA_T
+        self.update_params()
+        if self.start is not None and self.end is not None and self.delta_t is not None:
+            self.timestamps = list(np.arange(self.start, self.end, self.delta_t))
+        else:
+            self.timestamps = None        
+
+    def set_start_end(self, start: int = None, end: int = None):
+        """
+        Set the timestamps for the loader.
+        :param start: Start time in minutes from midnight.
+        :param end: End time in minutes from midnight.
+        :param delta_t: Time step in minutes.
+        """
+        self.parser.params = copy.deepcopy(self.parser.params)
+        self.parser.params["start"] = min2hhmm(start) if start is not None else self.start
+        self.parser.params["end"] = min2hhmm(end) if end is not None else self.end
+        self.reset()
         
     def filters_to_query_expression(filters: list[list[tuple[str, str, Any]]]) -> str:
         return filters_to_query_expression(filters=filters)
@@ -296,10 +325,12 @@ class Loader(BaseLoader):
         return df
     
     def load_matrix(self, parameters: dict, **kwargs) -> pd.DataFrame:
-        if self.end%1440<self.start%1440:
-            filters = [(("timestamp","<",self.end%1440),("timestamp",">=",self.start%1440))]
+        end = kwargs.pop("end", self.end)
+        start = kwargs.pop("start", self.start)
+        if end%1440<start%1440:
+            filters = [(("timestamp","<",end%1440),("timestamp",">=",start%1440))]
         else:
-            filters = [("timestamp",">=",self.start%1440),("timestamp","<",self.end%1440)]
+            filters = [("timestamp",">=",start%1440),("timestamp","<",end%1440)]
         dtype = self.parser.get_dtype("matrices")
         df = self._load_dataset(parameters=parameters, filters = filters, dtype=dtype, **kwargs)
         if df is None:
@@ -451,13 +482,13 @@ class Loader(BaseLoader):
     @property
     def OD(self) -> MatrixODT:
         if self._OD is None:
-            self._load_demand()
+            self.load_demand()
         return self._OD
     
     @property
     def ODs(self) -> dict[Any, MatrixODT]:
         if self._ODs is None:
-            self._load_demand()
+            self.load_demand()
         return self._ODs
 
     @property
@@ -499,7 +530,7 @@ class Loader(BaseLoader):
     @property
     def perc(self) -> dict[int, MatrixODT]:
         if self._perc is None:
-            self._load_demand()
+            self.load_demand()
         return self._perc
     
     @property
@@ -606,7 +637,7 @@ class Loader(BaseLoader):
         if df_zones is None:
             raise Exception(f"load_zones({parameters}) function return None value")
 
-        self._zones = list(df_zones["id"].values)
+        self._zones = df_zones["id"].values.tolist()
         self._origins = self.zones.copy()
         self._destinations = self.zones.copy()
         self.log.info(f"Zones identified {len(self.zones)}")
@@ -839,24 +870,42 @@ class Loader(BaseLoader):
     def _load_counts(self):
         self.log.info("Loading Counts...")
         parameters = self.parser.get("params.counts")
+        self._counts = {}
         if parameters is None:            
-            self.log.warning("key 'counts' not found in execution parameters['params']")
-            self._counts = []
+            self.log.warning("key 'counts' not found in execution parameters['params']")            
             return
-        self._counts = []
-        if "src" not in parameters:
-            raise KeyError("key 'src' required in counts parameters")
-        tmp = self.load_counts(parameters)
-        if tmp is None:
-            raise Exception(f"load_counts({parameters}) function return None value")
-        tmp["eq_counts"] = tmp["counts"] * tmp["mode"].apply(lambda x: self.modes.get(x,{}).get("eq_factor",1))
-        #self._counts = tmp.groupby(["id", "timestamp","modes"]).agg(counts=("eq_counts", "sum"))["counts"].reset_index()
-        counts_by_mode = tmp.groupby(["mode"])
-        for mode, df_mode in counts_by_mode:
-            self.counts[mode] = df_mode
-        self.counts["all"] = tmp.groupby(["id", "timestamp"]).agg(counts=("eq_counts", "sum"))["counts"].reset_index()
+        counts =pd.DataFrame()
+        for id_count, set_counts in enumerate(parameters):                
+            self.log.info(f"Loading Counts {id_count}...")
+            set_counts = self.parser.get_input_parameters("params.counts", id_count)
+            if "src" not in set_counts:
+                raise KeyError("key 'src' required in counts parameters")
+            tmp = self.load_counts(set_counts)
+            if tmp is None:
+                raise Exception(f"load_counts({set_counts}) function return None value")
+            counts = counts.combine_first(tmp)      
 
-    def _load_demand(self):
+        counts["eq_counts"] = 0.0
+        counts_by_mode = counts.groupby("mode")
+        for mode, df_mode in counts_by_mode:
+            b=df_mode.index
+            if mode in self.modes:
+                df_mode["eq_counts"] = df_mode["counts"] * df_mode["mode"].apply(lambda x: self.modes.get(x,{}).get("eq_factor",1))
+                counts.loc[b, "eq_counts"] = df_mode["eq_counts"]
+                self._counts[mode] = df_mode["counts"].reset_index(drop=True)
+            elif mode is None or mode == "all":
+                df_mode["eq_counts"] = df_mode["counts"]
+                df_mode["mode"] = "all"
+                counts.loc[b, ["eq_counts","mode"]] = df_mode[["eq_counts","mode"]]                
+            else:
+                self.log.warning(f"Mode '{mode}' not defined in modes parameter, counts will not be aggregated by mode")
+                df_mode["eq_counts"] = df_mode["counts"]
+                df_mode["mode"] = "all"
+                counts.loc[b, ["eq_counts","mode"]] = df_mode[["eq_counts","mode"]]
+
+        self._counts["all"] = counts.groupby(["id", "timestamp"]).agg(counts=("eq_counts", "sum"))["counts"].reset_index()
+
+    def load_demand(self, timestamps: list[int] = None):
         self.log.info("Loading OD Matrices...")
         parameters = self.parser.get("params.demand")
         if parameters is None:
@@ -864,7 +913,8 @@ class Loader(BaseLoader):
         modes = set()
         self._perc = {}
         self._ODs = {}
-        self._OD = MatrixODT(rows=self.origins, cols=self.destinations, timestamps=self.timestamps, init=0, mode=None)
+        timestamps = timestamps or self.timestamps
+        self._OD = MatrixODT(rows=self.origins, cols=self.destinations, timestamps=timestamps, init=0, mode=None)
         for id_mat, od_param in enumerate(parameters):
             self.log.info(f"Loading OD Matrix '{id_mat}'...")
             mode = od_param.get("mode", "c")            
@@ -876,7 +926,7 @@ class Loader(BaseLoader):
             if mode in self._ODs:
                 OD = self._ODs[mode]
             else:
-                OD = MatrixODT(rows=self.origins, cols=self.destinations, timestamps=self.timestamps, init=0, mode=mode)
+                OD = MatrixODT(rows=self.origins, cols=self.destinations, timestamps=timestamps, init=0, mode=mode)
                 self._ODs[mode] = OD
 
             tot_od_pairs=0
@@ -886,23 +936,23 @@ class Loader(BaseLoader):
                 if "scalar" in mat_params:
                     if not isinstance(mat_params["scalar"], (int, float)):
                         raise TypeError("key 'scalar' must be a number")
-                    current_od = MatrixODT(rows=self.origins, cols=self.destinations, timestamps=self.timestamps, init=mat_params["scalar"], mode=mode)
+                    current_od = MatrixODT(rows=self.origins, cols=self.destinations, timestamps=timestamps, init=mat_params["scalar"], mode=mode)
                 else:
                     mat_params = self.parser.get_input_parameters(f"params.demand.{id_mat}.matrices", id_m)
                     if "src" not in mat_params:
                         raise KeyError("key 'src' required in matrices element")
-                    tmp = self.load_matrix(mat_params)
+                    tmp = self.load_matrix(mat_params, start = min(timestamps), end = max(timestamps))
                     if tmp is None:
                         raise Exception(f"load_matrix({mat_params}) function return None value")
                     tot_od_pairs += tmp.shape[0]                    
-                    current_od = MatrixODT.read_df(rows=self.origins,cols=self.destinations, timestamps=self.timestamps, df=tmp)
+                    current_od = MatrixODT.read_df(rows=self.origins,cols=self.destinations, timestamps=timestamps, df=tmp)
                 if id_m==0:                    
                     OD += current_od
                 else:
                     op = mat_params.get("op", "+")                    
                     if op == "merge":
                         if tmp:  # merge con dataframe
-                            OD=MatrixODT.read_df(rows=self.origins, cols=self.destinations, timestamps=self.timestamps, df=tmp, od=OD)
+                            OD=MatrixODT.read_df(rows=self.origins, cols=self.destinations, timestamps=timestamps, df=tmp, od=OD)
                         else: # merge con scalar
                             OD *= 0
                             OD += current_od

@@ -1,0 +1,19 @@
+{
+    "simulation_id": 3,
+    "description": "Demo",
+    "date_simulation": "2024-05-07",
+    "start": "08:00",
+    "end": "8:30",  
+    "op": "od_estimation",
+    "scenario_id": 30,
+    "settings": {
+        "OD_ESTIMATION_WHISKERS" : 30,
+        "OD_ESTIMATION_MAX_ITE" : 1,
+        "OD_ESTIMATION_RGAP" : 0.01,
+        "OD_ESTIMATION_MSA_MAX_ITE" : 1,
+        "OD_ESTIMATION_MSA_K" : 1,
+        "OD_ESTIMATION_MSA_RGAP" : 0.001,
+        "OD_ESTIMATION_MSA_TIMESLICE" : 60,
+        "OD_ESTIMATION_USE_OBSERVED_PATHS": true
+    }
+}

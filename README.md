@@ -241,7 +241,7 @@ Il file `settings.ini` contiene tutte le impostazioni di configurazione per Mode
 ---
 
 ## [OD_ESIMATION]
-- **OD_ESTIMATION_PRELOAD**: Pre-caricamento dati OD (in minuti).
+- **OD_ESTIMATION_WHISKERS**: Pre-caricamento dati OD (in minuti).
 - **OD_ESTIMATION_MAX_ITE**: Iterazioni massime per la stima OD.
 - **OD_ESTIMATION_RGAP**: RGAP per la stima OD.
 - **OD_ESTIMATION_MSA_MAX_ITE**: Iterazioni massime MSA per OD.

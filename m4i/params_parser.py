@@ -17,6 +17,7 @@ from .utils import util, deep_update
 from .iniclass import IniClass
 from datetime import datetime, timedelta
 from .utils import to_datetime_auto
+import pytz
 
 
 class ParamsParser:
@@ -104,6 +105,12 @@ class ParamsParser:
         params["settings"] = settings
         return params
 
+    def clone(self):
+        ini = self.ini
+        params = copy.deepcopy(self.params)
+        parser = ParamsParser(params=params, settings=ini)
+        return parser
+
     @staticmethod
     def from_file(params_path: str="params.ini", settings_path: str="settings.ini") -> ParamsParser:
         """
@@ -120,18 +127,18 @@ class ParamsParser:
             date_simulation = datetime.now()
             #self.set_value("date",datetime.datetime.now().strftime("%Y-%m-%d"))
         else:         
-            date_simulation = to_datetime_auto(self.get("date_simulation"))
+            date_simulation = to_datetime_auto(self.get("date_simulation"),tz_localize=self.ini.TZ_LOCAL)
         if "start" not in self.params:
-            time_start = datetime.now()
+            time_start = datetime.now(tz=pytz.timezone(self.ini.TZ_LOCAL))
         else:
-            time_start = to_datetime_auto(self.get("start"))
+            time_start = to_datetime_auto(self.get("start"),tz_localize=self.ini.TZ_LOCAL)
         
         if "end" not in self.params:
-            time_end = datetime.now() + timedelta(minutes=60)
+            time_end = datetime.now(tz=pytz.timezone(self.ini.TZ_LOCAL)) + timedelta(minutes=60)
         else:
-            time_end = to_datetime_auto(self.get("end"))
+            time_end = to_datetime_auto(self.get("end"),tz_localize=self.ini.TZ_LOCAL)
 
-        dt = datetime.combine(date_simulation.date(), time_start.time())        
+        dt = datetime.combine(date_simulation.date(), time_start.time(), tzinfo=pytz.timezone(self.ini.TZ_LOCAL))        
         self.update_date(dt=dt, name="simulation", override=True, time=True, date=True)            
         self.update_date(dt=time_start, name="start", override=True, time=True, date=True)
         self.update_date(dt=time_end, name="end", override=True, time=True, date=True)
@@ -351,7 +358,7 @@ class ParamsParser:
             "counts": [
                 {"name": "id", "type": is_int, "dtype": "Int64", "required": True},
                 {"name": "timestamp", "type": is_int, "dtype": "Int16", "required": True},
-                {"name": "mode", "type": is_set, "dtype": "string", "required": False, "default": None},
+                {"name": "mode", "type": is_str, "dtype": "string", "required": False, "default": None},
                 {"name": "counts", "type": is_number, "dtype": "Float32", "required": True},                
             ],
             "matrices": [

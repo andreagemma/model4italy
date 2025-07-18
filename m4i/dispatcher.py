@@ -89,6 +89,8 @@ class Dispatcher(BaseM4IModel):
                 self.run_dynamic_simulation()
             elif self.op == "online":
                 self.run_online()                
+            elif self.op == "od_estimation":
+                self.run_od_estimation()
             elif self.op == "save_state":
                 self.run_save_state()
             elif self.op == "fcd_server_online":
@@ -130,6 +132,10 @@ class Dispatcher(BaseM4IModel):
 
     def run_online(self):        
         op: OP = OnlineSimulator(loader=self.loader, writer=self.writer)  
+        op.run()   
+
+    def run_od_estimation(self):        
+        op: OP = ODEstimation(loader=self.loader, writer=self.writer)  
         op.run()   
 
     def run_save_state(self):        

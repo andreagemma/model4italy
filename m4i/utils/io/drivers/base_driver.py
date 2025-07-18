@@ -121,7 +121,7 @@ class BaseDriver:
             if isinstance(filters, str):
                 query = filters
             else:
-                query = filters_to_query_expression(filters)
+                query = filters_to_query_expression(filters,quoting='', op_boolean_symbols=True)
             df = df.query(query)
         return df
     

@@ -31,7 +31,8 @@ class DynamicSimulation(OP):
             save_state_graph=self.ini.SAVE_GRAPH,
             load_state_graph=self.ini.LOAD_GRAPH,
             save_state_paths=self.ini.SAVE_PATHS,
-            load_state_paths=self.ini.LOAD_PATHS)
+            load_state_paths=self.ini.LOAD_PATHS,
+            load_off_line_paths=self.ini.USE_OBSERVED_PATHS)
         n_steps = self.msa.calc_task_steps()
         if n_steps:
             self.msa.task_set_steps(n_steps)

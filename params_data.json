@@ -113,6 +113,17 @@
                 }
             }
         ],
+        "counts": [
+            {
+                "src": "counts.csv",
+                "mapping": {
+                    "id": "id",
+                    "timestamp": "timestamp",
+                    "mode": "mode",
+                    "counts": "counts"
+                }
+            }
+        ],        
         "traffic_lights": [
             {
                 "src": "traffic_lights.csv",
@@ -167,7 +178,7 @@
             }
         },
         "statistics": "stats.csv",
-        "state": "./dati/output/{description}/state",
+        "state": "state",
         "params": "../params_{simulation_id}.json",
         "fcd": {
             "connector": "DBLoader",

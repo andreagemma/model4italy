@@ -9,17 +9,15 @@ import dateutil
 import numpy as np
 import pandas as pd
 from ..iniclass import IniClass
-from ..utils import task
 from ..matrix import MatrixODT, MatrixOD, MatrixAss
-from .. import Loader
+from ..connectors import Loader, Writer
 from .od_estimator import ODEstimator
 
-@task
 class ODEstimatorOffline(ODEstimator):
 
 
-    def __init__(self, loader:Loader=None, ODSeed=None):
-        super().__init__(loader=loader, ODSeed=ODSeed)
+    def __init__(self, loader:Loader=None, writer: Writer = None, **kwargs):
+        super().__init__(loader=loader, writer=writer, **kwargs)
         # Pesi F.O.
         self.gamma1 = self.ini.OD_ESTIMATION_GAMMA1
         self.gamma2 = self.ini.OD_ESTIMATION_GAMMA2
@@ -33,8 +31,8 @@ class ODEstimatorOffline(ODEstimator):
         self.sa = self.ini.OD_ESTIMATION_SA # segmento minore della sezione aurea
         self.sb = 1-self.ini.OD_ESTIMATION_SA # segmento maggiore della sezione aurea
         self.gce=[]
-        for i in range(0,len(self.ODseed)*self.ini.DELTA_T,self.ini.DELTA_T):
-            self.gce.append(self.ODseed[i].mat)
+        for i,t in enumerate(sorted(self.ODseed.keys())):
+            self.gce.append(self.ODseed[t].mat)
         self.ite = 0
         self.fob = 1e308
         self.flows = None
@@ -53,19 +51,19 @@ class ODEstimatorOffline(ODEstimator):
         self.M: MatrixAss=M
         self.tstart=tstart
         self.tend=tend
-        self.tstart1:int=max(0,self.tstart-int(self.ini.OD_ESTIMATION_PRELOAD))
-        self.tend1:int=min(1440,int(self.tend+self.ini.OD_ESTIMATION_PRELOAD))
-        self.pre_int:int=int(self.loader.ini.OD_ESTIMATION_PRELOAD/self.ini.DELTA_T)
+        self.tstart1:int=max(0,self.tstart-int(self.ini.OD_ESTIMATION_WHISKERS))
+        self.tend1:int=min(1440,int(self.tend+self.ini.OD_ESTIMATION_WHISKERS))
+        self.pre_int:int=int(self.loader.ini.OD_ESTIMATION_WHISKERS/self.ini.DELTA_T)
         self.t_intervals=list(range(self.tstart1,self.tend1,self.ini.DELTA_T))
         self.t_corr:list=list(range(tstart,int(tend),self.ini.DELTA_T))
         self.t_post:list=list(range(tstart,self.tend1,self.ini.DELTA_T))
-        self.zone:list=list(self.ODseed[0].rows)
+        self.zone:list=self.loader.origins
         
         gi=[]
         gce=[]
-        for item in self.t_intervals:
+        for i_item, item in enumerate(self.t_intervals):
             gi.append(np.ravel(self.OD[item].mat))
-            gce.append(np.ravel(self.gce[int(item/self.ini.DELTA_T)]))
+            gce.append(np.ravel(self.gce[int(i_item/self.ini.DELTA_T)]))
         
         #pdb.set_trace()
         pic = np.ones([len(self.loader.detectors), 1])
@@ -75,12 +73,11 @@ class ODEstimatorOffline(ODEstimator):
         r2_i=[]
         r2_f=[]
         self.task_step_done(message=f"Initialization")
-
         for interval in self.t_post:
             flows_dep=np.zeros((1,self.M[0,0].mat.shape[0]))
             for dep in range(max(0,self.t_intervals.index(interval)-self.pre_int),self.t_intervals.index(interval)+1):
                 flows_dep+=self.M[self.t_intervals.index(interval),dep].mat*gi[dep]
-            tmp = self.loader.counts.loc[["id","counts"],self.loader.counts['ts']==interval]
+            tmp = self.counts.loc[self.counts['timestamp']==interval, ["id","counts"]]
             if self.ite==1:
                 check_flows_i=tmp.copy().reset_index(drop=True)
                 check_flows_i['flows']=flows_dep.transpose()
@@ -127,7 +124,7 @@ class ODEstimatorOffline(ODEstimator):
        
         if self.gamma2!=0:
             for interval in self.t_post:
-                fob2+=(self.gamma2*(pic.transpose()*((flows[self.t_post.index(interval)]-self.counts[self.counts['ts']==interval]['counts'].values)**2)).sum())
+                fob2+=(self.gamma2*(pic.transpose()*((flows[self.t_post.index(interval)]-self.counts[self.counts['timestamp']==interval]['counts'].values)**2)).sum())
            
         self.fob=fob1+fob2
         self.task_step_done(message=f"Objective function calculation: FOB={self.fob}")
@@ -144,7 +141,7 @@ class ODEstimatorOffline(ODEstimator):
             grad1=self.gamma1*(qce.transpose()*(gi[self.t_intervals.index(interval)]-gce[self.t_intervals.index(interval)]))
             grad2_dep=np.zeros((1,len(gi[0])))
             for dep in range(max(0,self.t_intervals.index(interval)-self.pre_int),self.t_intervals.index(interval)+1):
-                grad2_dep+=(self.M[self.t_intervals.index(interval),dep].mat.transpose()*(pic.transpose()*((flows[self.t_post.index(interval)]-self.counts[self.counts['ts']==interval]['counts'].values))).transpose()).transpose()
+                grad2_dep+=(self.M[self.t_intervals.index(interval),dep].mat.transpose()*(pic.transpose()*((flows[self.t_post.index(interval)]-self.counts[self.counts['timestamp']==interval]['counts'].values))).transpose()).transpose()
             grad2=grad2_dep
             self.grad.append(grad1+grad2)
             
@@ -239,13 +236,15 @@ class ODEstimatorOffline(ODEstimator):
         gi=od_new.copy()
         OD_new=self.OD.copy()
         
+        template = (self.ODseed.values())[0].mat
         for interval in self.t_corr:
             ind_zone=0
-            new_m=np.reshape(gi[self.t_intervals.index(interval)],[len(self.ODseed[0].mat),len(self.ODseed[0].mat)])
+            new_m=np.reshape(gi[self.t_intervals.index(interval)],[len(template),len(template)])
+            tmp = OD_new[interval]
             for z in self.zone: 
                 for j in self.zone:
                     pos=self.zone.index(j)
-                    OD_new[interval][z,j]=new_m[ind_zone][pos]
+                    tmp[z,j]=new_m[ind_zone][pos]
                 ind_zone+=1
         self.task_step_done(message=f"OD matrix updated for intervals {self.t_corr[0]} to {self.t_corr[-1]}")
             

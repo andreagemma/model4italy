@@ -51,6 +51,9 @@ class AssignmentModel(BaseM4IModel):
         ipc: IPC = None,
         max_rel_gap: float = None,
         max_ite: int = None,
+        start: int = None,
+        end: int = None,
+        max_timeslice:int = None,
         **kwargs
         ):
         super().__init__(loader=loader, writer=writer, ipc=ipc)
@@ -58,9 +61,10 @@ class AssignmentModel(BaseM4IModel):
         self.max_ite: int = max_ite
         self.max_rel_gap: float = max_rel_gap
 
-        self.global_t_start: int = max(0, self.loader.start)
-        self.global_t_end: int = min(1440, self.loader.end)
-        self.global_time_slice: int = int(min(self.global_t_end-self.global_t_start,loader.ini.MSA_MAX_TIMESLICE))
+        self.global_t_start: int = max(0, self.loader.start if start is None else start)
+        self.global_t_end: int = min(1440, self.loader.end if end is None else end)
+        self.global_time_slice: int = int(loader.ini.MSA_MAX_TIMESLICE if max_timeslice is None else max_timeslice)
+        self.global_time_slice: int = int(min(self.global_t_end-self.global_t_start,self.global_time_slice))
 
         self.delta_t = self.loader.delta_t
 

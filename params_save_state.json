@@ -4,13 +4,13 @@
     "date_simulation": "2024-05-07",
     "start": "07:00",
     "end": "10:00",  
-    "op": "assignment",
+    "op": "save_state",
     "scenario_id": 30,
     "settings": {
         "MSA_MAX_ITE": 10,
         "MSA_K": 3,
         "MSA_SPP_NUMCPUS": 0,
         "MSA_K_BALANCING": 2,
-        "USE_OBSERVED_PATHS": true  
+        "USE_OBSERVED_PATHS": true
     }
 }

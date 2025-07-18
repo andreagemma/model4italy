@@ -9,64 +9,97 @@ Created on Thu Jun 24 23:21:48 2021
 """
 @author: andge
 """
-from ..utils.task import task
-from .. import ODEstimator
-from ..connectors import Loader
+from ..assignment_models.assignment_model import AssignmentModel
+from ..simulators import BaseSimulator, MicroSimulator
+from .op import OP
+from ..connectors import Loader, Writer
 from ..matrix import MatrixAss, MatrixODT
 from ..graphs import AbstractGraph
+from ..assignment_models.msa import MSA
+from ..od_estimator import ODEstimatorOffline
+from ..utils.util import min2hhmm
 import logging
 import pandas as pd
 import numpy as np
 import pdb
 
-@task
-class ODEstimation:
+class ODEstimation(OP):
 
-    def __init__(self, loader: Loader, assignment, od_estimator):
-        self.loader: Loader = loader
+    def __init__(self, loader: Loader, writer: Writer, **kwargs):
+        super().__init__(loader, writer, **kwargs)
+        tstart:int=max(0,self.loader.start-int(self.ini.OD_ESTIMATION_WHISKERS))
+        tend:int=min(1440,int(self.loader.end+self.ini.OD_ESTIMATION_WHISKERS))
+        timestamps=list(range(tstart,tend,self.ini.DELTA_T))
+        loader.load_demand(timestamps=timestamps)
         self.ODz2z: MatrixODT = loader.OD
         self.G: AbstractGraph = loader.G
-        self.MSA = assignment
+        self.MSA = MSA
 
         self.fobs = []
         self.links_info = {"ite": [], "flows": [], "counts": []}
 
-    def run(self, max_ite=10, rgap=0.01, msa_max_ite=10, msa_rgap=0.01, msa_k=2, params=None):
-        log = logging.getLogger("ODM")
-        log.info("Inizializzazione dati")
+    def run(self):
+        self.log.info("Inizializzazione dati")
         # %% associo alle zone i nodi O-D 
 
-        stima = StimaOD(self.loader, self.ODz2z.ods)
-        log.info("Inizio")
+        stima = ODEstimatorOffline(loader=self.loader, writer=self.writer, ODSeed=self.ODz2z.ods)
+        self.log.info("Inizio")
         start = int(max(self.loader.start, 0))
         end = int(min(self.loader.end, 1440))
-        for tstart in range(start, end, int(self.loader.ini.STIMA_OD_TIMESLICE)):
-            tend = min(int(tstart + self.loader.ini.STIMA_OD_TIMESLICE), end)
-            log.info("Ottimizzazione %s - %s", min2hhmm(tstart), min2hhmm(tend))
-            for ite in range(1, max_ite + 1):
-                log.info("Ite: %s - Inizio", ite)
-                msa = self.MSA(loader=self.loader,
-                               max_k=msa_k, max_ite=msa_max_ite, max_rgap=msa_rgap, stima_od=True,
-                               tstart=int(tstart - self.loader.ini.STIMA_OD_PRE),
-                               tend=int(tend + self.loader.ini.STIMA_OD_PRE),
-                               time_slice=int(tend - tstart + 2 * self.loader.ini.STIMA_OD_PRE))
+        
+        self.simulator: BaseSimulator = MicroSimulator(loader=self.loader)
+        self.simulator.task_steps = 1
+        self.simulator.task_parent = self
+        self.simulator.task_weight = 10
+        tstarts = list(range(start, end, int(self.ini.OD_ESTIMATION_MSA_TIMESLICE)))
+        self.task_set_steps(len(tstarts) * self.ini.OD_ESTIMATION_MAX_ITE)
+
+        for tstart in tstarts:
+            tend = min(int(tstart + self.ini.OD_ESTIMATION_MSA_TIMESLICE), end)
+            self.log.info("Analyzing %s - %s...", min2hhmm(tstart), min2hhmm(tend))
+            for ite in range(1, self.ini.OD_ESTIMATION_MAX_ITE + 1):
+                self.task_step_done(f"t: {tstart}-{tend} ite: {ite} - Start")
+                msa: AssignmentModel = self.MSA(
+                    task_parent = self,
+                    loader = self.loader,
+                    writer = self.writer,
+                    max_k=self.ini.OD_ESTIMATION_MSA_K, 
+                    max_ite=self.ini.OD_ESTIMATION_MSA_MAX_ITE, 
+                    max_rgap=self.ini.OD_ESTIMATION_MSA_RGAP, 
+                    start=tstart - self.ini.OD_ESTIMATION_WHISKERS,
+                    end = tend + self.ini.OD_ESTIMATION_WHISKERS,
+                    time_slice=tend - tstart + 2 * self.ini.OD_ESTIMATION_WHISKERS,
+                    od_estimation=True,
+                    simulator=self.simulator,
+                    save_state_graph=False,
+                    load_state_graph=False,
+                    save_state_paths=False,
+                    load_state_paths=False,
+                    save_ass_matrix=False,
+                    save_paths=False,
+                    load_off_line_paths=self.ini.OD_ESTIMATION_USE_OBSERVED_PATHS,                
+                    save_agg_results=False,
+                )
+                n_steps = msa.calc_task_steps()
+                if n_steps:
+                    msa.task_set_steps(n_steps)                
                 msa.run()
 
 #                self.df_grouped.to_csv("res_ite_%d.csv"%ite)
-                M = msa.matrix_ass
-                log.info("Ite: %s - Aggiornamento Matrice", ite)
+                M = msa.ass_matrix
+                self.log.info("Ite: %s - Aggiornamento Matrice", ite)
                 od_updated = stima.update(OD=self.ODz2z.ods, M=M, tstart=tstart, tend=tend)
                 for t, od in od_updated.items():
                     self.ODz2z[t].mat = self.ODz2z[t].mat * 0 + od.mat
-                log.info("Ite: %s - FOB: %s", ite, stima.fob)
-                log.info("Ite: %s - ODTOT: %s", ite, sum([od.mat.sum() for od in self.ODz2z.ods.values()]))
+                self.log.info("Ite: %s - FOB: %s", ite, stima.fob)
+                self.log.info("Ite: %s - ODTOT: %s", ite, sum([od.mat.sum() for od in self.ODz2z.ods.values()]))
         
         msa.max_ite = 1
         msa.run()
-        tstart=int(start - self.loader.ini.STIMA_OD_PRE)
-        tend=int(end + self.loader.ini.STIMA_OD_PRE)
+        tstart=int(start - self.loader.ini.OD_ESTIMATION_WHISKERS)
+        tend=int(end + self.loader.ini.OD_ESTIMATION_WHISKERS)
         self.df_grouped, self.stats, self.vsl_results = msa.sim.agg_results(tstart = tstart*60, tduration = (tend-tstart)*60)
-        log.info("Fine")
+        self.log.info("Fine")
         return self.ODz2z
     
     def get_sim_results(self):

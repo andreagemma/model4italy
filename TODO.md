@@ -9,7 +9,7 @@
 - [ ] Aggregazione Grafo FCD OFF Line ma prima aggiungere lista istanti temporali di riferiemnto (day_type come metadato)
 - [ ] Aggregazione Grafo FCD On Line
 - [ ] Calcolo Cammini On Line
-- [ ] Assegnazione con Cammini FCD Precalcolati OFFLIne
+- [x] Assegnazione con Cammini FCD Precalcolati OFFLIne
 - [ ] Rolling Horizon con gestione day_type (reset grafo)
 - [ ] Stima OD Online con gestione day_type
 - [ ] Stima OD Offline con gestione day_type

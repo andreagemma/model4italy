@@ -103,13 +103,14 @@ class IniClass:
         self.USE_OBSERVED_PATHS = self.config_reader.getboolean("USE_OBSERVED_PATHS", 'ASSIGNMENT', True)  # Indica se vengono usati i percorsi osservati
 
         # OD ESTIMATION
-        self.OD_ESTIMATION_PRELOAD = self.config_reader.getint("OD_ESTIMATION_PRELOAD", 'OD_ESTIMATION', 60)
+        self.OD_ESTIMATION_WHISKERS = self.config_reader.getint("OD_ESTIMATION_WHISKERS", 'OD_ESTIMATION', 60)
         self.OD_ESTIMATION_MAX_ITE = self.config_reader.getint("OD_ESTIMATION_MAX_ITE", 'OD_ESTIMATION', 2)
         self.OD_ESTIMATION_RGAP = self.config_reader.getfloat("OD_ESTIMATION_RGAP", 'OD_ESTIMATION', 0.01)
         self.OD_ESTIMATION_MSA_MAX_ITE = self.config_reader.getint("OD_ESTIMATION_MSA_MAX_ITE", 'OD_ESTIMATION', 6)
         self.OD_ESTIMATION_MSA_K = self.config_reader.getint("OD_ESTIMATION_MSA_K", 'OD_ESTIMATION', 3)
         self.OD_ESTIMATION_MSA_RGAP = self.config_reader.getfloat("OD_ESTIMATION_MSA_RGAP", 'OD_ESTIMATION', 0.01)
         self.OD_ESTIMATION_MSA_TIMESLICE = self.config_reader.getint("OD_ESTIMATION_MSA_TIMESLICE", 'OD_ESTIMATION', 60)
+        self.OD_ESTIMATION_USE_OBSERVED_PATHS = self.config_reader.getboolean("OD_ESTIMATION_USE_OBSERVED_PATHS", 'OD_ESTIMATION', True)  # Indica se vengono usati i percorsi osservati
         
         self.OD_ESTIMATION_GAMMA1 = self.config_reader.getfloat("OD_ESTIMATION_GAMMA1", 'OD_ESTIMATION', 0)
         self.OD_ESTIMATION_GAMMA2 = self.config_reader.getfloat("OD_ESTIMATION_GAMMA2", 'OD_ESTIMATION', 1)
@@ -160,7 +161,7 @@ class IniClass:
         
         # OUPTUT
         self.OUTPUT_AGG_INT = self.config_reader.getfloat("OUTPUT_AGG_INT", 'OUTPUT', 15)
-        self.OUTPUT_STATE_COMPRESSION = self.config_reader.getboolean("OUTPUT_STATE_COMPRESSION", 'OUTPUT', None)
+        self.OUTPUT_STATE_COMPRESSION = self.config_reader.get("OUTPUT_STATE_COMPRESSION", 'OUTPUT', None)
         self.OUTPUT_STATE_LEVEL_COMPRESSION = self.config_reader.getint("OUTPUT_STATE_LEVEL_COMPRESSION", 'OUTPUT', 5)  # livello di compressione per lo stato (1-9)
 
         # WEB_SERVER

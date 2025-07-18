@@ -8,23 +8,22 @@ import copy
 import dateutil
 import numpy as np
 import pandas as pd
-from libs.iniclass import IniClass
+from m4i.connectors.writer import Writer
 from ..matrix import MatrixODT, MatrixOD, MatrixAss
-from .. import Loader
+from ..connectors import Loader, Writer
+from ..base_m4i_model import BaseM4IModel
 
-class ODEstimator:
+class ODEstimator(BaseM4IModel):
 
 
-    def __init__(self, loader:Loader=None, ODSeed:MatrixODT=None, **kwargs):
+    def __init__(self, loader:Loader=None, writer: Writer = None, ODSeed:MatrixODT=None, **kwargs):
+        super().__init__(loader=loader, writer=writer, **kwargs)
         # inizializzazione #load
         # load file e memorizzi in dict counts
-        self.loader:Loader = loader
-        self.ini: IniClass= self.loader.ini
-        self.counts: pd.DataFrame = self.loader.counts
+        self.counts: pd.DataFrame = self.loader.counts["all"].copy()
         self.detectors: pd.DataFrame = self.loader.detectors
         self.ODseed: MatrixODT = ODSeed.copy()
-
-
+    
     def update(self, OD:MatrixODT, M: MatrixAss, tstart:int, tend:int, **kwargs) -> MatrixODT:
         raise NotImplementedError("The method is not implemented")
     
