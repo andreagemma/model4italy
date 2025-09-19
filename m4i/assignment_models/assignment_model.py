@@ -618,7 +618,7 @@ class AssignmentModel(BaseM4IModel):
     def calculate_ass_matrix(self):
         self.log.info ("Assignment matrix calculation...")
 
-        def fn_calc_mat_ass(tasks, eq_factors, G, links_cost, nodes_cost, turns_cost, current_time_start, OD):
+        def fn_calc_mat_ass(tasks, eq_factors, G, links_cost, nodes_cost, turns_cost, current_time_start, OD, detectors):
             ret = []
             for (source, target, t_start, mode), paths in tasks:
                 for path in paths:
@@ -627,8 +627,9 @@ class AssignmentModel(BaseM4IModel):
                         continue
                     costs = tuple(path.get_costs(G, links_cost=links_cost, nodes_cost=nodes_cost, turns_cost=turns_cost))
                     links = path.get_links()
-                    for t, l_idx in zip(costs, links):  # [t for t in zip(idxs, links) if t[1] in self.matrix_ass.detectors]:                
-                        ret.append((source, target, l_idx, t_start, t, path["path_flow"] / f))
+                    for t, l_idx in zip(costs, links):  # [t for t in zip(idxs, links) if t[1] in self.matrix_ass.detectors]:   
+                        if l_idx in detectors:             
+                            ret.append((source, target, l_idx, t_start, t, path["path_flow"] / f))
             return ret        
         tasks = list(self.m_paths.all_kpaths()) 
         
@@ -637,14 +638,18 @@ class AssignmentModel(BaseM4IModel):
             for params in Parallel.execute(fn_calc_mat_ass, tasks, n_workers=n_workers, 
                                         eq_factors=self.eq_factors, G=self.G, 
                                         links_cost=self.links_cost, nodes_cost=self.nodes_cost, turns_cost=self.turns_cost,
-                                        current_time_start=self.current_time_start, OD=self.OD):
-                for (source, target, l, t_start, t_enter, flow) in params:
+                                        current_time_start=self.current_time_start, OD=self.OD, detectors=self.ass_matrix.detectors):
+                for (source, target, l, t_start, t, flow) in params:
+                    t_start = int(np.floor(t_start))
+                    t_enter = int(t_start + np.floor(t/self.delta_t))
                     self.ass_matrix.add(source, target, l=l, t_start=t_start, t_enter=t_enter, flow=flow)
         else:
-            for (source, target, l, t_start, t_enter, flow) in fn_calc_mat_ass(tasks, 
+            for (source, target, l, t_start, t, flow) in fn_calc_mat_ass(tasks, 
                                         eq_factors=self.eq_factors, G=self.G, 
                                         links_cost=self.links_cost, nodes_cost=self.nodes_cost, turns_cost=self.turns_cost,
-                                        current_time_start=self.current_time_start, OD=self.OD):
+                                        current_time_start=self.current_time_start, OD=self.OD, detectors=self.ass_matrix.detectors):
+                    t_start = int(np.floor(t_start))
+                    t_enter = int(t_start + np.floor(t/self.delta_t))
                     self.ass_matrix.add(source, target, l=l, t_start=t_start, t_enter=t_enter, flow=flow)
         self.log.info ("Assignment matrix calculated")
 

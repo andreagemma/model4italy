@@ -12,7 +12,7 @@ def main():
         parser.add_argument('-d', '--params_data', help='JSON file with data parameters (default: params_data.json)')
         parser.add_argument('-c', '--config', default='settings.ini', help='Configuration file (default: settings.ini)')
         parser.add_argument('-m', '--monitor', help='Folder of results of monitor process. If not specified, the process is not monitored')
-        parser.add_argument('-o', '--option', action='append', help='Option parameter. Override JSON setting.')
+        parser.add_argument('-O', '--option', action='append', help='Option parameter. Override JSON setting.')
         parser.add_argument('-e', '--env', action='append', help='Override Enviroment Variables.')
         subparsers = parser.add_subparsers(dest='command', help='Sub-command help')
 
@@ -22,6 +22,8 @@ def main():
         parser_run.add_argument('-d', '--params-data', help='JSON file with data parameters (default: params_data.json)')
         parser_run.add_argument('-c', '--config', default='settings.ini', help='Configuration file (default: settings.ini)')        
         parser_run.add_argument('-o', '--op', help='Operation. Override JSON setting (default: None)')
+        parser_run.add_argument('-O', '--option', action='append', help='Option parameter. Override JSON setting.')
+        parser_run.add_argument('-e', '--env', action='append', help='Override Enviroment Variables.')
 
         # Subparser for the "server" command
         parser_server = subparsers.add_parser('server', help='Start the web server')

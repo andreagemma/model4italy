@@ -3,7 +3,7 @@
     "params": {
         "input": {
             "connector": "FileLoader",
-            "location": "./dati/eur2/files"
+            "location": "./dati/cav"
         },
         "output": {
             "connector": "FileWriter",
@@ -14,11 +14,6 @@
                 "id": "c",
                 "description": "car",
                 "eq_factor": 1
-            },
-            {
-                "id": "h",
-                "description": "heavy",
-                "eq_factor": 2
             }
         ],
         "demand": [
@@ -62,8 +57,7 @@
                         "modes": "modes"
                     }
                 },
-                "nodes": { "src":
-                    "nodes.shp",
+                "nodes": { "src": "nodes.shp",
                     "mapping": {
                         "id": "id",
                         "centroid": "centroid",
@@ -83,7 +77,7 @@
                 }
             }
         ],
-        "links_sets": [
+        "links_sets_no": [
             {
                 "src": "links_sets.csv",
                 "mapping": {
@@ -124,7 +118,6 @@
                 }
             }
         ],        
-        "traffic_lights": ["sign_nodes.json"],
         "traffic_lights_no": [
             {
                 "src": "traffic_lights.csv",
@@ -138,71 +131,13 @@
                 }
             }
         ],
-        "aggregated_results": "aggregated_results_{simulation_id}.geoparquet",
-        "aggregated_results_part": {
-            "src": "aggregated_results_{simulation_id}.geoparquet",
+        "aggregated_results": {
+            "src": "aggregated_results_{simulation_id}.parquet",
             "partition_cols": ["t"]
         },
         "paths": "path_{simulation_id}.geoparquet",
-        "fcd_paths": {
-            "src": "fcd_paths.geoparquet",
-            "additional_fields": {
-                "day_type": "{day_type_simulation}"
-            }
-        },
-        "fcd_paths_clustered": {
-            "src": "fcd_paths_clustered.geoparquet"            
-        },
-        "fcd_trips": {
-            "src": "fcd_trips.geoparquet",
-            "additional_fields": {
-                "day_type": "{day_type_simulation}"
-            },
-            "mode": "wa"
-        },
-        "fcd_fcd_": {
-            "src": "fcd_fcd.geoparquet",
-            "partition_cols": [
-                "day_type",
-                "t"
-            ],
-            "additional_fields": {
-                "day_type": "{day_type_simulation}",
-                "mode": "wa"
-            }
-        },
-        "fcd_graph": {
-            "src": "fcd_graph.parquet",
-            "partition_cols": [
-                "day_type",
-                "t_base"
-            ],
-            "additional_fields": {
-                "day_type": "{day_type_simulation}",
-                "mode": "wa"
-            }
-        },
         "statistics": "stats.csv",
         "state": "state",
-        "params": "../params_{simulation_id}.json",
-        "fcd": {
-            "connector": "DBLoader",
-            "location": "postgresql+psycopg://postgres:lDvdc15dcd5@192.168.133.80:5432/fcd_mobito",
-            "src": "eur.fcdmm",
-            "index_col": "id_fcd",
-            "crs": "EPSG:4326",
-            "tz_data": "UTC",
-            "mapping": {
-                "id_fcd": "id_fcd",
-                "id_veh": "id_trip",
-                "heading": "heading",
-                "timestamp": "dt",
-                "engine": "engine",
-                "speed": "speed",
-                "lon": "lon",
-                "lat": "lat",
-                "geometry": "geometry"
-            }
-        }
+        "params": "../params_{simulation_id}.json"
     }
 }

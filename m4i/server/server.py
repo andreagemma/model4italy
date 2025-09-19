@@ -20,25 +20,36 @@ def execute():
 
     # Read the `params` parameter from the request
     try:
-        params = request.json
-        if not params:
-            return Status(status=Status.REQ_ERROR, error="Invalid or missing 'params' in request").jsonify(), 400
+        execution_params = request.get_json(silent=True)
+        if not execution_params:
+            return Status(
+                status=Status.REQ_ERROR,
+                error="Missing JSON body",
+                details="The request must include a JSON body matching ExecutionParams"
+            ).jsonify(), 400        
     except Exception as ex:
-        log.error("Error reading params: %s", ex)
-        return Status(status=Status.REQ_ERROR, error="Error reading 'params'", details= str(ex)).jsonify(), 400
+        log.error("Error reading request body: %s", ex)
+        return Status(status=Status.REQ_ERROR, error="Invalid JSON body", details=str(ex)).jsonify(), 400         
 
     # Save the execution in the database with status "pending"
     
     try:
-        new_execution = Execution.create_execution(params)
+        # Salva l'intero ExecutionParams nel campo execution.params
+        new_execution = Execution.create_execution(execution_params)
     except Exception as ex:
         return Status(status=Status.REQ_ERROR, error="Database error", details=str(ex)).jsonify(), 500
 
     # Launch the calculation asynchronously
-    run_execution_in_thread(params=params, execution=new_execution)
+    run_execution_in_thread(params=execution_params, execution=new_execution)
 
     # Immediately return the execution ID
-    return Status(status=Status.REQ_SUCCESS, execution_id=new_execution.id).jsonify(), 200
+    # Ritorna execution_id, più gli ExecutionParams ricevuti, e Location verso lo status
+    resp = Status(
+        status=Status.REQ_SUCCESS,
+        execution_id=new_execution.id,
+        params=execution_params
+    ).jsonify()
+    return resp, 200, {"Location": f"/status/{new_execution.id}"}
 
 @run_in_thread
 def run_execution_in_thread(params, execution=None):
@@ -73,13 +84,13 @@ def get_status(execution_id):
 
             # Build the response
             response = Status(
+                id=execution.id,
+                uuid=execution.uuid,
                 status=execution.status,
                 start_time=execution.start_time,
                 end_time=execution.end_time,
                 params=json.loads(execution.params),
                 result=execution.result,
-                id=execution.id,
-                uuid=execution.uuid,
                 progress=execution.progress,
                 last_message=execution.last_message,
                 last_message_time=execution.last_message_time

@@ -153,10 +153,9 @@ Il file `settings.ini` contiene tutte le impostazioni di configurazione per Mode
 ---
 
 ## [OUTPUT]
-- **OUTPUT_AGG_INT**: Intervallo di aggregazione dei risultati in minuti (default:15)..
+- **AGG_INT**: Intervallo di aggregazione dei risultati in minuti (default:15)..
 - **OUTPUT_STATE_COMPRESSION**: Metodo di compressione per la memorizzazione dello stato (default: None).
 - **OUTPUT_STATE_LEVEL_COMPRESSION**: Livello di comrpressione (default: 5)
-
 ---
 
 ## [WEB_SERVER]
@@ -220,7 +219,6 @@ Il file `settings.ini` contiene tutte le impostazioni di configurazione per Mode
 - **SIMU_STEP**: Passo di simulazione (in secondi).
 - **CAR_LENGTH**: Lunghezza media dei veicoli (in metri).
 - **MIN_SPEED**: Velocità minima consentita (in km/h).
-- **AGG_INT**: Intervallo di aggregazione (in minuti).
 - **LT1**, **LT2**: Parametri aggiuntivi per la simulazione.
 
 ---
