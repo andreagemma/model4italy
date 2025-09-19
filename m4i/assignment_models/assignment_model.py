@@ -663,8 +663,9 @@ class AssignmentModel(BaseM4IModel):
             return None
         results = self.simulator.agg_results(self.global_t_start, self.global_t_end, agg_int=self.loader.ini.OUTPUT_AGG_INT)
         id_links = results["id_link"].unique()
-        df_geometry = pd.DataFrame([[id_link,ST_Multi(G.get_link(id_link).get_value("geometry"))] for id_link in id_links], columns=["id_link","geometry"])
+        df_geometry = pd.DataFrame([[id_link,ST_Multi(G.get_link(id_link).get_value("geometry"))] for id_link in id_links], columns=["id_link","geometry","length","connector"])
         results = results.merge(df_geometry, on="id_link")
+        results["q_length"] = (results["max_q"] / results["lanes"]) * self.ini.CAR_LENGTH / results["length"] * 100
         results = gpd.GeoDataFrame(results, geometry="geometry" ,crs=self.loader.ini.CRS_CALC)
         return results
         

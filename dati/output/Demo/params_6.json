@@ -1,0 +1,363 @@
+{
+    "one": 0,
+    "params": {
+        "input": {
+            "connector": "FileLoader",
+            "location": "./dati/eur2/files"
+        },
+        "output": {
+            "connector": "FileWriter",
+            "location": "./dati/output/{description}/{scenario_id}"
+        },
+        "modes": [
+            {
+                "id": "c",
+                "description": "car",
+                "eq_factor": 1
+            },
+            {
+                "id": "h",
+                "description": "heavy",
+                "eq_factor": 2
+            }
+        ],
+        "demand": [
+            {
+                "mode": "c",
+                "matrices": [
+                    {
+                        "src": "mat_car.parquet",
+                        "mapping": {
+                            "o": "o",
+                            "d": "d",
+                            "timestamp": "timestamp",
+                            "value": "value"
+                        }
+                    }
+                ]
+            }
+        ],
+        "zones": {
+            "src": "zones.shp",
+            "mapping": {
+                "id": "id",
+                "geometry": "geometry"
+            }
+        },
+        "supply": [
+            {
+                "links": {
+                    "src": "links.shp",
+                    "mapping": {
+                        "id": "id",
+                        "from_node": "from_node",
+                        "to_node": "to_node",
+                        "length": "length",
+                        "v0": "v0",
+                        "connector": "connector",
+                        "lanes": "lanes",
+                        "alpha": "alpha",
+                        "rcr": "rcr",
+                        "capacity": "capacity",
+                        "modes": "modes"
+                    }
+                },
+                "nodes": {
+                    "src": "nodes.shp",
+                    "mapping": {
+                        "id": "id",
+                        "centroid": "centroid",
+                        "modes": "modes",
+                        "geometry": "geometry"
+                    }
+                },
+                "turns": {
+                    "src": "turns.csv",
+                    "mapping": {
+                        "from_node": "from_node",
+                        "to_node": "to_node",
+                        "via_node": "via_node",
+                        "penalty": "penalty",
+                        "modes": "modes"
+                    }
+                }
+            }
+        ],
+        "links_sets": [
+            {
+                "src": "links_sets.csv",
+                "mapping": {
+                    "id_set": "id_set",
+                    "id_link": "id_link"
+                }
+            }
+        ],
+        "events": [
+            {
+                "src": "events.csv",
+                "mapping": {
+                    "id_link_set": "id_link_set",
+                    "type": "type",
+                    "start": "start",
+                    "end": "end",
+                    "params": "params"
+                }
+            }
+        ],
+        "detectors": [
+            {
+                "src": "detectors.shp",
+                "mapping": {
+                    "id": "id",
+                    "id_link": "id_link"
+                }
+            }
+        ],
+        "counts": [
+            {
+                "src": "counts.csv",
+                "mapping": {
+                    "id": "id",
+                    "timestamp": "timestamp",
+                    "mode": "mode",
+                    "counts": "counts"
+                }
+            }
+        ],
+        "traffic_lights": [
+            {
+                "src": "traffic_lights.csv",
+                "crs": "EPSG:4326",
+                "mapping": {
+                    "id": "id",
+                    "cycle": "cycle",
+                    "offset": "offset",
+                    "phases": "phases",
+                    "geometry": "geometry"
+                }
+            }
+        ],
+        "aggregated_results": "aggregated_results_{simulation_id}.geoparquet",
+        "aggregated_results_part": {
+            "src": "aggregated_results_{simulation_id}.geoparquet",
+            "partition_cols": [
+                "t"
+            ]
+        },
+        "paths": "path_{simulation_id}.geoparquet",
+        "fcd_paths": {
+            "src": "fcd_paths.geoparquet",
+            "additional_fields": {
+                "day_type": "{day_type_simulation}"
+            }
+        },
+        "fcd_paths_clustered": {
+            "src": "fcd_paths_clustered.geoparquet"
+        },
+        "fcd_trips": {
+            "src": "fcd_trips.geoparquet",
+            "additional_fields": {
+                "day_type": "{day_type_simulation}"
+            },
+            "mode": "wa"
+        },
+        "fcd_fcd_": {
+            "src": "fcd_fcd.geoparquet",
+            "partition_cols": [
+                "day_type",
+                "t"
+            ],
+            "additional_fields": {
+                "day_type": "{day_type_simulation}",
+                "mode": "wa"
+            }
+        },
+        "fcd_graph": {
+            "src": "fcd_graph.parquet",
+            "partition_cols": [
+                "day_type",
+                "t_base"
+            ],
+            "additional_fields": {
+                "day_type": "{day_type_simulation}",
+                "mode": "wa"
+            }
+        },
+        "statistics": "stats.csv",
+        "state": "state",
+        "params": "../params_{simulation_id}.json",
+        "fcd": {
+            "connector": "DBLoader",
+            "location": "postgresql+psycopg://postgres:lDvdc15dcd5@192.168.133.80:5432/fcd_mobito",
+            "src": "eur.fcdmm",
+            "index_col": "id_fcd",
+            "crs": "EPSG:4326",
+            "tz_data": "UTC",
+            "mapping": {
+                "id_fcd": "id_fcd",
+                "id_veh": "id_trip",
+                "heading": "heading",
+                "timestamp": "dt",
+                "engine": "engine",
+                "speed": "speed",
+                "lon": "lon",
+                "lat": "lat",
+                "geometry": "geometry"
+            }
+        }
+    },
+    "simulation_id": 6,
+    "description": "Demo",
+    "start": "07:00",
+    "end": "7:30",
+    "op": "assignment",
+    "scenario_id": 31,
+    "settings": {
+        "DB_SETTINGS_USE": false,
+        "DB_SETTINGS_TYPE": "sqlite",
+        "DB_SETTINGS_DRIVER": "sqlite",
+        "DB_SETTINGS_USER": "",
+        "DB_SETTINGS_PASS": "",
+        "DB_SETTINGS_HOST": "",
+        "DB_SETTINGS_PORT": "",
+        "DB_SETTINGS_NAME": "settings.db",
+        "DB_SETTINGS_URL": "sqlite:///settings.db",
+        "LOG_NAME": "m4i",
+        "LOG_USE": true,
+        "LOG_DIR": "log",
+        "LOG_ON_DATABASE": true,
+        "LOG_ON_CONSOLE": true,
+        "LOG_ON_FILE": true,
+        "LOG_LEVEL": "DEBUG",
+        "LOG_EXECUTION_FORMAT": "%(asctime)s | %(last_elapsed).2f/%(elapsed).2fs | %(levelname)s | %(name)s | %(execution_id)s | %(message)s",
+        "LOG_FORMAT": "%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+        "SRC_COEFS": "/home/ag/Desktop/d/Documenti/Lavoro/RM1/Flagship/SW/model4italy/m4i_package/m4i/coefficients.json",
+        "SRC_CONV_TBL": "",
+        "DEBUG": false,
+        "CRS": "EPSG:4326",
+        "CRS_CALC": "EPSG:6875",
+        "TZ_LOCAL": "Europe/Rome",
+        "TZ_CALC": "UTC",
+        "SIMU_STEP": 6.0,
+        "CAR_LENGTH": 5.0,
+        "MIN_SPEED": 4.0,
+        "LT1": 0.0,
+        "LT2": 0.0,
+        "CLASS_EQ_FACT": {
+            "c": 1,
+            "h": 2
+        },
+        "MSA_MAX_ITE": 5,
+        "MSA_RGAP": 0.01,
+        "MSA_K": 2,
+        "MSA_MAX_TIMESLICE": 180,
+        "MSA_SPP_NUMCPUS": 24,
+        "MSA_K_BALANCING": 2,
+        "DELTA_T": 15,
+        "MSA_PRELOAD": 0,
+        "MSA_POSTLOAD": 0,
+        "SAVE_GRAPH": false,
+        "LOAD_GRAPH": false,
+        "SAVE_PATHS": false,
+        "LOAD_PATHS": false,
+        "USE_OBSERVED_PATHS": false,
+        "OD_ESTIMATION_WHISKERS": 60,
+        "OD_ESTIMATION_MAX_ITE": 2,
+        "OD_ESTIMATION_RGAP": 0.01,
+        "OD_ESTIMATION_MSA_MAX_ITE": 6,
+        "OD_ESTIMATION_MSA_K": 3,
+        "OD_ESTIMATION_MSA_RGAP": 0.01,
+        "OD_ESTIMATION_MSA_TIMESLICE": 60,
+        "OD_ESTIMATION_USE_OBSERVED_PATHS": true,
+        "OD_ESTIMATION_GAMMA1": 0.0,
+        "OD_ESTIMATION_GAMMA2": 1.0,
+        "OD_ESTIMATION_GAMMA3": 1.0,
+        "OD_ESTIMATION_ITESA": 100,
+        "OD_ESTIMATION_LAMBDA_LB": 0.0,
+        "OD_ESTIMATION_LAMBDA_UB": 0.05,
+        "OD_ESTIMATION_EPS": 1e-06,
+        "OD_ESTIMATION_EPS2": 10.0,
+        "OD_ESTIMATION_SA": 0.362,
+        "FCD_SERVER_FCD_HORIZON": 60,
+        "FCD_SERVER_FCD_TIMESLICE": 5,
+        "FCD_SERVER_FCD_TIMESLICE_OFFLINE": 120,
+        "FCD_SERVER_SHARE_DATA_ONLINE": true,
+        "FCD_SERVER_WRITE_OUTPUT": true,
+        "FCD_SERVER_MAP_MATCHING": true,
+        "FCD_SERVER_ROUTING": true,
+        "FCD_SERVER_TRIPS": true,
+        "FCD_SERVER_UPDATE_SPEED": true,
+        "FCD_SPEED_AGGREGATION_INTERVAL": 15,
+        "FCD_MAP_MATCHING_CPUS": 0,
+        "FCD_MAP_MATCHING_MAX_DISTANCE": 50.0,
+        "FCD_MAP_MATCHING_MAX_ANGLE": 45.0,
+        "FCD_ROUTING_CPUS": 0,
+        "FCD_ROUTING_START_FROM_ZONE": true,
+        "FCD_ROUTING_END_TO_ZONE": true,
+        "FCD_ROUTING_AGGRATION_INTERVAL": 15,
+        "FCD_TRIPS_CPUS": 0,
+        "FCD_TRIPS_SIGNAL_BREAK_MAX_DT": 900,
+        "FCD_TRIPS_SIGNAL_BREAK_DT": 300,
+        "FCD_TRIPS_SIGNAL_BREAK_V": 0.5555555555555556,
+        "FCD_TRIPS_STOP_O_DS": 50.0,
+        "FCD_TRIPS_STOP_D_DS": 50.0,
+        "FCD_TRIPS_SIGNAL_CONT_DT": 600,
+        "FCD_TRIPS_SIGNAL_CONT_V": 0.1388888888888889,
+        "FCD_TRIPS_MAX_V3": 69.44444444444444,
+        "FCD_TRIPS_MAX_DISTANCE_OVERRIDE_POSITION_FIRST_POINT": 200.0,
+        "FCD_TRIPS_MIN_LENGTH": 100.0,
+        "FCD_TRIPS_MIN_TIME": 1,
+        "FCD_TRIPS_REMOVE_STOPS": false,
+        "FCD_TRIPS_MAX_DISTANCE_BETWEEN_DATA": 20000.0,
+        "FCD_TRIPS_MAX_DELTA_PROGR": 20000.0,
+        "OUTPUT_AGG_INT": 15.0,
+        "AGG_INT": 15.0,
+        "OUTPUT_STATE_COMPRESSION": "gzip",
+        "OUTPUT_STATE_LEVEL_COMPRESSION": 5,
+        "WEB_SERVER_HOST": "0.0.0.0",
+        "WEB_SERVER_PORT": 5000,
+        "WEB_SERVER_DEBUG": false,
+        "DATABASE_URL": "sqlite:///model4italy.db",
+        "IPC_USE": true,
+        "IPC_BUCKET": "m4i",
+        "IPC_BACKEND": "local",
+        "IPC_HOST": "localhost",
+        "IPC_PORT": 16379,
+        "IPC_DB": 0,
+        "IPC_COMPRESSION": "lz4",
+        "IPC_COMPRESSION_LEVEL": 5,
+        "PARALLEL_USE": true,
+        "PARALLEL_NUMCPUS": 16,
+        "PARALLEL_ENGINE": "ray",
+        "PARALLEL_CLUSTER_ADDRESS": "local"
+    },
+    "date_simulation": "2025-09-19",
+    "day_type_simulation": "friday",
+    "dow_simulation": 5,
+    "time_simulation": "07:00:00",
+    "datetime_simulation": "2025-09-19 07:00:00",
+    "ts_simulation": 29304370,
+    "t_simulation": 420,
+    "date_start": "1970-01-01",
+    "day_type_start": "weekday",
+    "dow_start": 4,
+    "time_start": "07:00:00",
+    "datetime_start": "1970-01-01 07:00:00",
+    "ts_start": 360,
+    "t_start": 420,
+    "date_end": "1970-01-01",
+    "day_type_end": "weekday",
+    "dow_end": 4,
+    "time_end": "07:30:00",
+    "datetime_end": "1970-01-01 07:30:00",
+    "ts_end": 390,
+    "t_end": 450,
+    "execution_id": 499,
+    "date_execution": "2025-09-19",
+    "day_type_execution": "friday",
+    "dow_execution": 5,
+    "time_execution": "15:12:21",
+    "datetime_execution": "2025-09-19 15:12:21",
+    "ts_execution": 29304912,
+    "t_execution": 912
+}

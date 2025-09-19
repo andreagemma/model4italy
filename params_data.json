@@ -92,7 +92,7 @@
                 }
             }
         ],
-        "events_no": [
+        "events": [
             {
                 "src": "events.csv",
                 "mapping": {
@@ -123,9 +123,8 @@
                     "counts": "counts"
                 }
             }
-        ],        
-        "traffic_lights": ["sign_nodes.json"],
-        "traffic_lights_no": [
+        ],
+        "traffic_lights": [
             {
                 "src": "traffic_lights.csv",
                 "crs": "EPSG:4326",
