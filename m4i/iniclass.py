@@ -81,6 +81,7 @@ class IniClass:
         self.SIMU_STEP = self.config_reader.getfloat("SIMU_STEP", 'SIMULATOR', 6)  # step di simulazione
         self.CAR_LENGTH = self.config_reader.getfloat("CAR_LENGTH", 'SIMULATOR', 5)  # lunghezza veicolo in metri
         self.MIN_SPEED = self.config_reader.getfloat("MIN_SPEED", 'SIMULATOR', 4)  # velocità minima per la coda
+        self.AGG_INT = self.config_reader.getint("AGG_INT", 'SIMULATOR', 5)  # intervallo di aggregazione in secondi
         self.LT1 = self.config_reader.getfloat("LT1", 'SIMULATOR', 0)  # perditempo 1 alla partenza del veicolo
         self.LT2 = self.config_reader.getfloat("LT2", 'SIMULATOR', 0)  # perditempo 2 alla partenza del veicolo
 
@@ -160,9 +161,13 @@ class IniClass:
         
         # OUPTUT
         self.OUTPUT_AGG_INT = self.config_reader.getfloat("OUTPUT_AGG_INT", 'OUTPUT', 15)
-        self.AGG_INT = self.OUTPUT_AGG_INT # TODO: rimuovere
         self.OUTPUT_STATE_COMPRESSION = self.config_reader.get("OUTPUT_STATE_COMPRESSION", 'OUTPUT', None)
         self.OUTPUT_STATE_LEVEL_COMPRESSION = self.config_reader.getint("OUTPUT_STATE_LEVEL_COMPRESSION", 'OUTPUT', 5)  # livello di compressione per lo stato (1-9)
+        self.OUTPUT_IND_RES = self.config_reader.getboolean("OUTPUT_IND_RES", 'OUTPUT', False)  # Indica se vengono tracciati i risultati individuali
+        self.MONITORED_VEH = self.config_reader.getint("MONITORED_VEH", 'OUTPUT', 30)  # Percentuale di veicoli da monitorare 
+        self.OUTPUT_STATS = self.config_reader.get("OUTPUT_STATS", 'OUTPUT', True)  # Indica se vengono salvate le statistich
+        self.OUTPUT_CONG_LEVELS = self.config_reader.get("OUTPUT_CONG_LEVELS", 'OUTPUT', [0, 0.1, 0.25, 0.75, 0.9, 5])  # Livelli di congestione
+        self.LOS_CRITICO = self.config_reader.getfloat("LOS_CRITICO", 'OUTPUT', 0.25)  # Livello di congestione critico
 
         # WEB_SERVER
         self.WEB_SERVER_HOST = self.config_reader.get("WEB_SERVER_HOST", 'WEB_SERVER', '0.0.0.0')

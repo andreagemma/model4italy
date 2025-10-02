@@ -3,6 +3,7 @@ import pandas as pd
 import geopandas as gpd
 import pytest
 from m4i.utils.io.io_dataframe import IO_DataFrame
+import warnings, logging
 
 @pytest.mark.parametrize("ext", ["geoparquet", "parquet"])
 def test_io_dataframe_export_import(tmp_path, ext):
@@ -38,6 +39,7 @@ def test_io_dataframe_export_import(tmp_path, ext):
     gdf2 = gpd.GeoDataFrame(gdf2, geometry='geometry', crs="EPSG:4326")
 
     folder = tmp_path / "test_folder"
+    warnings.warn( str(folder) )
     folder.mkdir()
     file1 = f"test1.{ext}"
     filename = folder / file1

@@ -5,6 +5,7 @@ Created on Fri Oct  1 17:32:40 2021
 @author: Natalia
 """
 from ... import *
+from ...connectors import Loader
 import logging, time, traceback
 import pandas as pd
 from datetime import datetime
@@ -15,6 +16,9 @@ transfer_condition = {'mov', 'queue', 'arrived', "sleeping"} # UPDATE: GEMMA
 node_conditions = {'queueing', 'at node'} # UPDATE: GEMMA
 class car:
     ini: IniClass
+    loader: Loader 
+    ind_res: bool
+    mon_veh: int
 
     def __init__(self, id_n, t, path, G, deltat,heavy = None):
         self.deltat = deltat
@@ -23,6 +27,7 @@ class car:
         self.ent_time = t  # [m] entrance on the network
         self.status = 'sleeping'  # status of vehicle
         self.G = G  # graph
+        self.signalized_links = G["signalized_links"]
         self.o = path["source"]
         self.d = path["target"]
         
@@ -33,7 +38,9 @@ class car:
         self.s_t = None
         self.q_trace = G["q_trace"]
         self.same_link = False
-        self.monitored_veh = False
+        
+        if self.ind_res:
+            self.monitored_veh = True if (self.ID%self.mon_veh) == 0 else False
         self.trace = []
         
 
@@ -60,6 +67,7 @@ class car:
                
         self.lt1 = car.ini.LT1/60
         self.lt2 = car.ini.LT2/60
+        self.critical_gap = 5/3600
 
     
     def update_graph(self, graph):
@@ -81,7 +89,14 @@ class car:
         #if self.status == "moving": # UPDATE: GEMMA: implementato a livello superiore per evitare la chiamata
 
         tt = t + self.deltat
-        s_t = (tt - self.c_l_ti) / (self.c_l_tf - self.c_l_ti)  # space traveled on link
+        dt = (self.c_l_tf - self.c_l_ti)
+            
+        if dt == 0:
+            s_t = 1
+        else:
+            s_t = (tt - self.c_l_ti) / dt  # space traveled on link
+    
+    
         # if self.monitored_veh and self.next_link["idx"] == 67940:
             
         #     pdb.set_trace()
@@ -132,24 +147,45 @@ class car:
                 nl = self.next_link["idx"]
 
                 try:
-                    if len(self.path_links)<self.n_l+1:
-                        nnl = self.path_links[self.n_l+1]
-                        turn_state = self.signalized_turns.get((l, nl, nnl))
-                        if turn_state is not None:
-                            permitted_turn = turn_state == "green"
-                        else:
-                            if (l, nl) in self.signalized_turns:
-                                permitted_turn = self.signalized_turns[l, nl] == "green"
-                    else:
-                        if (l, nl) in self.signalized_turns:
-                            permitted_turn = self.signalized_turns[l, nl] == "green"
+                    nnl = None if self.n_l+1 >= len(self.path_links) else self.path_links[self.n_l+1]
                 except:
-                    pass
+                    nnl = None
+                        
+                       
+                if l in self.signalized_links:
 
-
+                    
+                    key = (l, nl) if (l, nl) in self.signalized_turns else None
+                    key = (l, nl, nnl) if (l, nl, nnl) in self.signalized_turns else key
+                    
+                    if key:
+                        permitted_turn = self.signalized_turns[key]["state"] == "green"
+                        # pdb.set_trace()
+                        
+                        if self.signalized_turns[key]["type"] == "left_turn":
+                            
+                            if self.signalized_turns[key]["permitted"] & permitted_turn :
+                                #pdb.set_trace()
+                                
+                            
+                                fl = self.G["signalized_turns"][key]["opposite_turn"]["from_link"] 
+                                fl = self.G.get_link(fl)  # match opposite direction
+                                mv = fl["mov_vehs"]
+                                
+                                if mv>0:
+                                    
+                                    dmv = fl["length"]/(fl["mov_vehs"]*fl["speed"])
+                                else: 
+                                    dmv = 100000
+                            
+                                if dmv > self.critical_gap or self.signalized_turns[key]["permitted_movs"] == 0:
+                                    permitted_turn = False
+            
+            
                 if (self.current_link["inflow_cap"] >= 1) & (self.next_link["storage_cap"] >= 1) & permitted_turn:  # capacity of next link and on current link  
 
                     self.update_cap(self.current_link, self.next_link)
+                    
                     ex = self.current_link["ex_q_veh"]
                     if ex:
                         lost_time = self.lt1 + ex * self.lt2
@@ -161,15 +197,12 @@ class car:
                         self.current_link["ex_q_veh"] += 1
 
                     self.status = "moving"  # transfer the vehicle on next link, update the capacities, detectors, enter and exit time and counter of the vehicles on next link
-
                     self.c_l_ti = self.c_l_tf + lost_time
                     self.c_l_tf = self.c_l_ti + self.next_link["ta"]
-
                     self.c_l += 1
                     self.n_l += 1
                     self.current_link = self.G.get_link(self.path_links[self.c_l])
                     
-
                 else:
 
                     self.status = "queue"  # put vehicle as a queuing vehicle and update its exit time (CHECK THIS!!!.)                       
@@ -178,14 +211,13 @@ class car:
                         pass
                     else:
                         self.current_link["storage_cap"] -= (1-self.current_link["ksi"])
-                        self.same_link = True
-                            
+                        self.same_link = True                            
 
 
 
     def move(self, t):
    
-        if self.status == "arrived":
+        if self.status == "arrived" and not self.monitored_veh:
             return False # UPDATE: GEMMA: se il veicolo è arrivato non deve più muoversi
         
         if self.status == "sleeping":
@@ -214,7 +246,8 @@ class car:
             self.status = 'moving'
         elif self.status == "queue":
             self.status = "at node"
-        return self.status != "arrived" # UPDATE: GEMMA: se il veicolo è arrivato non deve più muoversi
+        
+        return self.status != "arrived" if not self.monitored_veh else True # UPDATE: GEMMA: se il veicolo è arrivato non deve più muoversi
 
     def update_cap(self, current_link, next_link):
         #update variable when transfering from current link to next link

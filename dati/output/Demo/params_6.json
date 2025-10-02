@@ -94,7 +94,7 @@
         ],
         "events": [
             {
-                "src": "events.csv",
+                "src": "events1.csv",
                 "mapping": {
                     "id_link_set": "id_link_set",
                     "type": "type",
@@ -125,21 +125,11 @@
             }
         ],
         "traffic_lights": [
-            {
-                "src": "traffic_lights.csv",
-                "crs": "EPSG:4326",
-                "mapping": {
-                    "id": "id",
-                    "cycle": "cycle",
-                    "offset": "offset",
-                    "phases": "phases",
-                    "geometry": "geometry"
-                }
-            }
+            "sign_nodes_newlast.json"
         ],
-        "aggregated_results": "aggregated_results_{simulation_id}.geoparquet",
-        "aggregated_results_part": {
-            "src": "aggregated_results_{simulation_id}.geoparquet",
+        "aggregated_results_file": "aggregated_results_{simulation_id}.geoparquet",
+        "aggregated_results": {
+            "src": "aggregated_results_{simulation_id}_dir.geoparquet",
             "partition_cols": [
                 "t"
             ]
@@ -209,7 +199,7 @@
     "simulation_id": 6,
     "description": "Demo",
     "start": "07:00",
-    "end": "7:30",
+    "end": "10:00",
     "op": "assignment",
     "scenario_id": 31,
     "settings": {
@@ -241,13 +231,14 @@
         "SIMU_STEP": 6.0,
         "CAR_LENGTH": 5.0,
         "MIN_SPEED": 4.0,
+        "AGG_INT": 5,
         "LT1": 0.0,
         "LT2": 0.0,
         "CLASS_EQ_FACT": {
             "c": 1,
             "h": 2
         },
-        "MSA_MAX_ITE": 5,
+        "MSA_MAX_ITE": 1,
         "MSA_RGAP": 0.01,
         "MSA_K": 2,
         "MSA_MAX_TIMESLICE": 180,
@@ -311,9 +302,20 @@
         "FCD_TRIPS_MAX_DISTANCE_BETWEEN_DATA": 20000.0,
         "FCD_TRIPS_MAX_DELTA_PROGR": 20000.0,
         "OUTPUT_AGG_INT": 15.0,
-        "AGG_INT": 15.0,
         "OUTPUT_STATE_COMPRESSION": "gzip",
         "OUTPUT_STATE_LEVEL_COMPRESSION": 5,
+        "OUTPUT_IND_RES": true,
+        "MONITORED_VEH": 30,
+        "OUTPUT_STATS": true,
+        "OUTPUT_CONG_LEVELS": [
+            0,
+            0.1,
+            0.25,
+            0.75,
+            0.9,
+            5
+        ],
+        "LOS_CRITICO": 0.25,
         "WEB_SERVER_HOST": "0.0.0.0",
         "WEB_SERVER_PORT": 5000,
         "WEB_SERVER_DEBUG": false,
@@ -331,12 +333,12 @@
         "PARALLEL_ENGINE": "ray",
         "PARALLEL_CLUSTER_ADDRESS": "local"
     },
-    "date_simulation": "2025-09-19",
+    "date_simulation": "2025-09-26",
     "day_type_simulation": "friday",
     "dow_simulation": 5,
     "time_simulation": "07:00:00",
-    "datetime_simulation": "2025-09-19 07:00:00",
-    "ts_simulation": 29304370,
+    "datetime_simulation": "2025-09-26 07:00:00",
+    "ts_simulation": 29314450,
     "t_simulation": 420,
     "date_start": "1970-01-01",
     "day_type_start": "weekday",
@@ -348,16 +350,16 @@
     "date_end": "1970-01-01",
     "day_type_end": "weekday",
     "dow_end": 4,
-    "time_end": "07:30:00",
-    "datetime_end": "1970-01-01 07:30:00",
-    "ts_end": 390,
-    "t_end": 450,
-    "execution_id": 499,
-    "date_execution": "2025-09-19",
+    "time_end": "10:00:00",
+    "datetime_end": "1970-01-01 10:00:00",
+    "ts_end": 540,
+    "t_end": 600,
+    "execution_id": 511,
+    "date_execution": "2025-09-26",
     "day_type_execution": "friday",
     "dow_execution": 5,
-    "time_execution": "15:12:21",
-    "datetime_execution": "2025-09-19 15:12:21",
-    "ts_execution": 29304912,
-    "t_execution": 912
+    "time_execution": "16:33:17",
+    "datetime_execution": "2025-09-26 16:33:17",
+    "ts_execution": 29315073,
+    "t_execution": 993
 }

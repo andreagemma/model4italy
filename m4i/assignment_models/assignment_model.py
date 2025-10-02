@@ -7,8 +7,6 @@ from typing import List, Dict, Tuple, Any, Union
 import itertools
 import pdb
 import pandas as pd
-
-from m4i.utils.util import file_ordered_list
 from ..utils.tictoc import TicToc
 from ..utils.parallel import Parallel
 from ..connectors import StateManager
@@ -661,13 +659,25 @@ class AssignmentModel(BaseM4IModel):
         G = self.loader.G
         if self.simulator is None:
             return None
-        results = self.simulator.agg_results(self.global_t_start, self.global_t_end, agg_int=self.loader.ini.OUTPUT_AGG_INT)
-        id_links = results["id_link"].unique()
-        df_geometry = pd.DataFrame([[id_link,ST_Multi(G.get_link(id_link).get_value("geometry"))] for id_link in id_links], columns=["id_link","geometry","length","connector"])
-        results = results.merge(df_geometry, on="id_link")
-        results["q_length"] = (results["max_q"] / results["lanes"]) * self.ini.CAR_LENGTH / results["length"] * 100
-        results = gpd.GeoDataFrame(results, geometry="geometry" ,crs=self.loader.ini.CRS_CALC)
-        return results
+        #results = self.simulator.agg_results(self.global_t_start, self.global_t_end, agg_int=self.loader.ini.OUTPUT_AGG_INT)
+        #id_links = results["id_link"].unique()
+        #df_geometry = pd.DataFrame([[id_link,ST_Multi(G.get_link(id_link).get_value("geometry"))] for id_link in id_links], columns=["id_link","geometry"])     
+        #results = results.merge(df_geometry, on="id_link").merge(self.loader.df_links[["id_link", "length", "lanes"]], on="id_link")
+        #results["q_length"] = (results["max_q"] / results["lanes"]) * self.ini.CAR_LENGTH / results["length"] * 100
+        #results = gpd.GeoDataFrame(results, geometry="geometry" ,crs=self.loader.ini.CRS_CALC)
+        #return results
+        res = self.simulator.agg_results(self.global_t_start, self.global_t_end, agg_int=self.loader.ini.OUTPUT_AGG_INT)
+        trace_res = self.simulator.get_trace_res(self.global_t_start, self.global_t_end)
+        sign_res = self.simulator.get_signalized_res(self.global_t_start, self.global_t_end)
+        stats = self.simulator.agg_stats(self.global_t_start, self.global_t_end)
+        
+
+
+        #id_links = results["id_link"].unique()
+        #df_geometry = pd.DataFrame([[id_link,ST_Multi(G.get_link(id_link).get_value("geometry"))] for id_link in id_links], columns=["id_link","geometry"])
+        #results = results.merge(df_geometry, on="id_link")
+        #results = gpd.GeoDataFrame(results, geometry="geometry" ,crs=self.loader.ini.CRS_CALC)
+        return res		
         
     def get_paths_dataframe(self, t=None):
         from shapely import MultiLineString
