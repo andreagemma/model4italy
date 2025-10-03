@@ -284,18 +284,7 @@ class AssignmentModel(BaseM4IModel):
                 mode = "w" if self.interval==0 else "a"
                 df["t"] = ds_t
                 saved = self.writer.write_agg_results(df, mode=mode, crs=self.loader.ini.CRS)
-                
-                """
-                mode = "w"
-                for t in np.arange(self.real_time_start,self.real_time_end,self.loader.ini.AGG_INT):
-                    b = ds_t.between(t,t+self.loader.ini.AGG_INT, inclusive="left")
-                    tmp = df[b].copy()
-                    tmp["t"] = ds_t[b]
-                    saved=self.writer.write_agg_results(tmp, mode="w", partition=f"t={t}")
-                    mode = "a"
-                    if not saved:
-                        break
-                """
+                                
                 if saved:                    
                     self.log.info("Saved aggregated results")
                 else:
@@ -667,6 +656,7 @@ class AssignmentModel(BaseM4IModel):
         #results = gpd.GeoDataFrame(results, geometry="geometry" ,crs=self.loader.ini.CRS_CALC)
         #return results
         res = self.simulator.agg_results(self.global_t_start, self.global_t_end, agg_int=self.loader.ini.OUTPUT_AGG_INT)
+        # TODO: Gestire save_trace, save_sign, save_agg_stats
         trace_res = self.simulator.get_trace_res(self.global_t_start, self.global_t_end)
         sign_res = self.simulator.get_signalized_res(self.global_t_start, self.global_t_end)
         stats = self.simulator.agg_stats(self.global_t_start, self.global_t_end)

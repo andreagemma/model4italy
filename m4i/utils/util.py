@@ -1254,3 +1254,397 @@ def file_ordered_list(cartella, estensioni=None, reverse=False):
         if f.is_file() and (estensioni is None or f.suffix.lower() in estensioni)
     ]
     return sorted(files, key=lambda x: x.stat().st_mtime, reverse=reverse)
+
+
+
+def _py_list_to_sql_tuple(py_list):
+    """Converte una lista Python in una tupla SQL: ['a', 2, None] -> ('a', 2, NULL)."""
+    out = []
+    for x in py_list:
+        if isinstance(x, str):
+            out.append("'" + x.replace("'", "''") + "'")
+        elif x is None:
+            out.append("NULL")
+        elif isinstance(x, bool):
+            out.append("TRUE" if x else "FALSE")
+        else:
+            out.append(str(x))
+    return "(" + ", ".join(out) + ")"
+
+def _replace_outside_quotes(s, mapping):
+    """Sostituisce caratteri/substringhe solo fuori dalle stringhe quotate."""
+    out = []
+    in_s = in_d = False
+    i = 0
+    while i < len(s):
+        ch = s[i]
+        if ch == "'" and not in_d:
+            in_s = not in_s
+            out.append(ch)
+            i += 1
+            continue
+        if ch == '"' and not in_s:
+            in_d = not in_d
+            out.append(ch)
+            i += 1
+            continue
+
+        if not in_s and not in_d:
+            # mapping su singolo carattere
+            if ch in mapping:
+                out.append(mapping[ch])
+                i += 1
+                continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+def pandas_query_to_sql(expr: str, *, return_with_where: bool = True) -> str:
+    """
+    Converte un'espressione tipo pandas in una clausola SQL WHERE (dialetto generico ANSI).
+    Esempi supportati:
+      - a==2 & b=='3'                      -> a = 2 AND b = '3'
+      - `col con spazi`.isnull()           -> "col con spazi" IS NULL
+      - age.notnull() & ~status.isin(['x','y'])
+      - city in ['RM','MI'] or val not in [1,2]
+      - name.str.contains('abc')           -> name LIKE '%abc%'
+      - code.str.startswith('IT')          -> code LIKE 'IT%'
+      - code.str.endswith('99')            -> code LIKE '%99'
+    Nota: è consigliato passare espressioni già ben parentesizzate.
+    """
+    s = expr.strip()
+
+    # 1) Backtick di pandas (colonne con spazi) -> identificatori SQL tra doppi apici
+    s = re.sub(r"`([^`]+)`", r'"\1"', s)
+
+    # 2) Booleans Python -> SQL
+    s = re.sub(r"\bTrue\b", "TRUE", s)
+    s = re.sub(r"\bFalse\b", "FALSE", s)
+
+    # 3) Funzioni nullability: a.isnull() / a.notnull()
+    s = re.sub(r'(\b\w+|"[^"]+")\s*\.\s*isnull\s*\(\s*\)', r'\1 IS NULL', s, flags=re.IGNORECASE)
+    s = re.sub(r'(\b\w+|"[^"]+")\s*\.\s*notnull\s*\(\s*\)', r'\1 IS NOT NULL', s, flags=re.IGNORECASE)
+
+    # 4) String functions comuni: contains / startswith / endswith
+    # contains('x')
+    def _contains_to_like(m):
+        col = m.group(1)
+        quote = m.group(2)
+        val = m.group(3)
+        val = val.replace("'", "''") if quote == "'" else val
+        return f"{col} LIKE '%{val}%'"
+    s = re.sub(r'(\b\w+|"[^"]+")\s*\.\s*str\s*\.\s*contains\s*\(\s*([\'"])(.*?)\2\s*(?:,[^)]*)?\)',
+               _contains_to_like, s, flags=re.IGNORECASE)
+
+    # startswith('x')
+    def _starts_to_like(m):
+        col, quote, val = m.group(1), m.group(2), m.group(3)
+        val = val.replace("'", "''") if quote == "'" else val
+        return f"{col} LIKE '{val}%'"
+    s = re.sub(r'(\b\w+|"[^"]+")\s*\.\s*str\s*\.\s*startswith\s*\(\s*([\'"])(.*?)\2\s*\)',
+               _starts_to_like, s, flags=re.IGNORECASE)
+
+    # endswith('x')
+    def _ends_to_like(m):
+        col, quote, val = m.group(1), m.group(2), m.group(3)
+        val = val.replace("'", "''") if quote == "'" else val
+        return f"{col} LIKE '%{val}'"
+    s = re.sub(r'(\b\w+|"[^"]+")\s*\.\s*str\s*\.\s*endswith\s*\(\s*([\'"])(.*?)\2\s*\)',
+               _ends_to_like, s, flags=re.IGNORECASE)
+
+    # 5) .isin([...]) -> IN (...)
+    def _isin_repl(m):
+        col = m.group(1)
+        py_list_text = m.group(2)
+        try:
+            py_list = ast.literal_eval(py_list_text)
+        except Exception:
+            # fallback: lascia intatto se parsing non riuscito
+            return m.group(0)
+        return f"{col} IN {_py_list_to_sql_tuple(py_list)}"
+    s = re.sub(r'(\b\w+|"[^"]+")\s*\.\s*isin\s*\(\s*(\[[^\]]*\])\s*\)', _isin_repl, s, flags=re.IGNORECASE)
+
+    # 6) 'in' / 'not in' in stile pandas.query:  col in [..] / col not in [..]
+    def _in_op_repl(m):
+        col, neg, py_list_text = m.group(1), m.group(2), m.group(3)
+        try:
+            py_list = ast.literal_eval(py_list_text)
+        except Exception:
+            return m.group(0)
+        op = "NOT IN" if (neg and neg.strip().lower().startswith("not")) else "IN"
+        return f"{col} {op} {_py_list_to_sql_tuple(py_list)}"
+    s = re.sub(r'(\b\w+|"[^"]+")\s+(not\s+)?in\s+(\[[^\]]*\])', _in_op_repl, s, flags=re.IGNORECASE)
+
+    # 7) Operatori logici bitwise -> SQL (solo fuori da stringhe)
+    s = _replace_outside_quotes(s, mapping={
+        '&': ' AND ',
+        '|': ' OR ',
+        '~': ' NOT ',
+    })
+
+    # 8) Confronti: == -> = ; != -> <> (standard SQL)
+    # Fallo fuori dai confronti con None (che gestiamo dopo).
+    s = re.sub(r'(?<![<>=!])==(?!=)', '=', s)
+    s = re.sub(r'!=', '<>', s)
+
+    # 9) Confronti con None -> IS NULL / IS NOT NULL
+    s = re.sub(r'(\b\w+|"[^"]+")\s*=\s*None\b', r'\1 IS NULL', s)
+    s = re.sub(r'(\b\w+|"[^"]+")\s*<>\s*None\b', r'\1 IS NOT NULL', s)
+
+    # 10) Normalizza "NOT col IN (...)" -> "col NOT IN (...)"
+    s = re.sub(r'\bNOT\s+(\b\w+|"[^"]+")\s+IN\b', r'\1 NOT IN', s, flags=re.IGNORECASE)
+
+    # 11) Spaziatura pulita
+    s = re.sub(r'\s+', ' ', s).strip()
+
+    return ("WHERE " + s) if return_with_where else s
+
+
+import re
+
+# ---------- Utility di quoting e tokenizzazione ----------
+
+def _python_quote(s: str) -> str:
+    """Rende una stringa sicura per pandas.query: apici singoli con escape."""
+    return "'" + s.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+def _tokenize_sql_strings_and_identifiers(s: str):
+    """
+    Sostituisce stringhe SQL (') e identificatori doppi-quotati (") con token,
+    restituendo:
+      text, str_map[token] = python-quoted-string, id_map[token] = backticked-id
+    """
+    out = []
+    str_map = {}
+    id_map = {}
+    i = 0
+    str_cnt = 0
+    id_cnt = 0
+    n = len(s)
+
+    while i < n:
+        ch = s[i]
+        # Stringa SQL con apice singolo: '...'
+        if ch == "'":
+            i += 1
+            buf = []
+            while i < n:
+                if s[i] == "'":
+                    if i + 1 < n and s[i+1] == "'":  # escape SQL: '' -> '
+                        buf.append("'")
+                        i += 2
+                        continue
+                    else:
+                        i += 1
+                        break
+                else:
+                    buf.append(s[i])
+                    i += 1
+            token = f"__STR{str_cnt}__"
+            str_cnt += 1
+            # python-quote
+            str_map[token] = _python_quote("".join(buf))
+            out.append(token)
+            continue
+
+        # Identificatore tra doppi apici: "Col con spazi" (SQL standard)
+        if ch == '"':
+            i += 1
+            buf = []
+            while i < n:
+                if s[i] == '"':
+                    if i + 1 < n and s[i+1] == '"':  # escape "" -> "
+                        buf.append('"')
+                        i += 2
+                        continue
+                    else:
+                        i += 1
+                        break
+                else:
+                    buf.append(s[i])
+                    i += 1
+            token = f"__ID{id_cnt}__"
+            id_cnt += 1
+            # pandas backtick; escape eventuali backtick raddoppiandoli
+            ident = "".join(buf).replace("`", "``")
+            id_map[token] = f"`{ident}`"
+            out.append(token)
+            continue
+
+        out.append(ch)
+        i += 1
+
+    return "".join(out), str_map, id_map
+
+def _untokenize(s: str, str_map: dict, id_map: dict) -> str:
+    # reintegra prima gli identificatori, poi le stringhe
+    for k, v in id_map.items():
+        s = s.replace(k, v)
+    for k, v in str_map.items():
+        s = s.replace(k, v)
+    return s
+
+def _cleanup_spaces(s: str) -> str:
+    return re.sub(r"\s+", " ", s).strip()
+
+# ---------- Trasformazioni semantiche ----------
+
+def _sql_list_to_py_list(text_inside_parens: str, str_map: dict) -> str:
+    """
+    Converte l'elenco SQL dentro (...) in una lista Python resa come stringa:
+    es: "__STR0__, 2, NULL, TRUE" -> "['abc', 2, None, True]"
+    """
+    items = []
+    for raw in [t.strip() for t in text_inside_parens.split(",") if t.strip()]:
+        if raw in str_map:               # string token
+            items.append(str_map[raw])
+        elif re.fullmatch(r"NULL", raw, flags=re.I):
+            items.append("None")
+        elif re.fullmatch(r"TRUE", raw, flags=re.I):
+            items.append("True")
+        elif re.fullmatch(r"FALSE", raw, flags=re.I):
+            items.append("False")
+        else:
+            # numero o identificatore: lasciamo intatto
+            items.append(raw)
+    return "[" + ", ".join(items) + "]"
+
+def _like_to_pandas(col: str, str_token: str, str_map: dict, *, insensitive=False, neg=False) -> str:
+    """Converte (I)LIKE in .str.contains/startswith/endswith o uguaglianza."""
+    lit = str_map.get(str_token, str_token)  # es: "'abc%'" (python-quoted)
+    # togli apici esterni
+    if len(lit) >= 2 and ((lit[0] == "'" and lit[-1] == "'") or (lit[0] == '"' and lit[-1] == '"')):
+        pat = lit[1:-1].encode('utf-8').decode('unicode_escape')  # gestisce eventuali escape
+    else:
+        pat = lit
+
+    simple_percent = "%" in pat
+    simple_underscore = "_" in pat
+
+    def _wrap(expr: str, negate: bool) -> str:
+        return f"~({expr})" if negate else expr
+
+    # Case-insensitive: con starts/ends/equality usiamo lower()
+    if not simple_underscore and pat.count("%") in (0, 1, 2):
+        if "%" not in pat:
+            # uguaglianza
+            if insensitive:
+                expr = f"{col}.str.lower() == {_python_quote(pat.lower())}"
+            else:
+                expr = f"{col} == {_python_quote(pat)}"
+            return _wrap(expr, neg)
+
+        if pat.endswith("%") and pat.find("%") == len(pat) - 1:
+            stem = pat[:-1]
+            if insensitive:
+                expr = f"{col}.str.lower().str.startswith({_python_quote(stem.lower())})"
+            else:
+                expr = f"{col}.str.startswith({_python_quote(stem)})"
+            return _wrap(expr, neg)
+
+        if pat.startswith("%") and pat.rfind("%") == 0:
+            tail = pat[1:]
+            if insensitive:
+                expr = f"{col}.str.lower().str.endswith({_python_quote(tail.lower())})"
+            else:
+                expr = f"{col}.str.endswith({_python_quote(tail)})"
+            return _wrap(expr, neg)
+
+        if pat.startswith("%") and pat.endswith("%") and pat.count("%") == 2:
+            core = pat[1:-1]
+            # contains
+            expr = f"{col}.str.contains({_python_quote(core)}, regex=False" + (", case=False)" if insensitive else ")")
+            return _wrap(expr, neg)
+
+    # Caso generale: traduciamo %/_ in regex .*/.
+    regex_parts = []
+    for ch in pat:
+        if ch == "%":
+            regex_parts.append(".*")
+        elif ch == "_":
+            regex_parts.append(".")
+        else:
+            regex_parts.append(re.escape(ch))
+    regex = "".join(regex_parts)
+    expr = f"{col}.str.contains({_python_quote(regex)}, regex=True" + (", case=False)" if insensitive else ")")
+    return _wrap(expr, neg)
+
+def sql_where_to_pandas(expr: str) -> str:
+    """
+    Converte una clausola SQL WHERE (o un'espressione logica SQL) in
+    un'espressione per pandas.DataFrame.query.
+    """
+    # 0) Rimuovi 'WHERE' iniziale se presente
+    s = re.sub(r"^\s*WHERE\s+", "", expr, flags=re.I).strip()
+
+    # 1) Tokenizza stringhe SQL e identificatori doppi-quotati
+    s, str_map, id_map = _tokenize_sql_strings_and_identifiers(s)
+
+    # 2) Normalizza boolean/NULL
+    s = re.sub(r"\bTRUE\b", "True", s, flags=re.I)
+    s = re.sub(r"\bFALSE\b", "False", s, flags=re.I)
+    # (NULL lo gestiamo nei confronti specifici)
+
+    # 3) BETWEEN / NOT BETWEEN
+    def _between_repl(m):
+        col = m.group("col").strip()
+        a = m.group("a").strip()
+        b = m.group("b").strip()
+        is_not = bool(m.group("not"))
+        core = f"({col} >= {a}) & ({col} <= {b})"
+        return f"~({core})" if is_not else core
+
+    s = re.sub(
+        r"(?P<col>[\w\.__ID]+)\s+(?P<not>NOT\s+)?BETWEEN\s+(?P<a>[^ ]+)\s+AND\s+(?P<b>[^ )]+)",
+        _between_repl, s, flags=re.I)
+
+    # 4) IS NULL / IS NOT NULL
+    s = re.sub(r"(?P<col>[\w\.__ID]+)\s+IS\s+NOT\s+NULL\b", r"\g<col>.notnull()", s, flags=re.I)
+    s = re.sub(r"(?P<col>[\w\.__ID]+)\s+IS\s+NULL\b", r"\g<col>.isnull()", s, flags=re.I)
+
+    # 5) Confronti con NULL usando =, <> o !=
+    s = re.sub(r"(?P<col>[\w\.__ID]+)\s*(=)\s*NULL\b", r"\g<col>.isnull()", s, flags=re.I)
+    s = re.sub(r"(?P<col>[\w\.__ID]+)\s*(<>|!=)\s*NULL\b", r"\g<col>.notnull()", s, flags=re.I)
+
+    # 6) IN / NOT IN
+    def _in_repl(m):
+        col = m.group("col").strip()
+        is_not = bool(m.group("not"))
+        vals = _sql_list_to_py_list(m.group("vals"), str_map)
+        expr = f"{col}.isin({vals})"
+        return f"~({expr})" if is_not else expr
+
+    s = re.sub(
+        r"(?P<col>[\w\.__ID]+)\s+(?P<not>NOT\s+)?IN\s*\(\s*(?P<vals>[^()]*)\)",
+        _in_repl, s, flags=re.I)
+
+    # 7) LIKE / NOT LIKE / ILIKE / NOT ILIKE
+    def _like_repl(m):
+        col = m.group("col").strip()
+        neg = bool(m.group("not"))
+        insensitive = bool(m.group("i"))
+        str_tok = m.group("str").strip()
+        return _like_to_pandas(col, str_tok, str_map, insensitive=insensitive, neg=neg)
+
+    s = re.sub(
+        r"(?P<col>[\w\.__ID]+)\s+(?P<not>NOT\s+)?(?P<i>I)?LIKE\s+(?P<str>__STR\d+__)",
+        _like_repl, s, flags=re.I)
+
+    # 8) Operatori logici
+    #    NOT ( ... ) -> ~( ... )
+    s = re.sub(r"\bNOT\s*\(", "~(", s, flags=re.I)
+    #    AND/OR
+    s = re.sub(r"\bAND\b", "&", s, flags=re.I)
+    s = re.sub(r"\bOR\b", "|", s, flags=re.I)
+
+    # 9) Confronti: = -> == ; <> -> !=
+    s = re.sub(r"(?<![<>=!])=(?!=)", "==", s)      # '=' non facente parte di <=, >=, !=, ==
+    s = re.sub(r"<>", "!=", s)
+
+    # 10) Ripulisci spazi
+    s = _cleanup_spaces(s)
+
+    # 11) Reinstalla token (identificatori -> backticks, stringhe -> python-quoted)
+    s = _untokenize(s, str_map, id_map)
+
+    return s

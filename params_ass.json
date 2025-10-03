@@ -2,7 +2,7 @@
     "simulation_id": 6,
     "description": "Demo",
     "start": "07:00",
-    "end": "10:00",  
+    "end": "07:30",  
     "op": "assignment",
     "scenario_id": 31,
     "settings": {
