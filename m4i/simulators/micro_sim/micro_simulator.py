@@ -19,6 +19,8 @@ from operator import itemgetter
 import random
 import logging
 import time
+import geopandas as gpd
+from shapely import LineString
 
 
 unroll_results = False
@@ -29,82 +31,98 @@ sort_fun= attrgetter("c_l_ti") # use operator since it's faster than lambda
 
 class SigNode:
 
-    def __init__(self, graph, id, node, lim=None):
+    def __init__(self, graph, id, node, simustep, lim=None):
         self.G: AbstractGraph = graph
         self.id = id
         self.Cycle = node["cycle"]
-        self.phases = node["phases"]
+        self.phases =  {} 
         self.res = []
 
-        for phase in self.phases:
+        for phase in node["phases"]:
             self.G.get_link(phase["from_link"])["signalized"] = True
+            
+            key =  (phase["from_link"], phase["via_link"], phase["to_link"]) if "via_link" in phase else (phase["from_link"], phase["to_link"])
+            
+            self.phases[key] = phase
+            self.G["signalized_links"].add(phase["from_link"])
+            self.G["signalized_turns"][key] = {}
+            self.G["signalized_turns"][key]["state"] = "green"
+            self.G["signalized_turns"][key]["type"] = phase["type"]
+            
+            
+            if phase["t_start"] % simustep != 0:
+                phase["t_start"] = -(-phase["t_start"]//simustep)*simustep
+            if phase["t_end"] % simustep != 0:
+                phase["t_end"] = -(-phase["t_end"]//simustep)*simustep
+       
+            if phase["type"] == "left_turn":
 
-            if "via_link" in phase:
-                self.G["signalized_turns"][phase["from_link"], phase["via_link"], phase["to_link"]] = "green"
-            else:
-                self.G["signalized_turns"][phase["from_link"], phase["to_link"]] = "green"
+                if phase["permitted"] == True:
+                    
+                    self.G["signalized_turns"][key]["permitted"]= True
+                    self.G["signalized_turns"][key]["opposite_turn"]= phase["opposite_turn"]
+                    self.G["signalized_turns"][key]["permitted_movs"] = 2
+
 
     def update_cap(self, t, t1):
         "Signalized node model"
         tt = t1 * 60 % self.Cycle
-
-        for phase in self.phases:
+        for key, phase in self.phases.items():
+            self.res.append([phase["from_link"], phase["to_link"], t1, self.G["signalized_turns"][key]["state"], phase["type"]])
+            
             if tt == phase["t_start"]:
-                if "via_link" in phase:
-                    self.G["signalized_turns"][phase["from_link"], phase["via_link"], phase["to_link"]] = "green"
-                else:
-                    self.G["signalized_turns"][phase["from_link"], phase["to_link"]] = "green"
-
+                self.G["signalized_turns"][key]["state"] = "green"
+                
             elif tt == phase["t_end"]:
-                if "via_link" in phase:
-                    self.G["signalized_turns"][phase["from_link"], phase["via_link"], phase["to_link"]] = "red"
-                else:
-                    self.G["signalized_turns"][phase["from_link"], phase["to_link"]] = "red"
 
-            links = [phase["from_link"], phase["to_link"]]
-
-            if "via_link" in phase:
-                self.res.append([phase["from_link"], phase["to_link"], t, self.G["signalized_turns"][phase["from_link"], phase["via_link"], phase["to_link"]], phase["type"]])
-            else:
-                self.res.append([phase["from_link"], phase["to_link"], t, self.G["signalized_turns"][phase["from_link"], phase["to_link"]], phase["type"]])
-
+                self.G["signalized_turns"][key]["state"] = "red"
+                
+                
     def update_graph(self, new_graph): #UPDATE: Gemma 
         for k,v in self.G["signalized_turns"].items():
             new_graph["signalized_turns"][k] = v
         self.G = new_graph
 
-class YieldNode:
-    def __init__(self, graph):
-        self.G = graph
-        self.id = id
-        self.main_links = main_links
-        self.yield_links = yield_links
-        self.lim = lim if lim else 0.2
 
-    def __init__(self, graph, id, main_links, yield_links, lim=None):
+
+
+
+class YieldNode:
+    def __init__(self, graph, node, lim = None, filt = None):
         self.G = graph
-        self.id = id
-        self.main_links = main_links
-        self.yield_links = yield_links
-        self.lim = lim if lim else 0.2
+        self.idx = node
+        bws = graph["bwsl"][node]
+        fws = graph["fwsl"][node]
+
+        bws_links = sorted(bws, key=lambda link: link["v0"])
+
+        self.main_links = [bws_links[1]]
+        self.yield_links = [bws_links[0]]
+        self.lim = lim if lim else 1
+        self.filt = filt if filt else 10
 
     def update_cap(self):
-        "Yield capacity model"
-        main_flow = sum([self.G.get_link(ix)["ent_veh"] for ix in self.main_links])
-        main_cap = sum([self.G.get_link(ix)["cap_dt"] for ix in self.main_links])
-        perc = (1 - self.lim) * math.exp(-5.4 / main_cap * main_flow) + self.lim
-
-        for link in self.yield_links:
-            self.G.get_link(link)["inflow_cap"] = self.G.get_link(link)["cap_dt"] * perc
-
-        p = sum([self.G.get_link(ix)["l_queue"] / self.G.get_link(ix)["length"] for ix in self.yield_links])
+        "Yield capacity model" 
+        main_cap = sum([ix["inflow_cap"]*self.filt for ix in self.main_links])
+        main_flow = sum([ix["ent_veh_f"]*self.filt for ix in self.main_links])
+        perc = (1-self.lim) * math.exp(-5.4/main_cap*main_flow) + self.lim
+        
+        for link in self.yield_links:              
+            link["inflow_cap"] = link["inflow_cap"]*perc
+        
+        p = sum([link["l_queue"]/link["length"] for link in self.yield_links])             
         if p > 0.3:
             for link in self.main_links:
-                self.G.get_link(link)["inflow_cap"] = self.G.get_link(link)["cap_dt"] * 0.85
-    
-    def update_graph(self, graph):
-        self.G = graph
-
+                link["inflow_cap"] = link["inflow_cap"]*0.85   
+                
+                
+ 
+ 
+ 
+ 
+ 
+ 
+                
 class MicroSimulator(BaseSimulator):
 
     def __init__(self, loader: Loader, monitored_links=None, yield_nodes=None, **kwargs): #UPDATE: Gemma         
@@ -117,17 +135,18 @@ class MicroSimulator(BaseSimulator):
         self.t_slice = self.G["delta_t"]  # [min] duration of a simulation slice
         # self.ints_agg = 1
         self.ints_agg = int(self.agg_int * 60 / self.simustep)  # number of simusteps within agg_int
-
         self.G["q_trace"] = []
         self.G["signalized_turns"] = {}
+        self.G["signalized_links"] = set()
         self.ODs = self.loader.OD
         self.origini: list[int] = self.loader.origins.copy()
         self.destinazioni: list[int] = self.loader.destinations.copy()
         self.paths: KPathList = None
         self.monitored_links = monitored_links
         self.yield_nodes: list[YieldNode] = yield_nodes
-
-        self.signalized_nodes = [SigNode(id=1, node=s_n, graph=self.G) for s_n in self.loader.sign_nodes]
+        self.ind_res = kwargs.get("ind_res", self.loader.ini.OUTPUT_IND_RES)
+        self.mon_veh = kwargs.get("mon_veh", self.loader.ini.MONITORED_VEH)
+        self.signalized_nodes = [SigNode(id=1, node=s_n, graph=self.G, simustep = self.simustep) for s_n in self.loader.sign_nodes]
 
         self.monitored_flows = []
         self.filt = 10
@@ -138,7 +157,6 @@ class MicroSimulator(BaseSimulator):
         self.coef = self.loader.coefficients
         self.links_list = [l["idx"] for l in self.G.get_all_links()]  # list of the links
         self.preload = False
-        #self.preload_links = None # UPDATE: Gemma inutilizzato
 
         self.ass_results = []
         self.t = 1
@@ -150,7 +168,11 @@ class MicroSimulator(BaseSimulator):
         self.heavy_perc = self.loader.get_perc("h")
         self.vehs: list["car"]=[]
         car.ini = loader.ini
-        self.ini = loader.ini # UPDATE: GEMMA
+        car.ind_res = self.ind_res
+        car.mon_veh = self.mon_veh
+
+        self.ini = loader.ini # UPDATE: GEMM
+        self.res = None
 
     def set_params(self):
         
@@ -205,14 +227,14 @@ class MicroSimulator(BaseSimulator):
 
     def close_link(self, t):
         "Close links"
-        for measure in self.params["ramps"]:
-            if t == measure["start_t"]:
+        for measure in self.loader.get_events("closures"):
+            if t == measure["start"]:
                 for l in measure["arc_list"]:
                     link = self.G.get_link(l)
                     link["storage_cap"] = 0
                     link["disabled"] = True
 
-            elif t == measure["end_t"] - self.deltat:
+            elif t == measure["end"] - self.deltat:
                 for l in measure["arc_list"]:
                     link = self.G.get_link(l)
                     link["storage_cap"] = max(1, (link["length"] * link["numlanes"]) / self.l_car)
@@ -256,8 +278,8 @@ class MicroSimulator(BaseSimulator):
 
     def close_lanes(self, t):
         "Update lanes closures"
-        for measure in self.params["lanes"]:
-            if t == measure["start_t"]:
+        for measure in self.loader.get_events("lanes"):
+            if t == measure["start"]:
                 for l in measure["arc_list"]:
                     link = self.G.get_link(l)
                     num_lanes = self.coef["Corsia"][measure["params"]["type_lanes"]]
@@ -358,11 +380,6 @@ class MicroSimulator(BaseSimulator):
         self.t = int(time_start * self.simustep)
         self.t_i = self.t
         self.t_f = self.t_i + self.simint
-        #self.agg_intervals = set(range(self.t_i + self.ints_agg - 1, self.t_f, self.ints_agg)) #UPDATE: Gemma rimosso
-        #self.int_update = range(#UPDATE: Gemma rimosso
-        #    self.t_i + int(self.t_slice / self.deltat) - 1, self.t_f, int(self.t_slice / self.deltat)#UPDATE: Gemma rimosso
-        #)  # vector for updates of travel times and od flows based on t_slice and sim duration#UPDATE: Gemma rimosso
-
         self.set_closures(time_start, time_end)
         if self.loader.dparams.get("heavy_vehicles_ban",False):
             self.heavy_vehicles_ass = True
@@ -389,48 +406,13 @@ class MicroSimulator(BaseSimulator):
         self.paths = paths
 
     def agg_results(self, tstart, tend, agg_int=None):
-
-        "Aggregates results to a dataframe pandas"
-
-        if False:
-            agg_trace = 1 * 6
-            ####SERVE PER TIRARE FUORI I VEICOLI TRACCIATI
-            trace_res = pd.DataFrame()
-            for veh in self.vehs:
-                if veh.monitored_veh:
-                    df = pd.DataFrame(data=veh.trace, columns=["t", "p", "id_link", "status"])
-                    df["id"] = veh.ID
-                    # df = df[df.t.isin(range(tstart, tend, 1))]
-                    trace_res = pd.concat([trace_res, df])
-
-            times = pd.date_range(start=min2hhmm(tstart), end=min2hhmm(tend), freq=str(agg_trace) + "s")  # range(0, self.simint);
-            dic = {tstart + i / 60: time for (i, time) in zip(range(0, (tend - tstart) * 60, agg_trace), times)}
-            # dic = {i: time for (i, time) in zip(range(tstart, tend, 1), times)}
-            trace_res["time"] = trace_res.t.map(dic)
-            trace_res = trace_res[~trace_res["time"].isna()]
-            trace_res = trace_res.astype({"id_link": int, "p": float, "id": int, "time": "datetime64[ns]"})
-
-            sign_res = pd.DataFrame()
-            times = pd.date_range(start=min2hhmm(tstart), end=min2hhmm(tend), freq=str(6) + "s")
-            # dic = {tstart + i/60: time for (i, time) in zip(range(0, (tend - tstart)*60+1, 6), times)}
-            dic = {i: time for (i, time) in zip(range(self.ints_agg, int((tend - tstart) / self.deltat) + 1, self.ints_agg), times)}
-
-            for node in self.signalized_nodes:
-
-                sig_res = pd.DataFrame(data=node.res)
-
-                sign_res = pd.concat([sign_res, sig_res])
-
-            sign_res.columns = ["id_from", "id_to", "t", "type", "status"]
-            sign_res["time"] = sign_res.t.map(dic)
-            sign_res.t.map(dic)
-
-        agg_int = agg_int or str(self.agg_int) + "min"
-        #agg_int = str(6) + "s" # UPDATE: GEMMA
-
+        
+        "Aggregates results to a GeoDataframe"
+        
         df_aggregated = pd.DataFrame()
         if self.ass_results:
-            id_link = "id_link" # UPDATE: GEMMA
+        
+            id_link = "id"
             light_flow_in = "light_flow_in"
             heavy_flow_in = "heavy_flow_in"
             light_flow_out = "light_flow_out"
@@ -441,61 +423,67 @@ class MicroSimulator(BaseSimulator):
             avg_density = "avg_density"
             avg_speed = "avg_speed"
             avg_tt = "avg_tt"
+            length = "length"
+            v_max = "v0"
 
-            #if self.agg_int >= 1: # UPDATE: GEMMA Fix per >=1
-            #    times = pd.date_range(start=min2hhmm(tstart + self.agg_int), end=min2hhmm(tend), freq=str(self.agg_int) + "min")  # range(0, self.simint)
-            #else:
-            #times = pd.date_range(start=min2hhmm(tstart), end=min2hhmm(tend), freq=str(int(self.agg_int * 60)) + "s")  # range(0, self.simint)
 
-            col = ["time", id_link, light_flow_in, light_flow_out, heavy_flow_in, heavy_flow_out, max_q, avg_mov_vehs, avg_que_vehs, avg_speed, avg_density, avg_tt, "n_updates"]
-            df_aggregated = pd.DataFrame(data=self.ass_results, columns=col)
-            df_aggregated[[avg_mov_vehs, avg_que_vehs, avg_speed, avg_density, avg_tt]] = df_aggregated[[avg_mov_vehs, avg_que_vehs, avg_speed, avg_density, avg_tt]].div(
-                df_aggregated.n_updates, axis=0
-            )
-            #dic = {i: time for (i, time) in zip(range(self.ints_agg, int((tend - tstart) / self.deltat) + 1, self.ints_agg), times)}
-            # dic = {i: time for (i, time) in zip(range(tstart, tend, 1), times)}
-            # UPDATE: GEMMA
-            #dic = {i: time for (i, time) in zip(range(self.t_i, self.t_f , self.ints_agg), times)}
+            
+            freq = str(self.agg_int)+'min' if self.agg_int >= 1 else str(int(self.agg_int*60))+'s'
+            times = pd.date_range(start=min2hhmm(tstart), end=min2hhmm(tend), freq=freq)
+            ints =[tstart + i * self.agg_int for i in range(int((tend+1 - tstart) / self.agg_int))]
 
-            #df_aggregated["time"] = df_aggregated.time.map(dic)
-            df_aggregated["time"] = pd.to_timedelta(df_aggregated["time"], unit='min')+pd.to_datetime(self.loader.parser.get("date_simulation"))
-            df_aggregated[[light_flow_in, heavy_flow_in, light_flow_out, heavy_flow_out]] = df_aggregated[[light_flow_in, heavy_flow_in, light_flow_out, heavy_flow_out]] * (60 / self.agg_int)
+            col = ["time", id_link,  light_flow_in, light_flow_out, heavy_flow_in, heavy_flow_out, max_q, avg_mov_vehs, avg_que_vehs, avg_speed, avg_density, avg_tt, "n_updates"]
+            df_aggregated = pd.DataFrame(data = self.ass_results, columns = col)
+            df_aggregated[[avg_mov_vehs, avg_que_vehs, avg_speed, avg_density, avg_tt]] = df_aggregated[[ avg_mov_vehs, avg_que_vehs, avg_speed, avg_density, avg_tt]].div(df_aggregated.n_updates, axis=0)
+            dic = {i: time for (i, time) in zip(ints, times)}  
 
-            df_aggregated = df_aggregated.astype(
-                {
-                    id_link: int,
-                    light_flow_in: int,
-                    heavy_flow_in: int,
-                    light_flow_out: int,
-                    heavy_flow_out: int,
-                    max_q: int,
-                    avg_mov_vehs: float,
-                    avg_que_vehs: float,
-                    avg_speed: float,
-                    avg_density: float,
-                    avg_tt: float,
-                    "n_updates": int,
-                    "time": "datetime64[ns]",
-                }
-            )
 
+            df_aggregated["time"] = df_aggregated.time.map(dic)
+            df_aggregated[[light_flow_in, heavy_flow_in, light_flow_out, heavy_flow_out]] = df_aggregated[[light_flow_in, heavy_flow_in, light_flow_out, heavy_flow_out]]*(60/self.agg_int)
+
+            df_aggregated = df_aggregated.astype({id_link: int, light_flow_in:int, heavy_flow_in:int, light_flow_out:int, heavy_flow_out:int, 
+                                            max_q:int, avg_mov_vehs:float, avg_que_vehs:float, 
+                                            avg_speed:float, avg_density:float, avg_tt:float, "n_updates":int, "time": 'datetime64[ns]'})
+            
+
+          
             if unroll_results:
                 self.conv_table[id_link] = self.conv_table["id_simpl"]
                 mapped_result = pd.merge(df_aggregated, self.conv_table, how="outer", on=[id_link, id_link])
                 mapped_result[id_link] = mapped_result["id_orig"]
                 result = mapped_result[col[:-1]]
-                result = result[~result["time"].isna()]
+                result = result[~result["time"].isna()] 
             else:
                 result = df_aggregated[col[:-1]]
                 result = result[~result["time"].isna()]
 
+
+        from ...utils import ST_Multi
+        links_l = pd.DataFrame([[id_link,ST_Multi(self.G.get_link(id_link).get_value("geometry")),self.G.get_link(id_link).get_value(v_max),self.G.get_link(id_link).get_value(length),self.G.get_link(id_link).get_value("numlanes")] for id_link in self.loader.df_links[id_link]], columns=["id_link","geometry",v_max, "length","lanes"])
+        result = pd.merge(result, links_l, left_on=id_link, right_on="id_link",suffixes=("", ""))
+        result = gpd.GeoDataFrame(result, geometry="geometry",crs=self.loader.ini.CRS_CALC)
+        
+
+        result[avg_speed] = result[length]/result[avg_tt]*60
+        result[avg_speed] = np.minimum(result[avg_speed], result[v_max])
+        result[max_q] = result[max_q].clip(lower=0)
+        result["q_length"] = (result["max_q"] / result["lanes"]) * self.ini.CAR_LENGTH / result[length] * 100
+        result["q_length"] = result["q_length"].clip(upper= 100)
+        
+
+        result = result[[id_link, light_flow_in, heavy_flow_in, light_flow_out, heavy_flow_out, 
+                                            max_q, avg_mov_vehs, avg_que_vehs, 
+                                            avg_speed, avg_density, avg_tt, length, v_max, "geometry", "time", "q_length"]]
+        
+        
+
         result["mode"] = "all"
-        result.rename(columns={avg_mov_vehs: "mov_vehs",avg_que_vehs:"que_vehs",avg_speed: "speed", avg_density: "density", avg_tt: "tt"}, inplace=True)
-        result_light = result[["time", "mode", id_link, light_flow_in, light_flow_out, max_q, "mov_vehs", "que_vehs", "speed", "density", "tt"]].copy()
+        result.rename(columns={avg_mov_vehs: "mov_vehs",avg_que_vehs:"que_vehs",avg_speed: "speed", avg_density: "density", avg_tt: "tt", id_link: "id_link"}, inplace=True)
+        result_light = result[["time", "mode", "id_link", light_flow_in, light_flow_out, max_q, "mov_vehs", "que_vehs", "speed", "density", "tt"]].copy()
         result_light["mode"] = "c"
         result_light.rename(columns={light_flow_in: "flow_in", light_flow_out: "flow_out"}, inplace=True)
 
-        result_heavy = result[["time", "mode", id_link, heavy_flow_in, heavy_flow_out, max_q, "mov_vehs", "que_vehs", "speed", "density", "tt"]].copy()
+        result_heavy = result[["time", "mode", "id_link", heavy_flow_in, heavy_flow_out, max_q, "mov_vehs", "que_vehs", "speed", "density", "tt"]].copy()
         result_heavy["mode"] = "h"
         result_heavy.rename(columns={heavy_flow_in: "flow_in", heavy_flow_out: "flow_out"}, inplace=True)
 
@@ -503,7 +491,188 @@ class MicroSimulator(BaseSimulator):
         result["flow_out"]=result["light_flow_out"]+result["heavy_flow_out"]        
         result.drop(columns=['light_flow_in', 'heavy_flow_in', 'light_flow_out', 'heavy_flow_out'], inplace=True)
         result_all = pd.concat([result,result_light, result_heavy], ignore_index=True)
-        return result_all[["time", "mode", id_link, "flow_in", "flow_out", max_q, "mov_vehs", "que_vehs", "speed", "density", "tt"]]
+        self.res = result_all
+        return result_all[["time", "mode", "id_link", "flow_in", "flow_out", max_q, "mov_vehs", "que_vehs", "speed", "density", "tt", "geometry", "q_length"]]
+
+
+        
+    def agg_stats(self, tstart, tend):
+        "Calculate statistics from the results"
+        avg_density = "density"
+        avg_speed = "speed"
+        avg_tt = "tt"
+        length = "length"
+        v_max = "v0"
+        light_flow_out = "flow_out"
+        stats = None
+
+
+        if self.res is None:
+            self.agg_results(tstart, tend, agg_int=None)
+        
+        
+        try:         
+            result_stats = self.res.copy().drop(columns="geometry")
+            cong_levels = self.ini.OUTPUT_CONG_LEVELS
+            deltat = self.agg_int/ 60
+
+
+            def f_stat(dat):
+                d = {}
+                tot_distance = sum(dat[avg_density]  * dat.length)
+                if tot_distance == 0:
+                    tot_distance = 1
+                d["v_avg"] = sum(dat[avg_density] * dat[avg_speed] * dat[length]) / tot_distance  # velocita' media
+                d["p_tot"] = sum(dat[avg_density] * dat[avg_speed] * dat[length]* deltat)  # vehi x km
+                d["t_tot"] = sum(dat[avg_density] * dat[length] * deltat)  # Tempo veicoli x km
+                for i, v0 in enumerate(cong_levels[:-1]):
+                    v1 = cong_levels[i + 1]
+                    mask = (dat[avg_speed] > v0 * dat[v_max]) & (dat[avg_speed] <= v1 * dat[v_max]) & (dat[light_flow_out] > 0)
+                    tot_distance = sum(dat[length][dat[light_flow_out] > 0])
+                    if tot_distance == 0:
+                        tot_distance = 1
+                    perc = sum(dat[length][mask]) / tot_distance
+                    d[f"cong_{int(v0 * 100)}"] = perc
+
+                mask = (dat[avg_speed] > 0) & (dat[avg_speed] <= self.ini.LOS_CRITICO * dat[v_max]) & (dat[light_flow_out] > 0)
+                d[f"avg_t_cong"] = len(dat["time"][mask].unique())*self.agg_int
+                d[f"max_avg_tt"] = dat.groupby("time").sum().max()["tt"]
+                d[f"min_avg_tt"] = dat.groupby("time").sum().min()["tt"]
+                d[f"arrived"] = sum([1 for veh in self.vehs if veh.status == "arrived"])
+                        
+                    
+                return pd.Series(d)
+            # """
+            segment = self.loader.links_sets
+
+            stat = []
+            for seg, links in segment.items():
+                mask = (result_stats["id"].isin(links))
+                if mask.any():
+                    _ = f_stat(result_stats[mask])
+                    _["segment_id"] = seg
+                    stat.append(_)
+
+            stats = pd.concat(stat, axis=1).T
+
+            return stats
+        except Exception as e:
+            print(f"Exception calc_stats {e} ")
+            return None
+
+        
+    def get_trace_res(self, tstart, tend):
+        "Get vehicles trace results"
+        geo_trace = None
+
+        if self.ind_res:
+
+            geo_result = None
+            geo_trace = None
+
+
+            shape = self.loader.df_links
+            if not isinstance(shape, gpd.GeoDataFrame):
+                from shapely import wkb
+                if 'geom' in shape.columns:
+                    try:
+                        shape['geometry'] = shape['geom'].apply(lambda x: wkb.loads(bytes.fromhex(x)))
+                    except:
+                        shape['geometry'] = shape['geom'].apply(wkb.loads)
+
+                    shape = gpd.GeoDataFrame(shape, geometry='geometry', crs = self.loader.ini.CRS_CALC)     
+                else:
+                    raise ValueError("DataFrame does not contain a 'geom' column for geometry conversion.")
+        
+            id_link = "id"
+            shape.set_index(id_link, inplace = True)
+
+            shape = shape.to_crs(epsg=32632)
+
+            agg_trace = int(self.simustep)
+            trace_res = pd.DataFrame()
+            for veh in self.vehs:
+                if veh.monitored_veh:
+                    df = pd.DataFrame(data = veh.trace, columns = ["t", "p", "id_link", "status"])
+                    df["id"] = veh.ID
+                    #df = df[df.t.isin(range(tstart, tend, 1))]
+                    trace_res = pd.concat([trace_res, df])
+            
+            times = pd.date_range(start=min2hhmm(tstart), end=min2hhmm(tend), freq=str(agg_trace)+'s')
+            dic = {tstart + i/60: time for (i, time) in zip(range(0, (tend - tstart)*60, agg_trace), times)}
+            
+            trace_res["time"] = trace_res.t.map(dic)
+            trace_res = trace_res[~trace_res["time"].isna()]
+            trace_res = trace_res[trace_res["status"].isin(['mov', 'queue'])]
+            trace_res = trace_res.astype({"id_link": int, "p":float, "id": int, "time": 'datetime64[ns]'})           
+            trace_res = trace_res.join(shape, on="id_link")
+
+
+            def point(geo, p, dire,id_link):
+                if dire == -1 or (dire == 0 and id_link < 0):
+                    geo = LineString(list(geo.coords)[::-1])
+                    
+                return geo.interpolate(p, normalized = True)
+
+            def angle(geo, p, dire, id_link):
+                p2 = geo.interpolate(p, normalized = True).bounds
+                p1 = geo.interpolate(p+0.1, normalized = True).bounds
+                if dire == -1 or (dire == 0 and id_link < 0):
+                    p2, p1 = p1, p2
+                        
+                return -math.degrees(math.atan2(p2[1]-p1[1], p2[0]-p1[0]))
+                
+                    
+            trace_res["point"] = trace_res.apply(lambda row : point(row.geometry, row.p, 1, row.id_link), axis=1)
+            trace_res["rotation"] = trace_res.apply(lambda row : angle(row.geometry, row.p, 1, row.id_link), axis=1)
+            geo_trace = gpd.GeoDataFrame(data = trace_res[["id", "id_link", "time", "status", "p", "rotation"]], 
+                                                geometry=trace_res["point"],
+                                                crs="EPSG:32632")
+                    
+            geo_trace = geo_trace.to_crs(crs = self.loader.ini.CRS_CALC)
+                
+            geo_trace = geo_trace.astype({"id": int, "id_link": int, "rotation":float, "time": 'datetime64[ns]'})
+
+            return geo_trace
+
+
+
+    def get_signalized_res(self, tstart, tend):
+        "Get signalized nodes results"
+        sign_res = pd.DataFrame()
+        agg_trace = int(self.simustep)
+        times = pd.date_range(start=min2hhmm(tstart), end=min2hhmm(tend), freq=str(agg_trace)+'s')#range(0, self.simint);
+        dic = {tstart + i/60: time for (i, time) in zip(range(0, (tend - tstart)*60, agg_trace), times)}
+                
+        
+        if self.signalized_nodes:
+            for node in self.signalized_nodes:
+                sig_res = pd.DataFrame(data = node.res)    
+                sign_res = pd.concat([sign_res, sig_res])
+        
+            sign_res.columns = ["id_from", "id_to", "t", "type", "status"]
+            sign_res["time"] = sign_res.t.map(dic)
+            sign_res.t.map(dic)
+
+            shape = self.loader.df_links
+            if not isinstance(shape, gpd.GeoDataFrame):
+                from shapely import wkb
+                if 'geom' in shape.columns:
+                    try:
+                        shape['geometry'] = shape['geom'].apply(lambda x: wkb.loads(bytes.fromhex(x)))
+                    except:
+                        shape['geometry'] = shape['geom'].apply(wkb.loads)
+
+                    shape = gpd.GeoDataFrame(shape, geometry='geometry', crs=self.loader.ini.CRS_CALC)     
+                else:
+                    raise ValueError("DataFrame does not contain a 'geom' column for geometry conversion.")
+                
+            id_link = "id"
+            shape = shape.to_crs(crs = self.loader.ini.CRS_CALC)
+            sign_res = shape.merge(sign_res, left_on=id_link, right_on="id_from").to_crs(epsg=4326)
+            
+            return sign_res
+
 
     def emission_model(self, od, heavy_perc, tstart, tend):
 
@@ -555,6 +724,8 @@ class MicroSimulator(BaseSimulator):
 
     def run_simulation(self, tstart, tend):
         "Run simulation without tracking"
+        self.tstart = tstart
+        self.tend = tend
         time_ = time.time()
         self.emission_model(self.OD, self.heavy_perc, tstart, tend)
         #self.G["links_set"] = {} #UPDATE: GEMMA: non serve più
@@ -570,6 +741,7 @@ class MicroSimulator(BaseSimulator):
             if t > ini_t and (t-ini_t) % self.ints_agg == 0: #UPDATE: GEMMA: ottimizzato
                 self.update_res(t1-self.ints_agg*self.deltat) # UPDATE: GEMMA: modificato
                 self.G.apply_links(self.reset_flags)
+                self.reset_turns()
 
             if t > ini_t and (t-ini_t) % int_update == 0: #UPDATE: GEMMA ottimizzato
                 #print("moving vehicles %d" % (len(self.vehs)))
@@ -762,7 +934,7 @@ class MicroSimulator(BaseSimulator):
             link["max_que"] = 0
             link["ex_q_veh"] = 0
             link["n_updates"] = 1
-            link["cum_tt_delta"] = 0
+            link["cum_tt_delta"] = link["t0"]
             link["n_updates_delta"] = 1
             link["default_numlanes"] = link["numlanes"]
             link["default_v0"] = link["v0"]
@@ -798,6 +970,11 @@ class MicroSimulator(BaseSimulator):
         link["cum_density"] = 0
         link["cum_tt"] = link["t0"]
         link["n_updates"] = 1
+    def reset_turns(self):
+        "Reset aggregated values"
+        for turn in self.G["signalized_turns"].values():
+            if turn["type"] == "left_turn":
+                turn["permitted_movs"] = 2
 
     def update_capacities(self, link):
         "Update capacity for next time interval"
@@ -840,6 +1017,7 @@ class MicroSimulator(BaseSimulator):
             if link["disabled"]:
                 speed = 0.0000001
                 link["storage_cap"] = 0
+                density = 0
 
             link["density"] = density
             speed = link["last_speed"] * (self.filt - 1) / self.filt + speed * (1) / self.filt

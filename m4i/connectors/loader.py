@@ -27,7 +27,7 @@ from os.path import join
 import warnings
 import websockets.sync.client
 from m4i.utils.util import min2hhmm
-from ..utils.util import to_datetime_auto
+from ..utils.util import to_datetime_auto, hhmm2min
 from ..matrix import MatrixODT, MatrixOD
 from ..graphs import DynamicGraph, DynamicTimeArrayAttribute, DynamicCallableAttribute, KPathList, Path, KPathContainer
 from ..utils import util
@@ -792,7 +792,7 @@ class Loader(BaseLoader):
                             params = row["params"]
                 except:
                     raise Exception(f"Failed to interpret event parameters:\n{row}")
-                event = {"arc_list": id_links, "type": row["type"], "start": row["start"], "end": row["end"], "params": params}
+                event = {"arc_list": id_links, "type": row["type"], "start": hhmm2min(row["start"]), "end": hhmm2min(row["end"]), "params": params}
                 row.update(event)
                 self._events[event["type"]].append(row)
             self._events = dict(self.events)

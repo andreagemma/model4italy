@@ -28,6 +28,10 @@ class FileLoader(BaseLoader):
         if src.lower().endswith(".json"):
             with open(src,'r') as f:
                 content = json.load(f)
+            for i,row in enumerate(content):
+                for k,v in row.items():
+                    if isinstance(v,(list,dict)):
+                        content[i][k] = json.dumps(v)
             return pd.DataFrame(content)
         iod = IO_DataFrame()
         df = iod.import_dataframe(src, filters=filters, dtype=dtype, **kwargs)

@@ -163,6 +163,11 @@ class IniClass:
         self.OUTPUT_AGG_INT = self.config_reader.getfloat("OUTPUT_AGG_INT", 'OUTPUT', 15)
         self.OUTPUT_STATE_COMPRESSION = self.config_reader.get("OUTPUT_STATE_COMPRESSION", 'OUTPUT', None)
         self.OUTPUT_STATE_LEVEL_COMPRESSION = self.config_reader.getint("OUTPUT_STATE_LEVEL_COMPRESSION", 'OUTPUT', 5)  # livello di compressione per lo stato (1-9)
+        self.OUTPUT_IND_RES = self.config_reader.getboolean("OUTPUT_IND_RES", 'OUTPUT', False)  # Indica se vengono tracciati i risultati individuali
+        self.MONITORED_VEH = self.config_reader.getint("MONITORED_VEH", 'OUTPUT', 30)  # Percentuale di veicoli da monitorare 
+        self.OUTPUT_STATS = self.config_reader.get("OUTPUT_STATS", 'OUTPUT', True)  # Indica se vengono salvate le statistich
+        self.OUTPUT_CONG_LEVELS = self.config_reader.get("OUTPUT_CONG_LEVELS", 'OUTPUT', [0, 0.1, 0.25, 0.75, 0.9, 5])  # Livelli di congestione
+        self.LOS_CRITICO = self.config_reader.getfloat("LOS_CRITICO", 'OUTPUT', 0.25)  # Livello di congestione critico
 
         # WEB_SERVER
         self.WEB_SERVER_HOST = self.config_reader.get("WEB_SERVER_HOST", 'WEB_SERVER', '0.0.0.0')

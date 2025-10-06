@@ -3,7 +3,7 @@
     "description": "Demo",
     "date_simulation": "2024-05-07",
     "start": "07:00",
-    "end": "07:30",  
+    "end": "10:00",  
     "op": "assignment",
     "scenario_id": 1,
     "settings": {

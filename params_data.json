@@ -92,9 +92,9 @@
                 }
             }
         ],
-        "events_no": [
+        "events": [
             {
-                "src": "events.csv",
+                "src": "events1.csv",
                 "mapping": {
                     "id_link_set": "id_link_set",
                     "type": "type",
@@ -125,19 +125,11 @@
             }
         ],        
         "traffic_lights": [
-            {
-                "src": "traffic_lights.csv",
-                "crs": "EPSG:4326",
-                "mapping": {
-                    "id": "id",
-                    "cycle": "cycle",
-                    "offset": "offset",
-                    "phases": "phases",
-                    "geometry":"geometry"
-                }
-            }
+             "sign_nodes_newlast.json"
         ],
-        "aggregated_results": "aggregated_results_{simulation_id}.geoparquet",
+        "aggregated_results": "aggregated_results_{simulation_id}.parquet",
+        "individual_results": "individual_results_{simulation_id}.geoparquet",
+        "stats_results": "stats_{simulation_id}.csv",
         "paths": "path_{simulation_id}.geoparquet",
         "fcd_paths": {
             "src": "fcd_paths.geoparquet",
@@ -145,7 +137,7 @@
                 "day_type": "{day_type_simulation}"
             }
         },
-        "fcd_paths_clustered": {
+        "fcd_paths_clustered_no": {
             "src": "fcd_paths_clustered.geoparquet"            
         },
         "fcd_trips": {
