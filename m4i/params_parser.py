@@ -346,7 +346,7 @@ class ParamsParser:
 
         fields = {
             "modes": [
-                {"name": "id", "type": is_str, "dtype": "string", "required": True},
+                {"name": "code", "type": is_str, "dtype": "string", "required": True},
                 {"name": "description", "type": is_str, "dtype": "string", "required": False, "default": ""},
                 {"name": "eq_factor", "type": is_number, "dtype": "Float32", "required": False, "default": 1.0},                
                 

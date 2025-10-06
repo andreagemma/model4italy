@@ -3,7 +3,7 @@ import re
 import typing
 import pandas as pd
 import geopandas as gpd
-from typing import Dict, List, Optional, Union, Tuple, Generator, Any, Callable
+from typing import Dict, List, Optional, Union, Tuple, Generator, Any, Callable, Sequence
 from functools import reduce
 import glob
 from pathlib import Path
@@ -11,7 +11,10 @@ import os
 from shapely import wkt
 import shapely.wkb
 from shapely.wkt import dumps as wkt_dumps
+from shapely import from_wkb, to_wkt, from_wkt
 import polars as pl
+import warnings
+
 
 def inner_filter_to_query_expression(filters, rename=None, quoting='"', op_boolean_symbols=False):
     """
@@ -119,33 +122,37 @@ class BaseDriver:
     def apply_filters(df, filters: Optional[Union[dict,str]] = None) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
         if filters is not None:
             if isinstance(filters, str):
-                query = filters
+                query = filters.replace("==","=").replace("=","").replace("<>","!=")
             else:
                 query = filters_to_query_expression(filters,quoting='', op_boolean_symbols=True)
             df = df.query(query)
         return df
     
     @staticmethod
-    def map_partitioned_dataframe(
-        df: Union[pd.DataFrame, gpd.GeoDataFrame],
-        partitionby: List[str],
-        func,
-        *args,
-        **kwargs
-    ) -> Generator[Any, None, None]:
-        """
-        Applica una funzione a ogni partizione del DataFrame.
-        
-        :param df: DataFrame o GeoDataFrame da partizionare.
-        :param partitionby: Colonne su cui partizionare.
-        :param func: Funzione da applicare a ogni partizione.
-        :param args: Argomenti posizionali per la funzione.
-        :param kwargs: Argomenti keyword per la funzione.
-        :return: DataFrame o GeoDataFrame con le partizioni elaborate.
-        """
-        grp = df.groupby(partitionby, observed=False)
-        for name, group in grp:
-            func((name, partitionby, group), *args, **kwargs)
+    def write_partitioned(
+        df: Union[pd.DataFrame,gpd.GeoDataFrame],
+        file: Union[str,Path],
+        partition_cols: Sequence[str],
+        support_append=False,
+        fn_save:Callable=None
+        ):
+        file = Path(file)
+        grp = df.groupby(partition_cols)    
+        for gname, grdf in grp:
+            if not isinstance(gname, Tuple):
+                gname = (gname,)
+            partition_dirs = [''.join([str(y) for y in x]) for x in zip(partition_cols,["="*len(partition_cols)],gname)]
+            part_folder = file / Path(*partition_dirs)
+            part_folder.mkdir(exist_ok=True, parents=True)
+            fname = part_folder / (file.stem + '_' + '_'.join(partition_dirs) + file.suffix)
+            if not support_append:
+                while (i:=0) is not None:
+                    if not fname.exists():
+                        break
+                    fname = part_folder / f"{file.stem}_{i}{file.suffix}"
+                    i+=1
+
+            fn_save(grdf, fname)
 
     @staticmethod            
     def reduce_folder(
@@ -186,55 +193,93 @@ class BaseDriver:
         return False
     
     @staticmethod
-    def to_geodataframe(df: Union[pd.DataFrame, gpd.GeoDataFrame], crs: Union[str, int] = "EPSG:4326", raise_error=False) -> Union[gpd.GeoDataFrame, pd.DataFrame]:
-        if isinstance(df, gpd.GeoDataFrame):
-            if df.geometry.name in df.columns:
+    def to_geodataframe(df: Union[pd.DataFrame, gpd.GeoDataFrame], crs: Union[str, int] = "EPSG:4326", geometry_col=None, raise_error=False) -> Union[gpd.GeoDataFrame, pd.DataFrame]:
+        
+        if isinstance(df, gpd.GeoDataFrame):            
+            geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="raise")              
+            if geometry_col in df.columns:
                 return df.set_crs(crs, allow_override=True) if df.crs is None else df
-
-        geometry_column = None
-        for col in ['geometry', 'geom']:
-            if col in df.columns:
-                geometry_column = col
-                break
-
-        if geometry_column is None:
-            if raise_error:
-                raise ValueError("DataFrame non contiene una colonna 'geometry' o 'geom'.")
+        if isinstance(df, pd.DataFrame):
+            geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="warn")              
+            if geometry_col in df.columns:
+                sample = df[geometry_col].dropna().iloc[0]
+                if isinstance(sample, (bytes, bytearray)):
+                    geometries = from_wkb(df.pop(geometry_col), on_invalid='fix')
+                elif isinstance(sample, str):
+                    geometries = from_wkt(df.pop(geometry_col), on_invalid='fix')
+                else:
+                    geometries = df.pop(geometry_col)
+                gdf = gpd.GeoDataFrame(df, geometry=geometries, crs=crs)
             else:
-                return df
-
-        # Determina il tipo di geometria e converte se necessario
-        sample = df[geometry_column].dropna().iloc[0]
-        if isinstance(sample, (bytes, bytearray)):
-            geometries = df[geometry_column].apply(lambda x: shapely.wkb.loads(x) if pd.notnull(x) else None)
-        elif isinstance(sample, str):
-            geometries = df[geometry_column].apply(lambda x: wkt.loads(x) if pd.notnull(x) else None)
+                gdf = gpd.GeoDataFrame(df)
+                if crs:
+                    if gdf.crs is None:
+                        gdf.set_crs(crs, inplace=True)
+                    else:
+                        gdf.to_crs(crs, inplace=True)
+        elif isinstance(df, dict):
+            df = pd.DataFrame.from_dict(df)
+            geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="warn")
+            if geometry_col is not None:
+                geoemtries = df.pop(geometry_col)
+                gdf = gpd.GeoDataFrame(df, geometry=geometries, crs=crs)
+            else:            
+                gdf = gpd.GeoDataFrame(df)
+                if crs:
+                    if gdf.crs is None:
+                        gdf.set_crs(crs, inplace=True)
+                    else:
+                        gdf.to_crs(crs, inplace=True)
         else:
-            geometries = df[geometry_column]
-
-        gdf = gpd.GeoDataFrame(df.copy(), geometry=geometries)
-        if crs is not None:
-            if gdf.crs is None:
-                gdf.set_crs(crs, inplace=True)
-            else:
-                gdf.to_crs(crs, inplace=True)
+            warnings.warn("Data is not a dataframe or geodataframe")
+            return None
         return gdf    
+
+    @staticmethod
+    def get_geometry_col(df: Union[pd.DataFrame, gpd.GeoDataFrame], geometry_col: str = None, errors='ignore'):
+        original = geometry_col
+        if df is not None:
+            if geometry_col is None:
+                if isinstance(df, gpd.GeoDataFrame):
+                    if df.geometry is None or df.geometry.name:
+                        geometry_col=df.geometry.name
+                elif isinstance(df, pd.DataFrame):
+                    for col in ['geometry', 'geom']:
+                        if col in df.columns:
+                            geometry_col = col
+                            break  
+        if errors.lower() == 'ignore':
+            return geometry_col if geometry_col in df.columns else None
+        if geometry_col is None or geometry_col not in df.columns:
+            if errors.lower() == "warn":     
+                warnings.warn("Geometry column not found")
+            elif errors.lower() == "raise":
+                raise KeyError("Geometry column not found")
+        else:
+            return geometry_col
+
     
     @staticmethod
-    def to_dataframe(df: Union[pd.DataFrame, gpd.GeoDataFrame]) -> pd.DataFrame:
-        """
-        Converte un GeoDataFrame o DataFrame in DataFrame.
-        Se esiste una colonna geometrica, viene convertita in WKT.
-        """
+    def to_dataframe(df: Union[pd.DataFrame, gpd.GeoDataFrame], geometry_col: str = "geometry", crs: str = None) -> pd.DataFrame:
         if isinstance(df, gpd.GeoDataFrame):
-            tmp = pd.DataFrame(df.drop("geometry", axis=1, errors="ignore"))
-            tmp["geometry"] = df.geometry.to_wkt()            
-            df = tmp
-            return df
+            geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="raise")              
+            if geometry_col in df.columns:
+                if df.crs is not None:
+                    df.to_crs(crs, inplace=True) if crs else None
+                else:
+                    df.set_crs(crs, inplace=True) if crs else None
+                geometries_wkt = df[geometry_col].to_wkt()
+                df = df.drop(columns=geometry_col)
+                df[geometry_col] = geometries_wkt
+                
+        elif isinstance(df, dict):
+            df = pd.DataFrame.from_dict(df)
         elif isinstance(df, pd.DataFrame):
             return df
         else:
-            raise TypeError("Input non valido: atteso pd.DataFrame o gpd.GeoDataFrame")
+            warnings.warn("Data is not a dataframe or geodataframe")
+            return None
+        return df
         
 
     def get_filename(path, 

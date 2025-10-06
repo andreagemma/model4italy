@@ -9,7 +9,7 @@ import typing
 from .particle import car
 from ...graphs import AbstractGraph, KPathList
 from .. import BaseSimulator
-from ...connectors import Loader #UPDATE: Gemma 
+from ...connectors import Loader 
 from ...utils import min2hhmm
 
 import math
@@ -25,7 +25,7 @@ from shapely import LineString
 
 unroll_results = False
 
-from operator import attrgetter #UPDATE: Gemma ottimizzato
+from operator import attrgetter 
 sort_fun= attrgetter("c_l_ti") # use operator since it's faster than lambda
     
 
@@ -78,7 +78,11 @@ class SigNode:
                 self.G["signalized_turns"][key]["state"] = "red"
                 
                 
+<<<<<<< HEAD
     def update_graph(self, new_graph): #UPDATE: Gemma 
+=======
+    def update_graph(self, new_graph): 
+>>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
         for k,v in self.G["signalized_turns"].items():
             new_graph["signalized_turns"][k] = v
         self.G = new_graph
@@ -125,7 +129,7 @@ class YieldNode:
                 
 class MicroSimulator(BaseSimulator):
 
-    def __init__(self, loader: Loader, monitored_links=None, yield_nodes=None, **kwargs): #UPDATE: Gemma         
+    def __init__(self, loader: Loader, monitored_links=None, yield_nodes=None, **kwargs): 
         super().__init__(loader=loader, **kwargs)
         self.simustep = self.loader.ini.SIMU_STEP  # [s] simulation step in seconds
         self.G: AbstractGraph = self.loader.G
@@ -171,7 +175,11 @@ class MicroSimulator(BaseSimulator):
         car.ind_res = self.ind_res
         car.mon_veh = self.mon_veh
 
+<<<<<<< HEAD
         self.ini = loader.ini # UPDATE: GEMM
+=======
+        self.ini = loader.ini 
+>>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
         self.res = None
 
     def set_params(self):
@@ -319,8 +327,7 @@ class MicroSimulator(BaseSimulator):
 
         self.G.apply_links(self.ini_links)
 
-        if (self.preload) or (self.heavy_preload):
-            #UPDATE: Gemma precarico i veicoli e le intersezioni
+        if (self.preload) or (self.heavy_preload):            
             self.vehs = self.preload_vehs            
             print("preload %d vehs" % (len(self.vehs)))
             [veh.update_graph(self.G) for veh in self.vehs]
@@ -332,7 +339,7 @@ class MicroSimulator(BaseSimulator):
             
             self.res_flow = self.preload_res_flow
             self.num = self.preload_num
-            self.preload = False #UPDATE: Gemma gia precaricato quindi non serve nella prossima iterazione
+            self.preload = False 
 
         else:
             self.vehs = []
@@ -345,7 +352,7 @@ class MicroSimulator(BaseSimulator):
                         self.res_flow[o, d] = 0
 
     def update_performance(self, tstart, tend):
-        #UPDATE: GEMMA - se non è importante riduce la memoria usata tra le iterazioni
+        
         self.results = []
         self.ass_results = []
 
@@ -389,12 +396,12 @@ class MicroSimulator(BaseSimulator):
         return
     
     def finalize_assignment(self, time_start, time_end):
-        # UPDATE: modificato perchè nessun altro codice modificherò le variabili # controllare heavy ban
+        
         self.preload = True
         self.preload_vehs = self.vehs
         self.preload_res_flow = self.res_flow
         self.preload_graph = self.G
-        self.preload_signalized_nodes = self.signalized_nodes #UPDATE: GEMMA aggiunto per copia anche delle intersezioni
+        self.preload_signalized_nodes = self.signalized_nodes 
         self.preload_yield_nodes = self.yield_nodes
         self.preload_num = self.num
         self.ass_results += self.results
@@ -467,7 +474,11 @@ class MicroSimulator(BaseSimulator):
         result[avg_speed] = result[length]/result[avg_tt]*60
         result[avg_speed] = np.minimum(result[avg_speed], result[v_max])
         result[max_q] = result[max_q].clip(lower=0)
+<<<<<<< HEAD
         result["q_length"] = (result["max_q"] / result["lanes"]) * self.ini.CAR_LENGTH / result[length] * 100
+=======
+        result["q_length"] = (result["max_q"] / result["lanes"]) * (self.ini.CAR_LENGTH / 1000) / result[length] * 100
+>>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
         result["q_length"] = result["q_length"].clip(upper= 100)
         
 
@@ -479,11 +490,19 @@ class MicroSimulator(BaseSimulator):
 
         result["mode"] = "all"
         result.rename(columns={avg_mov_vehs: "mov_vehs",avg_que_vehs:"que_vehs",avg_speed: "speed", avg_density: "density", avg_tt: "tt", id_link: "id_link"}, inplace=True)
+<<<<<<< HEAD
         result_light = result[["time", "mode", "id_link", light_flow_in, light_flow_out, max_q, "mov_vehs", "que_vehs", "speed", "density", "tt"]].copy()
         result_light["mode"] = "c"
         result_light.rename(columns={light_flow_in: "flow_in", light_flow_out: "flow_out"}, inplace=True)
 
         result_heavy = result[["time", "mode", "id_link", heavy_flow_in, heavy_flow_out, max_q, "mov_vehs", "que_vehs", "speed", "density", "tt"]].copy()
+=======
+        result_light = result[["time", "mode", "id_link", light_flow_in, light_flow_out, max_q, "mov_vehs", "que_vehs", "speed", "density", "tt", "geometry", "q_length"]].copy()
+        result_light["mode"] = "c"
+        result_light.rename(columns={light_flow_in: "flow_in", light_flow_out: "flow_out"}, inplace=True)
+
+        result_heavy = result[["time", "mode", "id_link", heavy_flow_in, heavy_flow_out, max_q, "mov_vehs", "que_vehs", "speed", "density", "tt", "geometry", "q_length"]].copy()
+>>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
         result_heavy["mode"] = "h"
         result_heavy.rename(columns={heavy_flow_in: "flow_in", heavy_flow_out: "flow_out"}, inplace=True)
 
@@ -547,7 +566,11 @@ class MicroSimulator(BaseSimulator):
 
             stat = []
             for seg, links in segment.items():
+<<<<<<< HEAD
                 mask = (result_stats["id"].isin(links))
+=======
+                mask = (result_stats["id_link"].isin(links))
+>>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
                 if mask.any():
                     _ = f_stat(result_stats[mask])
                     _["segment_id"] = seg
@@ -728,22 +751,22 @@ class MicroSimulator(BaseSimulator):
         self.tend = tend
         time_ = time.time()
         self.emission_model(self.OD, self.heavy_perc, tstart, tend)
-        #self.G["links_set"] = {} #UPDATE: GEMMA: non serve più
+        
         ini_t = self.t_i
         fin_t = self.t_f
-        #t_vec = range(ini_t, fin_t, 100)#UPDATE: GEMMA: inutile
+        
         int_update = int(self.t_slice / self.deltat)  # number of simulation steps within t_slice        
         for t in range(ini_t, fin_t):
             t1 = tstart + (t - ini_t) * self.deltat
             self.update_network(t1)
             self.vehs = self.sim_step(t1, self.vehs)
 
-            if t > ini_t and (t-ini_t) % self.ints_agg == 0: #UPDATE: GEMMA: ottimizzato
-                self.update_res(t1-self.ints_agg*self.deltat) # UPDATE: GEMMA: modificato
+            if t > ini_t and (t-ini_t) % self.ints_agg == 0: 
+                self.update_res(t1-self.ints_agg*self.deltat) 
                 self.G.apply_links(self.reset_flags)
                 self.reset_turns()
 
-            if t > ini_t and (t-ini_t) % int_update == 0: #UPDATE: GEMMA ottimizzato
+            if t > ini_t and (t-ini_t) % int_update == 0: 
                 #print("moving vehicles %d" % (len(self.vehs)))
                 self.G.apply_links(self.t_compute)
 
@@ -754,11 +777,11 @@ class MicroSimulator(BaseSimulator):
             self.update_ta(t, t1)
         t = fin_t
         t1 = tstart + (t - ini_t) * self.deltat
-        if t > ini_t and (t-ini_t) % self.ints_agg == 0: #UPDATE: GEMMA: per salvare ultimi risultati            
+        if t > ini_t and (t-ini_t) % self.ints_agg == 0: 
             self.update_res(t1-self.ints_agg*self.deltat)
             self.G.apply_links(self.reset_flags)
 
-        if t > ini_t and (t-ini_t) % int_update == 0: #UPDATE: GEMMA per salvare ultimi risultati
+        if t > ini_t and (t-ini_t) % int_update == 0: 
             #print("moving vehicles %d" % (len(self.vehs)))
             self.G.apply_links(self.t_compute)
 
@@ -817,9 +840,9 @@ class MicroSimulator(BaseSimulator):
             [t]
             + list(
                 itemgetter("idx", "ent_veh", "ex_veh", "ent_veh_h", "ex_veh_h", "max_que", "cum_mov_vehs", "cum_que_vehs", 
-                           "cum_speed", "cum_density", "cum_tt", "n_updates")(link) #UPDATE: GEMMA: modificato
+                           "cum_speed", "cum_density", "cum_tt", "n_updates")(link) 
             )
-            for link in self.G.get_all_links() #UPDATE: GEMMA: modificato
+            for link in self.G.get_all_links() 
         ]
         self.results += res
 
@@ -833,7 +856,7 @@ class MicroSimulator(BaseSimulator):
         "Simulation step"
         
         vehs = self.order_positions(t, vehs)
-        vehs = list(filter(lambda v: v.move(t), vehs)) # UPDATE: GEMMA: modificato  implementa anche il filtro su id status != "arrived" in quanto v.move ritorna False se il veicolo è arrivato
+        vehs = list(filter(lambda v: v.move(t), vehs)) 
 
         return vehs
 
@@ -858,7 +881,7 @@ class MicroSimulator(BaseSimulator):
             link["ex_veh_h"] = 0
             link["ent_veh"] = 0
             link["ent_veh_h"] = 0
-            pre_link = self.preload_graph.get_link(link["idx"]) # UPDATE: Gemma usa preload_graph non links
+            pre_link = self.preload_graph.get_link(link["idx"]) 
             link["storage_cap"] = pre_link["storage_cap"]
             link["inflow_cap"] = link["cap_dt"]
             link["que_vehs"] = pre_link["que_vehs"]

@@ -11,12 +11,12 @@
         },
         "modes": [
             {
-                "id": "c",
+                "code": "c",
                 "description": "car",
                 "eq_factor": 1
             },
             {
-                "id": "h",
+                "code": "h",
                 "description": "heavy",
                 "eq_factor": 2
             }
@@ -123,13 +123,24 @@
                     "counts": "counts"
                 }
             }
-        ],        
+        ],
         "traffic_lights": [
              "sign_nodes_newlast.json"
         ],
+<<<<<<< HEAD
         "aggregated_results": "aggregated_results_{simulation_id}.parquet",
         "individual_results": "individual_results_{simulation_id}.geoparquet",
         "stats_results": "stats_{simulation_id}.csv",
+=======
+        "aggregated_results": "aggregated_results_{simulation_id}.geoparquet",
+        "trace_results": "trace_results_{simulation_id}.geoparquet",
+        "aggregated_results_stats": "aggregated_results_stats_{simulation_id}.parquet",
+        "signal_results": "signal_results_{simulation_id}.geoparquet",
+        "aggregated_results_tmp": {
+            "src": "aggregated_results_{simulation_id}_dir.geoparquet",
+            "partition_cols": ["t"]
+        },
+>>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
         "paths": "path_{simulation_id}.geoparquet",
         "fcd_paths": {
             "src": "fcd_paths.geoparquet",

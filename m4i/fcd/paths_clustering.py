@@ -50,10 +50,11 @@ def clustering(df,crs_data, crs_calc):
     # Aggiungi le etichette al GeoDataFrame
     df["k"] = model.fit_predict(D)
     # per ogni gruppo prendo quello con tot_cost minimo
-    agg = {c:(c,"first") for c in df.columns}
+    agg = {c:(c,"first") for c in df.columns if c in {"source","target","mode", "links"}}
+    if "tot_cost" in df.columns:
+        agg["tot_cost"] = ("tot_cost","mean")
     agg["n_paths"] = ("source", "count")
-    agg.pop("k", None)
-    df = df.sort_values(by=['k', 'tot_cost'])
+    df = df.sort_values(by=['tot_cost'])
     df = df.groupby('k').agg(**agg).reset_index(drop=False)    
     df.drop(columns=['id_trip'], errors='ignore', inplace=True)
     return df

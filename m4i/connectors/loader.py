@@ -26,14 +26,19 @@ from os.path import join
 
 import warnings
 import websockets.sync.client
+<<<<<<< HEAD
 from m4i.utils.util import min2hhmm
 from ..utils.util import to_datetime_auto, hhmm2min
+=======
+
+from ..utils.util import to_datetime_auto, hhmm2min, min2hhmm, normalize_name
+>>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
 from ..matrix import MatrixODT, MatrixOD
 from ..graphs import DynamicGraph, DynamicTimeArrayAttribute, DynamicCallableAttribute, KPathList, Path, KPathContainer
 from ..utils import util
 from .. import IniClass
 from ..log import Logger
-from ..utils import import_dataframe, filters_to_query_expression, rename_filters
+from ..utils import import_dataframe, filters_to_query_expression, rename_filters, pandas_query_to_sql, sql_where_to_pandas
 from ..utils.ipc.ipc import IPC
 from ..params_parser import ParamsParser
 from .loaders.base_loader import BaseLoader
@@ -43,7 +48,7 @@ import copy
 
 class Loader(BaseLoader):
 
-    def __init__(self, parser: ParamsParser, logger: Logger = None):
+    def __init__(self, parser: ParamsParser, logger: Logger = None, tstart:int = None, tend:int = None):    
         self.execution_id = parser.get("execution_id")
         logger_name = f"{parser.ini.LOG_NAME}.{self.__class__.__name__}"
         if self.execution_id is None:
@@ -78,33 +83,27 @@ class Loader(BaseLoader):
         self.delta_t: int = self.ini.DELTA_T
         self.conv_tbl: pd.DataFrame = None
         self.parser = parser
-        self.update_params()
-        if self.start is not None and self.end is not None and self.delta_t is not None:
-            self.timestamps = list(np.arange(self.start, self.end, self.delta_t))
-        else:
-            self.timestamps = None
+        self.update_params(tstart = tstart, tend = tend)
+
         self.attr_to_share = ["_origins", "_destinations", "_zones", "_sign_nodes", "_OD", "_ODs",
                               "_detectors", "_counts", "_G", "_links_sets", "_perc", "_events", "_coefficients", "_modes", "_m_paths", "_bounds", "_zonization",
                               "_df_links", "_df_nodes", "_df_turns",
                               "dparams", "delta_t", "conv_tbl", "timestamps"]
         
-    def recreate(self) -> Loader:
+    def recreate(self, tstart:int=None, tend:int = None) -> Loader:
         """
         Create a clone of the current Loader instance.
         :return: A new Loader instance with the same parameters and state.
         """
-        new_loader = Loader(parser=self.parser.clone(), logger=self.log)
+        new_loader = Loader(parser=self.parser.clone(), logger=self.log, tstart=tstart, tend=tend)
         return new_loader
     
-    def reset(self):
+    def reset(self, tstart:int=None, tend:int = None):
         for attr in self.attr_to_share:
             setattr(self, attr, None)
         self.delta_t = self.ini.DELTA_T
-        self.update_params()
-        if self.start is not None and self.end is not None and self.delta_t is not None:
-            self.timestamps = list(np.arange(self.start, self.end, self.delta_t))
-        else:
-            self.timestamps = None        
+        self.update_params(tstart=tstart, tend=tend)
+    
 
     def set_start_end(self, start: int = None, end: int = None):
         """
@@ -139,6 +138,15 @@ class Loader(BaseLoader):
         mapping = parameters.get("mapping")
         if filters is not None:
             filters = rename_filters(filters=filters, rename=mapping)
+            if isinstance(filters, str):
+                pass
+            else:
+                filters = filters_to_query_expression(filters,quoting='', op_boolean_symbols=True)
+        if parameters.get("filters"):
+            if filters:
+                filters = f"({filters}) & {parameters.get('filters')}"
+            else:
+                filters = parameters.get("filters", None)
         if dtype is not None:
             dtype_inverse = {mapping.get(k, k): v for k, v in dtype.items()}
         else:
@@ -229,7 +237,12 @@ class Loader(BaseLoader):
         cls = getattr(module, class_name)
         return cls
 
-    def update_params(self):
+    def update_params(self, tstart: int = None, tend: int = None):
+        if tstart is not None:
+            self.parser.params["start"] = min2hhmm(tstart)
+        if tend is not None:
+            self.parser.params["end"] = min2hhmm(tend)
+
         self.dparams = self.parser.params        
         try:
             self.params = json.loads(json.dumps(self.dparams), object_hook=lambda d: namedtuple("X", d.keys())(*d.values()) if isinstance(d, dict) else d)
@@ -261,6 +274,11 @@ class Loader(BaseLoader):
             self.end = int(util.min_from_midnight(end))
         else:
             self.end = None
+
+        if self.start is not None and self.end is not None and self.delta_t is not None:
+            self.timestamps = list(np.arange(self.start, self.end, self.delta_t))
+        else:
+            self.timestamps = None            
         
     def has(self, name):
         return self.parser.get(name) is not None
@@ -311,11 +329,15 @@ class Loader(BaseLoader):
         df = pd.DataFrame(df)
         return df
 
-    def load_counts(self, parameters: dict, **kwargs) -> pd.DataFrame:
-        if self.end%1440<self.start%1440:
-            filters = [(("timestamp","<",self.end%1440),("timestamp",">=",self.start%1440))]
+    def load_counts_df(self, parameters: dict, **kwargs) -> pd.DataFrame:
+        end = kwargs.pop("end", self.end)
+        start = kwargs.pop("start", self.start)
+        end = self.end if end is None else end
+        start = self.start if start is None else start
+        if end%1440<start%1440:
+            filters = [(("timestamp","<",end%1440),("timestamp",">=",start%1440))]
         else:
-            filters = [("timestamp",">=",self.start%1440),("timestamp","<",self.end%1440)]
+            filters = [("timestamp",">=",start%1440),("timestamp","<",end%1440)]
         dtype = self.parser.get_dtype("counts")
         df = self._load_dataset(parameters=parameters, filters = filters, dtype=dtype, **kwargs)
         if df is None:
@@ -376,7 +398,25 @@ class Loader(BaseLoader):
         #df = pd.DataFrame(df)
         return df
 
+    def load_modes(self, parameters: dict, **kwargs) -> pd.DataFrame:
+        dtype = self.parser.get_dtype("modes")
+        if isinstance(parameters, list):
+            return pd.DataFrame(parameters)
+        df = self._load_dataset(parameters=parameters, dtype=dtype, geometry=None, **kwargs)
+        if df is None:
+            raise Exception(f"load_modes({parameters}) function return None value")
+        self.parser.check_fields("modes", df)
+        df = pd.DataFrame(df)
+        return df  
     
+    def load_paths(self, parameters: dict, **kwargs) -> pd.DataFrame:
+        dtype = self.parser.get_dtype("paths")
+        df = self._load_dataset(parameters=parameters, dtype=dtype, geometry=None, **kwargs)
+        if df is None:
+            raise Exception(f"load_paths({parameters}) function return None value")
+        self.parser.check_fields("paths", df)
+        df = pd.DataFrame(df)
+        return df  
 
     def load_links_sets(self, parameters: dict, **kwargs) -> pd.DataFrame:
         dtype = self.parser.get_dtype("links_sets")
@@ -500,7 +540,7 @@ class Loader(BaseLoader):
     @property
     def counts(self) -> dict[str,pd.DataFrame]:
         if self._counts is None:
-            self._load_counts()
+            self.load_counts()
         return self._counts
         
     @property
@@ -711,15 +751,22 @@ class Loader(BaseLoader):
     def _load_modes(self):
         self.log.info("Loading Modes...")
         self._modes = {}
-        parameters = self.parser.get("params.modes")
-        if parameters is None:
-            raise KeyError("key 'modes' not found in execution parameters['params']")
+        if isinstance(self.parser.get("params.modes"), list):
+            parameters = self.parser.get("params.modes")
+        else:
+            parameters = self.parser.get_input_parameters("params.modes")
+            if parameters is None:
+                raise KeyError("key 'modes' not found in execution parameters['params']")
+            df = self.load_modes(parameters)
+            if df is None:
+                raise Exception(f"load_modes({parameters}) function return None value")
+            parameters = df.to_dict(orient="records")
         for mode in parameters:
             if not isinstance(mode,dict):
                 raise KeyError("a single mode must to be a dictionary in parameters['params']['modes']")
-            if "id" not in mode:
+            if "code" not in mode:
                 raise KeyError("a single mode must to contains 'id' key")
-            key=str(mode.pop("id").lower())
+            key=str(mode.pop("code").lower())
             if key == "all":
                 raise KeyError(f"mode '{key}' is reserved")
             
@@ -867,7 +914,7 @@ class Loader(BaseLoader):
                 detectors = detectors.combine_first(tmp)
         self._detectors = detectors
 
-    def _load_counts(self):
+    def load_counts(self, tstart:int=None, tend:int=None):
         self.log.info("Loading Counts...")
         parameters = self.parser.get("params.counts")
         self._counts = {}
@@ -877,10 +924,10 @@ class Loader(BaseLoader):
         counts =pd.DataFrame()
         for id_count, set_counts in enumerate(parameters):                
             self.log.info(f"Loading Counts {id_count}...")
-            set_counts = self.parser.get_input_parameters("params.counts", id_count)
+            set_counts = self.parser.get_input_parameters("params.counts", id_count).copy()
             if "src" not in set_counts:
                 raise KeyError("key 'src' required in counts parameters")
-            tmp = self.load_counts(set_counts)
+            tmp = self.load_counts_df(set_counts, start=tstart, end=tend)
             if tmp is None:
                 raise Exception(f"load_counts({set_counts}) function return None value")
             counts = counts.combine_first(tmp)      
@@ -902,7 +949,7 @@ class Loader(BaseLoader):
                 df_mode["eq_counts"] = df_mode["counts"]
                 df_mode["mode"] = "all"
                 counts.loc[b, ["eq_counts","mode"]] = df_mode[["eq_counts","mode"]]
-
+        # TODO: Group by class of timestamps
         self._counts["all"] = counts.groupby(["id", "timestamp"]).agg(counts=("eq_counts", "sum"))["counts"].reset_index()
 
     def load_demand(self, timestamps: list[int] = None):

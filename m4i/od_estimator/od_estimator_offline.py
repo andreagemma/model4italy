@@ -81,7 +81,7 @@ class ODEstimatorOffline(ODEstimator):
             if self.ite==1:
                 check_flows_i=tmp.copy().reset_index(drop=True)
                 check_flows_i['flows']=flows_dep.transpose()
-                check_flows_i.to_excel('check_flows_i_'+str(interval)+'.xlsx')
+                #check_flows_i.to_excel('check_flows_i_'+str(interval)+'.xlsx')
                 # import sklearn.metrics
                 # r2_int_i=sklearn.metrics.r2_score(check_flows_i['counts'], check_flows_i['flows'])    
                 # r2_i.append(r2_int_i)
@@ -197,8 +197,8 @@ class ODEstimatorOffline(ODEstimator):
             # TO DO: da modificare file conteggi!!!!!!!!!!!!!
            
             for interval in self.t_post:
-                fa2+=(self.gamma2*(pic.transpose()*((fla[self.t_post.index(interval)]-self.counts[self.counts['ts']==interval]['counts'].values)**2)).sum())
-                fb2+=(self.gamma2*(pic.transpose()*((flb[self.t_post.index(interval)]-self.counts[self.counts['ts']==interval]['counts'].values)**2)).sum())
+                fa2+=(self.gamma2*(pic.transpose()*((fla[self.t_post.index(interval)]-self.counts[self.counts['timestamp']==interval]['counts'].values)**2)).sum())
+                fb2+=(self.gamma2*(pic.transpose()*((flb[self.t_post.index(interval)]-self.counts[self.counts['timestamp']==interval]['counts'].values)**2)).sum())
             fa=fa1+fa2
             fb=fb1+fb2
             
@@ -212,9 +212,10 @@ class ODEstimatorOffline(ODEstimator):
                 aak = ak + self.sa * (bk - ak)  # Nuovo valore intermedio minore, calcolato sul nuovo segmento di estremi [ak, bk]
 
             self.task_step_done(message=f"Iteration {j+1}/{self.itesa}: ak={ak}, aak={aak}, bk={bk}, bbk={bbk}, fa={fa}, fb={fb}")
-            if (bk - ak) < self.epsilon:
-                for i in range(j, self.itesa):
-                    self.task_step_done(message=f"Convergence reached at iteration {j+1}/{self.itesa}. Remaining iterations skipped.")
+            if (bk - ak) < self.epsilon:                
+                self.task_step_done(message=f"Convergence reached at iteration {j+1}/{self.itesa}. Remaining iterations skipped.", w=self.itesa-j)
+                #for i in range(j, self.itesa):
+                #    pass
                 break
         
         ### Calcolo del passo ottimo
@@ -236,7 +237,7 @@ class ODEstimatorOffline(ODEstimator):
         gi=od_new.copy()
         OD_new=self.OD.copy()
         
-        template = (self.ODseed.values())[0].mat
+        template = list(self.ODseed.values())[0].mat
         for interval in self.t_corr:
             ind_zone=0
             new_m=np.reshape(gi[self.t_intervals.index(interval)],[len(template),len(template)])

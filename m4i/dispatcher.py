@@ -55,7 +55,13 @@ class Dispatcher(BaseM4IModel):
         self.writer: Writer = Writer(parser=self.parser)
         if self.writer.has("params.params"):            
             try:
-                self.writer.write(self.parser.get_dict(), "params.params", mode="w")
+                import pandas as pd
+                import json
+                df = pd.DataFrame({
+                    "execution_id": [self.execution_id],
+                    "params": [json.dumps(self.parser.get_dict())]
+                })
+                self.writer.write(df, "params.params", mode="w")
             except Exception as ex:
                 self.log.error(f"Error writing params.json: {ex}")
     @property

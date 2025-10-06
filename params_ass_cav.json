@@ -1,0 +1,16 @@
+{
+    "simulation_id": 4,
+    "description": "CAV",
+    "date_simulation": "2024-05-07",
+    "start": "07:00",
+    "end": "10:00",  
+    "op": "assignment",
+    "scenario_id": 30,
+    "settings": {
+        "MSA_MAX_ITE": 1,
+        "MSA_K": 3,
+        "MSA_SPP_NUMCPUS": 0,
+        "MSA_K_BALANCING": 2,
+        "CRS": "EPSG:25832"
+    }
+}

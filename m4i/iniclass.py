@@ -81,7 +81,7 @@ class IniClass:
         self.SIMU_STEP = self.config_reader.getfloat("SIMU_STEP", 'SIMULATOR', 6)  # step di simulazione
         self.CAR_LENGTH = self.config_reader.getfloat("CAR_LENGTH", 'SIMULATOR', 5)  # lunghezza veicolo in metri
         self.MIN_SPEED = self.config_reader.getfloat("MIN_SPEED", 'SIMULATOR', 4)  # velocità minima per la coda
-        self.AGG_INT = self.config_reader.getfloat("AGG_INT", 'SIMULATOR', 0.1)  # intervallo di aggregazione per i risultati
+        self.AGG_INT = self.config_reader.getint("AGG_INT", 'SIMULATOR', 5)  # intervallo di aggregazione in secondi
         self.LT1 = self.config_reader.getfloat("LT1", 'SIMULATOR', 0)  # perditempo 1 alla partenza del veicolo
         self.LT2 = self.config_reader.getfloat("LT2", 'SIMULATOR', 0)  # perditempo 2 alla partenza del veicolo
 
@@ -94,8 +94,8 @@ class IniClass:
         self.MSA_SPP_NUMCPUS = self.config_reader.getint("MSA_SPP_NUMCPUS", 'ASSIGNMENT', 0)
         self.MSA_K_BALANCING = self.config_reader.getint("MSA_K_BALANCING", 'ASSIGNMENT', -1)
         self.DELTA_T = self.config_reader.getint("DELTA_T", 'ASSIGNMENT', 15)
-        self.MSA_PRELOAD = self.config_reader.getint("MSA_PRELOAD", 'ASSIGNMENT', 60)
-        self.MSA_POSTLOAD = self.config_reader.getint("MSA_POSTLOAD", 'ASSIGNMENT', 60)
+        self.MSA_PRELOAD = self.config_reader.getint("MSA_PRELOAD", 'ASSIGNMENT', 0)
+        self.MSA_POSTLOAD = self.config_reader.getint("MSA_POSTLOAD", 'ASSIGNMENT', 0)
         self.SAVE_GRAPH = self.config_reader.getboolean("SAVE_GRAPH", 'ASSIGNMENT', False)
         self.LOAD_GRAPH = self.config_reader.getboolean("LOAD_GRAPH", 'ASSIGNMENT', False)
         self.SAVE_PATHS = self.config_reader.getboolean("SAVE_PATHS", 'ASSIGNMENT', False)

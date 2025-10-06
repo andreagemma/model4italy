@@ -47,15 +47,15 @@ class TaskBase:
             return
         self.task_steps = steps
 
-    def task_step_done(self, message=""):
+    def task_step_done(self, message="",w=1):
         self.clear_cache()  # Reset total progress to recalculate
         if self.task_finished:
             if self.task_logger:
                 self.task_logger.warning("Step done called after task finished.")
             return
-        self.task_completed += self.task_weight/self.task_steps if self.task_steps > 0 else 1
+        self.task_completed += (self.task_weight/self.task_steps if self.task_steps > 0 else 1) * w
         self.task_last_message = message
-        if self.task_logger:
+        if self.task_logger and message:
             self.task_logger.info(f"Step done: {message}")
         if (not isclose(self.task_progress, 100, abs_tol=1e-3)) and self.task_progress > 100:
             warning_msg = "Progress exceeded 100%."

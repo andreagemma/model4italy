@@ -22,13 +22,15 @@ from ...graphs import KPathContainer
 from .. import Loader
 from ... import IniClass
 import sqlalchemy as sa
-
+from sqlalchemy.orm import Session, sessionmaker
 from ...log import Logger
+import warnings
+import json
 
 class DBWriter(BaseWriter):
 
-    def __init__(self, params: Union[str, dict], settings: IniClass=None, loader: Loader=None):
-        super().__init__(params=params, settings=settings, loader=loader, default_ext=".gpkg")
+    def __init__(self):
+        super().__init__()
 
     def write_dataset(self, df: Union[pd.DataFrame, gpd.GeoDataFrame], 
                       parameters, 
@@ -37,9 +39,11 @@ class DBWriter(BaseWriter):
         if df is None:
             warnings.warn(f"No dataset to write for {parameters}")
             return False
-        
+        if isinstance(df, dict):
+            df = pd.DataFrame(df)
         location = parameters.get("location")
         src = parameters.get("src")
+        mode = parameters.get("mode")
         
         if location is None:
             raise Exception("'location' not defined")
@@ -47,22 +51,55 @@ class DBWriter(BaseWriter):
             raise Exception("'src' not defined")
         
         engine = sa.create_engine(location)
-        with engine.connect() as conn:
-            pre_query = src.get("pre_query")   
-            if pre_query:
-                conn.execute(sa.text(pre_query))
+        with engine.begin() as conn:
             table_schema = src.split(".")             
             if len(table_schema) == 2:
                 schema, table = table_schema
             elif len(table_schema) == 1:
-                schema, table = "public", table_schema[0]
+                schema = parameters.get("schema", "public")
+                table = table_schema[0]
             else:
                 raise ValueError(f"Invalid src format: {src}")
+            pre_query = parameters.get("pre_query")   
+            if pre_query:
+                if isinstance(pre_query, str):
+                    pre_query = {
+                        "query": pre_query
+                    }
+                if pre_query.get("query"):
+                    errors = pre_query.get("errors", "raise")
+                    try:
+                        conn.execute(f"SET LOCAL search_path TO {schema},public;")
+                        conn.execute(sa.text(pre_query.get("query")))
+                    except Exception as e:
+                        if errors=="raise":
+                            raise e
+                        elif errors == "ignore":
+                            pass
+                        elif errors == "warn":
+                            Logger.warning(e.message)
+                            warnings.warn(e)
+            
+            savepoint = conn.begin_nested()            
+            rollback = False
+            mode = parameters.get("mode","a")
+            if mode == "a":
+                if_exists = "append"
+            elif mode == "w":
+                if_exists = "replace"
+            elif mode == "t":                    
+                try:                        
+                    conn.execute(sa.text(f"TRUNCATE {schema}.{table}"))
+                except:
+                    savepoint.rollback()
+                    rollback = True
+                if_exists = "append"
             if isinstance(df, gpd.GeoDataFrame):  
-                df.to_postgis(src, schema=schema, con=conn, if_exists="append", chunksize=100, index=False)
+                df.to_postgis(src, schema=schema, con=conn, if_exists=if_exists, chunksize=1000, index=False)
             else:
-                df.to_sql(table, schema=schema, con=conn, if_exists="append",method="multi", chunksize=1000, index=False)
-
+                df.to_sql(table, schema=schema, con=conn, if_exists=if_exists,method="multi", chunksize=1000, index=False)
+            if not rollback:
+                savepoint.commit()
             conn.commit()
             
 

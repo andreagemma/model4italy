@@ -14,6 +14,7 @@ from .util import remove_path, to_namedtuple
 from .util import ravel_dict, get_parametric_name
 from .util import deep_update, nested_dict_from_key_value_list
 from .util import pd_concat, file_ordered_list
+from .util import sql_where_to_pandas, pandas_query_to_sql
 from .config_reader import ConfigReader
 from .geom import ST_Multi, multi_line_to_line
 from . import ipc

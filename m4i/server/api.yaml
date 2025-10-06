@@ -1,0 +1,439 @@
+openapi: 3.1.0
+info:
+  title: Model4Italy – Motore di simulazione
+  version: "1.0.0"
+servers:
+  - url: https://{host}:{port}/
+    variables:
+      host: { default: localhost }
+      port: { default: "5000" }
+
+paths:
+  /execute:
+    post:
+      summary: Avvio asincrono di una simulazione/assegnazione o altro job
+      description: |
+        Accetta il JSON parametricamente definito (date, start, end, op, settings, params.*),
+        registra l'esecuzione in tabella `execution` con stato iniziale "pending",
+        avvia il thread di calcolo e restituisce un `execution_id`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecutionParams"
+      responses:
+        "200":
+          description: Esecuzione accettata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  execution_id: { type: integer, description: Identificativo esecuzione }
+                  execution_uuid: { type: string, format: uuid, description: UUID esecuzione }
+                  status: { type: string, enum: [success, error], description: Stato della richiesta }
+                  error: { type: string, description: Messaggio di errore sintetico }
+                  details: { type: string, description: Dettagli errore }
+        "400": { description: Parametri mancanti o errati }
+        "500": { description: Errore interno }
+  /status/{execution_id}:
+    get:
+      summary: Stato avanzamento
+      description: Restituisce lo stato di lavorazione e metadati, tempi, progress, ultimi messaggi.
+      parameters:
+        - name: execution_id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Stato trovato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionStatus"
+        "404": { description: Esecuzione non trovata }
+  /cancel/{execution_id}:
+    get:
+      summary: Cancellazione simulazione
+      description: Annulla una simulazione in corso o pianificata.
+      parameters:
+        - name: execution_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Conferma cancellazione
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [canceled, completed, failed]
+                    example: canceled
+                  execution_id: { type: integer }
+        "404": { description: Esecuzione non trovata }
+
+components:
+  schemas:
+    # ---- Definizioni I/O ----
+    DataInputConnector:
+      type: object
+      required: [connector, location]
+      properties:
+        connector: { type: string, enum: [FileLoader, DBLoader] }
+        location: { type: string, description: "Percorso base o URL DB (SQLAlchemy)." }
+
+    DataOutputConnector:
+      type: object
+      required: [connector, location]
+      properties:
+        connector: { type: string, enum: [FileWriter, DBWriter] }
+        location: { type: string, description: "Percorso base di output o URL DB (SQLAlchemy)." }
+
+    DataInputParams:
+      description: Parametri di input. Può essere un oggetto completo **oppure una stringa**. se stringa, il valore viene assegnato a `src` e il connettore/posizione vengono **ereditati** da `params.input`.
+      oneOf:
+        - type: string
+        - allOf:
+            - $ref: '#/components/schemas/DataInputConnector'
+            - type: object
+              properties:
+                src: { type: string, description: "Nome file, tabella o query di origine." }
+                mapping:
+                  type: object
+                  additionalProperties: true
+                  description: "Mappatura campi interni → campi sorgente."
+                crs: { type: string, description: "Sistema di riferimento della sorgente, formato EPSG:XXXX." }
+                tz_data: { type: string, description: "Time zone dei dati temporali della sorgente (es. UTC, Europe/Roma)." }
+
+    DataInputParamsOp:
+      type: object
+      description: >
+        Operatore su sorgenti di input. Consente composizione di più `DataInputParams`.
+        Se usato dentro `demand[].matrices`, permette di combinare più matrici.      
+      properties:
+        op:
+          type: string
+          enum: [merge, "+", "-", "*", "/"]
+          description: "Operazione: `merge` unisce dataset omogenei; `+ - * /` applicano operazioni elemento per elemento."
+      required: [op]
+
+    DataOutputParams:
+      description: Parametri di output. Può essere un oggetto completo **oppure una stringa**. se stringa, il valore viene assegnato a `src` e il connettore/posizione vengono **ereditati** da `params.output`.
+      oneOf:
+        - type: string
+        - allOf:
+            - $ref: '#/components/schemas/DataOutputConnector'
+            - type: object
+              properties:
+                src: { type: string, description: "Nome file o tabella di destinazione (se diverso dal default)." }
+                mapping:
+                  type: object
+                  additionalProperties: true
+                  description: "Mappatura campi interni → campi di destinazione."
+                partition_cols:
+                  type: array
+                  items: { type: string }
+                  description: "Lista di colonne usate per il partizionamento dei dati in output."
+                additional_fields:
+                  type: object
+                  additionalProperties: { type: string }
+                  description: "Mappa chiave-valore: ad ogni chiave viene creato un campo di destinazione riempito con il valore specificato."
+                crs: { type: string, description: "Sistema di riferimento della destinazione, formato EPSG:XXXX." }
+                tz_data: { type: string, description: "Time zone dei dati temporali della destinazione (es. UTC, Europe/Roma)." }
+
+    DataInputArrayParams:
+      type: array
+      items: { $ref: '#/components/schemas/DataInputParams' }
+      
+    MatrixItem:
+      description: schema matrice. Può essere un normale input o uno scalare. In entrambi i casi + possibile associare delle operazioni
+      oneOf:
+        - $ref: '#/components/schemas/DataInputParams'
+        - allOf:
+          - $ref: '#/components/schemas/DataInputParams'
+          - $ref: '#/components/schemas/DataInputParamsOp'          
+        - allOf:
+          - type: object
+            properties:
+              scalar: number
+            required: [scalar]
+          - $ref: '#/components/schemas/DataInputParamsOp'
+          
+          
+    SupplyItem:
+      description: "Descrizione dell'offerta di trasporto"
+      type: array
+      items:
+        type: object
+        properties:
+          links: { $ref: '#/components/schemas/DataInputParams' }
+          nodes: { $ref: '#/components/schemas/DataInputParams' }
+          turns: { $ref: '#/components/schemas/DataInputParams' }
+
+    DemandItem:
+      type: array
+      description: "Associazione modo → lista di matrici."
+      items:
+        type: object
+        required: [mode, matrices]
+        properties:
+          mode: { type: string }
+          matrices:
+            type: array
+            description: |
+              Elenco di matrici o operatori su matrici. Ogni elemento può essere:
+              - una `DataInputParams` (anche come **stringa**), oppure
+              - un oggetto `DataInputParamsOp` per comporre/scalare più matrici.
+            items:
+              $ref: '#/components/schemas/MatrixItem'
+    
+    # ---- Entry-point con discriminator (SOLO op supportate) ----
+    ExecutionParams:
+      oneOf:
+        - $ref: '#/components/schemas/ExecutionParamsAssignment'
+        - $ref: '#/components/schemas/ExecutionParamsSaveState'
+        - $ref: '#/components/schemas/ExecutionParamsSimulation'
+        - $ref: '#/components/schemas/ExecutionParamsOnline'
+        - $ref: '#/components/schemas/ExecutionParamsPathsCalculation'
+      discriminator:
+        propertyName: op
+        mapping:
+          assignment: '#/components/schemas/ExecutionParamsAssignment'
+          simulation: '#/components/schemas/ExecutionParamsSimulation'
+          save_state: '#/components/schemas/ExecutionParamsSaveState'
+          online: '#/components/schemas/ExecutionParamsOnline'
+          paths_calculation: '#/components/schemas/ExecutionParamsPathsCalculation'
+
+    # ---- Parte comune ----
+    ExecutionParamsCommon:
+      type: object
+      description: >
+        Parametri comuni a tutte le operazioni supportate. Le **proprietà aggiuntive** sono ammesse
+        (grazie a `additionalProperties: true`) e possono essere usate come **variabili di template**
+        nelle stringhe presenti in `params` con la sintassi `{nome_variabile}` (es. `{simulation_id}`, `{scenario}`).
+        Le variabili sono risolte rispetto alle proprietà di primo livello di questo oggetto.
+      additionalProperties: true
+      properties:
+        op:
+          type: string
+          enum: [assignment, simulation, paths_calculation]
+          description: Operazione del motore.
+        settings:
+          type: object
+          additionalProperties: true
+          description: "Parametri runtime generici. Per `assignment/simulation` vedere i campi specifici in ExecutionParamsAssignment.settings."
+        params:
+          type: object
+          description: "Blocco di configurazione I/O e dataset per il motore."
+          properties:
+            input:  { $ref: '#/components/schemas/DataInputConnector' }
+            output: { $ref: '#/components/schemas/DataOutputConnector' }
+          required: [input, output]
+      required: [op, params]
+
+    # ---- Varianti ----
+    ExecutionParamsAssignment:
+      allOf:
+        - $ref: '#/components/schemas/ExecutionParamsCommon'
+        - type: object
+          description: >
+            Parametri per l'operazione **assignment**. Oltre alle proprietà elencate,
+            sono ammessi campi aggiuntivi utilizzabili come variabili `{...}` nelle stringhe dentro `params`.
+          properties:            
+            op: { const: assignment}
+            date:  { type: string, format: date, description: "Giorno della simulazione, YYYY-MM-DD. (Opzionale)" }
+            start: { type: string, pattern: '^\d{1,2}:\d{2}$', description: "Orario di inizio, HH:MM." }
+            end:   { type: string, pattern: '^\d{1,2}:\d{2}$', description: "Orario di fine, HH:MM." }
+            settings:
+              type: object
+              additionalProperties: true
+              description: "Parametri run-time specifici (default in settings.ini)."
+              properties:
+                MSA_MAX_ITE:    { type: integer, description: "Numero massimo di iterazioni MSA." }
+                MSA_K:          { type: integer, description: "Numero di cammini." }
+                MSA_RGAP:       { type: number,  description: "Relative GAP (soglia di convergenza)." }
+                MSA_DELTA_T:    { type: integer, description: "Tempo di ricalcolo cammini (minuti)." }
+                SAVE_PATHS:     { type: boolean, description: "Se true, salva i cammini generati." }
+                SIMU_STEP:      { type: integer, description: "Step di simulazione (secondi)." }
+                CAR_LENGTH:     { type: number,  description: "Lunghezza veicolo leggero (metri)." }
+                MIN_SPEED:      { type: number,  description: "Velocità minima (km/h)." }
+                OUTPUT_AGG_INT: { type: integer, description: "Intervallo di aggregazione risultati (minuti)." }
+            params:
+              type: object
+              properties:
+                zones:  { $ref: '#/components/schemas/DataInputParams' }
+                supply: { $ref: '#/components/schemas/SupplyItem' }
+                demand: { $ref: '#/components/schemas/DemandItem' }
+                links_sets: { $ref: '#/components/schemas/DataInputArrayParams'}
+                events: { $ref: '#/components/schemas/DataInputArrayParams'}
+                traffic_lights: { $ref: '#/components/schemas/DataInputArrayParams'}
+                aggregated_results: { $ref: '#/components/schemas/DataOutputParams' }
+                paths: { $ref: '#/components/schemas/DataOutputParams' }                
+
+          required: [op, start, end, params]
+
+    ExecutionParamsSaveState:
+      allOf:
+        - $ref: '#/components/schemas/ExecutionParamsCommon'
+        - type: object
+          description: >
+            Parametri per l'operazione **save_state**. Oltre alle proprietà elencate,
+            sono ammessi campi aggiuntivi utilizzabili come variabili `{...}` nelle stringhe dentro `params`.
+          properties:            
+            op: { const: save_state}
+            date:  { type: string, format: date, description: "Giorno della simulazione, YYYY-MM-DD. (Opzionale)" }
+            start: { type: string, pattern: '^\d{1,2}:\d{2}$', description: "Orario di inizio, HH:MM." }
+            end:   { type: string, pattern: '^\d{1,2}:\d{2}$', description: "Orario di fine, HH:MM." }
+            settings:
+              type: object
+              additionalProperties: true
+              description: "Parametri run-time specifici (default in settings.ini)."
+              properties:
+                MSA_MAX_ITE:    { type: integer, description: "Numero massimo di iterazioni MSA." }
+                MSA_K:          { type: integer, description: "Numero di cammini." }
+                MSA_RGAP:       { type: number,  description: "Relative GAP (soglia di convergenza)." }
+                MSA_DELTA_T:    { type: integer, description: "Tempo di ricalcolo cammini (minuti)." }
+                SAVE_PATHS:     { type: boolean, description: "Se true, salva i cammini generati." }
+                SIMU_STEP:      { type: integer, description: "Step di simulazione (secondi)." }
+                CAR_LENGTH:     { type: number,  description: "Lunghezza veicolo leggero (metri)." }
+                MIN_SPEED:      { type: number,  description: "Velocità minima (km/h)." }
+                OUTPUT_AGG_INT: { type: integer, description: "Intervallo di aggregazione risultati (minuti)." }
+            params:
+              type: object
+              properties:
+                zones:  { $ref: '#/components/schemas/DataInputParams' }
+                supply: { $ref: '#/components/schemas/SupplyItem' }
+                demand: { $ref: '#/components/schemas/DemandItem' }
+                links_sets: { $ref: '#/components/schemas/DataInputArrayParams'}
+                events: { $ref: '#/components/schemas/DataInputArrayParams'}
+                traffic_lights: { $ref: '#/components/schemas/DataInputArrayParams'}
+                aggregated_results: { $ref: '#/components/schemas/DataOutputParams' }
+                paths: { $ref: '#/components/schemas/DataOutputParams' }     
+                state: { type: string, description: "Percorso file di stato da salvare."}    
+              required: [state]       
+
+          required: [op, start, end, params]
+
+    # ---- Varianti ----
+    ExecutionParamsSimulation:
+      allOf:
+        - $ref: '#/components/schemas/ExecutionParamsCommon'
+        - type: object
+          description: >
+            Parametri per l'operazione **simulation**. Oltre alle proprietà elencate,
+            sono ammessi campi aggiuntivi utilizzabili come variabili `{...}` nelle stringhe dentro `params`.
+          properties:            
+            op: { const: assignment}
+            date:  { type: string, format: date, description: "Giorno della simulazione, YYYY-MM-DD. (Opzionale)" }
+            start: { type: string, pattern: '^\d{1,2}:\d{2}$', description: "Orario di inizio, HH:MM." }
+            end:   { type: string, pattern: '^\d{1,2}:\d{2}$', description: "Orario di fine, HH:MM." }
+            settings:
+              type: object
+              additionalProperties: true
+              description: "Parametri run-time specifici (default in settings.ini)."
+              properties:
+                MSA_RGAP:       { type: number,  description: "Relative GAP (soglia di convergenza)." }
+                MSA_DELTA_T:    { type: integer, description: "Tempo di ricalcolo cammini (minuti)." }
+                SAVE_PATHS:     { type: boolean, description: "Se true, salva i cammini generati." }
+                SIMU_STEP:      { type: integer, description: "Step di simulazione (secondi)." }
+                CAR_LENGTH:     { type: number,  description: "Lunghezza veicolo leggero (metri)." }
+                MIN_SPEED:      { type: number,  description: "Velocità minima (km/h)." }
+                OUTPUT_AGG_INT: { type: integer, description: "Intervallo di aggregazione risultati (minuti)." }
+            params:
+              type: object
+              properties:
+                zones:  { $ref: '#/components/schemas/DataInputParams' }
+                supply: { $ref: '#/components/schemas/SupplyItem' }
+                demand: { $ref: '#/components/schemas/DemandItem' }
+                links_sets: { $ref: '#/components/schemas/DataInputArrayParams'}
+                events: { $ref: '#/components/schemas/DataInputArrayParams'}
+                traffic_lights: { $ref: '#/components/schemas/DataInputArrayParams'}
+                aggregated_results: { $ref: '#/components/schemas/DataOutputParams' }
+                paths: { $ref: '#/components/schemas/DataOutputParams' }                
+
+          required: [op, start, end, params]     
+
+    ExecutionParamsOnline:
+      allOf:
+        - $ref: '#/components/schemas/ExecutionParamsCommon'
+        - type: object
+          description: >
+            Parametri per l'operazione **online**. Oltre alle proprietà elencate,
+            sono ammessi campi aggiuntivi utilizzabili come variabili `{...}` nelle stringhe dentro `params`.
+            La chiamata è asincrona e i risultati vengono aggiornati in tempo reale
+          properties:            
+            op: { const: assignment}
+            date:  { type: string, format: date, description: "Giorno della simulazione, YYYY-MM-DD. (Opzionale)" }
+            start: { type: string, pattern: '^\d{1,2}:\d{2}$', description: "Orario di inizio, HH:MM." }
+            end:   { type: string, pattern: '^\d{1,2}:\d{2}$', description: "Orario di fine, HH:MM." }
+            settings:
+              type: object
+              additionalProperties: true
+              description: "Parametri run-time specifici (default in settings.ini)."
+              properties:
+                MSA_RGAP:       { type: number,  description: "Relative GAP (soglia di convergenza)." }
+                MSA_DELTA_T:    { type: integer, description: "Tempo di ricalcolo cammini (minuti)." }
+                SAVE_PATHS:     { type: boolean, description: "Se true, salva i cammini generati." }
+                SIMU_STEP:      { type: integer, description: "Step di simulazione (secondi)." }
+                CAR_LENGTH:     { type: number,  description: "Lunghezza veicolo leggero (metri)." }
+                MIN_SPEED:      { type: number,  description: "Velocità minima (km/h)." }
+                OUTPUT_AGG_INT: { type: integer, description: "Intervallo di aggregazione risultati (minuti)." }
+            params:
+              type: object
+              properties:
+                zones:  { $ref: '#/components/schemas/DataInputParams' }
+                supply: { $ref: '#/components/schemas/SupplyItem' }
+                demand: { $ref: '#/components/schemas/DemandItem' }
+                links_sets: { $ref: '#/components/schemas/DataInputArrayParams'}
+                events: { $ref: '#/components/schemas/DataInputArrayParams'}
+                traffic_lights: { $ref: '#/components/schemas/DataInputArrayParams'}
+                aggregated_results: { $ref: '#/components/schemas/DataOutputParams' }
+                paths: { $ref: '#/components/schemas/DataOutputParams' }    
+                fcd: { $ref: '#/components/schemas/DataInputParams'}            
+
+          required: [op, start, end, params]
+
+    ExecutionParamsPathsCalculation:
+      allOf:
+        - $ref: '#/components/schemas/ExecutionParamsCommon'
+        - type: object
+          description: >
+            Parametri per l'operazione **paths_calculation**. Campi extra ammessi come variabili `{...}` in `params`.
+          properties:
+            op: { const: paths_calculation }
+            params:
+              type: object
+              properties:
+                supply: { $ref: '#/components/schemas/SupplyItem' }
+                origin_nodes: { $ref: '#/components/schemas/DataInputParams' }
+                destination_nodes: { $ref: '#/components/schemas/DataInputParams' }
+                link_cost: string
+                node_cost: string
+                turn_cost: string
+                paths: { $ref: '#/components/schemas/DataOutputParams' }  
+      required: [params]
+    
+
+    # ---- Stato esecuzione ----
+    ExecutionStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, running, completed, success, failed, error, canceled]
+        start_time: { type: string, nullable: true }
+        end_time: { type: string, nullable: true }
+        progress: { type: number, minimum: 0, maximum: 100 }
+        result: { type: string, nullable: true }
+        params: { $ref: '#/components/schemas/ExecutionParams' }
+        id: { type: integer }
+        uuid: { type: string }
+        last_message: { type: string }
+        last_message_time: { type: string }

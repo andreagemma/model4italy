@@ -1,4 +1,4 @@
-from libs import TaskBase  # adatta all'import corretto
+from m4i import TaskBase  # adatta all'import corretto
 import pytest
 
 class DummyLogger:

@@ -7,8 +7,6 @@ from typing import List, Dict, Tuple, Any, Union
 import itertools
 import pdb
 import pandas as pd
-
-from m4i.utils.util import file_ordered_list
 from ..utils.tictoc import TicToc
 from ..utils.parallel import Parallel
 from ..connectors import StateManager
@@ -41,6 +39,9 @@ class AssignmentModel(BaseM4IModel):
         od_estimation : bool = False,
         save_paths: bool = True,
         save_agg_results: bool = True,
+        save_agg_results_stats: bool = True,
+        save_trace_results: bool = True,
+        save_signal_results: bool = True,
         save_state_graph: bool = False,
         load_state_graph: bool = False,
         load_state_paths: bool = False,
@@ -81,6 +82,9 @@ class AssignmentModel(BaseM4IModel):
         
         self.save_paths = save_paths and self.writer.has_write_paths()
         self.save_agg_results = save_agg_results and self.writer.has_write_agg_results() and self.simulator is not None
+        self.save_agg_results_stats = save_agg_results_stats and self.writer.has_write_agg_results_stats() and self.simulator is not None
+        self.save_trace_results = save_trace_results and self.writer.has_write_trace_results() and self.simulator is not None
+        self.save_signal_results = save_signal_results and self.writer.has_write_signal_results() and self.simulator is not None
         self.state_manager = StateManager(self.loader.parser)
 
         self.save_state_ass_matrix = save_ass_matrix and self.state_manager.has_write_state() and self.calc_ass_matrix
@@ -219,6 +223,9 @@ class AssignmentModel(BaseM4IModel):
             self.write_state_ass_matrix()
             self.write_paths()            
             self.write_agg_results()
+            self.write_agg_results_stats()
+            self.write_trace_results()
+            self.write_signal_results()
             
             
             
@@ -231,7 +238,8 @@ class AssignmentModel(BaseM4IModel):
             if self.writer.has("params.statistics"):
                 self.log.info("Saving stats...")
                 df = pd.DataFrame.from_dict(self.infos)
-                self.writer.write(df,"params.statistics",mode="w")
+                mode = None if self.interval==0 else "a"
+                self.writer.write(df,"params.statistics", mode=mode)
         except Exception as e:
             self.log.error("Failed to save paths:", exc_info=e, stack_info=True)     
 
@@ -241,19 +249,8 @@ class AssignmentModel(BaseM4IModel):
                 self.log.info("Saving paths...")
                 saved = True
                 paths = self.get_paths_dataframe()
-                mode = "w" if self.interval==0 else "a"
+                mode = None if self.interval==0 else "a"
                 saved = self.writer.write_paths(paths, mode=mode, crs=self.loader.ini.CRS)
-                """
-                mode="w"
-                for t in range(self.real_time_start,self.real_time_end,self.delta_t):
-                    paths = self.get_paths_dataframe(t=t)
-                    if paths is None:
-                        continue
-                    saved = self.writer.write_paths(paths, mode=mode, partition=f"t={t}")
-                    mode = "a"
-                    if not saved:                        
-                        break
-                """
                 paths = None   
                 if saved:
                     self.log.info("Saved paths")
@@ -268,7 +265,7 @@ class AssignmentModel(BaseM4IModel):
                 self.log.info("Saving state (Paths)...")
                 for t in range(self.real_time_start,self.real_time_end,self.delta_t):
                     paths = list(self.m_paths.get_paths_by_t(t))
-                    self.state_manager.write_state(paths, "paths", mode="w", partition=f"t={t}")
+                    self.state_manager.write_state(paths, "paths", partition=f"t={t}")
                 paths = None                                                        
                 self.log.info("Saved state")
         except Exception as e:
@@ -283,27 +280,72 @@ class AssignmentModel(BaseM4IModel):
                 ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400 ) / 60
                 if df["time"].dt.tz is None:
                     df["time"] = df["time"].dt.tz_localize(self.parser.ini.TZ_LOCAL)  
-                mode = "w" if self.interval==0 else "a"
-                df["t"] = ds_t
-                saved = self.writer.write_agg_results(df, mode=mode, crs=self.loader.ini.CRS)
-                
-                """
-                mode = "w"
-                for t in np.arange(self.real_time_start,self.real_time_end,self.loader.ini.AGG_INT):
-                    b = ds_t.between(t,t+self.loader.ini.AGG_INT, inclusive="left")
-                    tmp = df[b].copy()
-                    tmp["t"] = ds_t[b]
-                    saved=self.writer.write_agg_results(tmp, mode="w", partition=f"t={t}")
-                    mode = "a"
-                    if not saved:
-                        break
-                """
+                mode = None if self.interval==0 else "a"
+                df["t"] = ds_t.astype("Int64")
+                saved = self.writer.write_agg_results(df, crs=self.loader.ini.CRS, mode=mode)
+                                
                 if saved:                    
                     self.log.info("Saved aggregated results")
                 else:
                     self.log.warning("Failed to save aggregated results")
         except Exception as e:
             self.log.error("Failed to save aggregated results:", exc_info=e, stack_info=True)
+
+    def write_agg_results_stats(self):
+        try:                
+            if self.save_agg_results_stats:
+                self.log.info("Saving aggregated stats...")
+                saved = True
+                df=self.get_aggregated_results_stats_dataframe()
+                mode = None if self.interval==0 else "a"
+                saved = self.writer.write_agg_results_stats(df, mode=mode, crs=self.loader.ini.CRS)
+                                
+                if saved:                    
+                    self.log.info("Saved aggregated stats")
+                else:
+                    self.log.warning("Failed to save aggregated stats")
+        except Exception as e:
+            self.log.error("Failed to save aggregated stats:", exc_info=e, stack_info=True)
+
+    def write_trace_results(self):
+        try:                
+            if self.save_trace_results:
+                self.log.info("Saving trace results...")
+                saved = True
+                df=self.get_trace_results_dataframe()
+                ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400 ) / 60
+                if df["time"].dt.tz is None:
+                    df["time"] = df["time"].dt.tz_localize(self.parser.ini.TZ_LOCAL)  
+                mode = None if self.interval==0 else "a"
+                df["t"] = ds_t.astype("Float32")
+                saved = self.writer.write_trace_results(df, mode=mode, crs=self.loader.ini.CRS)
+                                
+                if saved:                    
+                    self.log.info("Saved trace results")
+                else:
+                    self.log.warning("Failed to save trace results")
+        except Exception as e:
+            self.log.error("Failed to save trace results:", exc_info=e, stack_info=True)
+
+    def write_signal_results(self):
+        try:                
+            if self.save_signal_results:
+                self.log.info("Saving signal results...")
+                saved = True
+                df=self.get_signal_results_dataframe()
+                ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400 ) / 60
+                if df["time"].dt.tz is None:
+                    df["time"] = df["time"].dt.tz_localize(self.parser.ini.TZ_LOCAL)  
+                mode = None if self.interval==0 else "a"
+                df["t"] = ds_t.astype("Float32")
+                saved = self.writer.write_signal_results(df, mode=mode, crs=self.loader.ini.CRS)
+                                
+                if saved:                    
+                    self.log.info("Saved trace results")
+                else:
+                    self.log.warning("Failed to save trace results")
+        except Exception as e:
+            self.log.error("Failed to save trace results:", exc_info=e, stack_info=True)
 
     def write_state_ass_matrix(self):
         try:
@@ -528,7 +570,7 @@ class AssignmentModel(BaseM4IModel):
                 tot_vehicles = len(self.simulator.vehs)
                 info["tot_vehicles"] = tot_vehicles      
         et = self.tic.elapsed_time()
-        info["cpu_time"] = et
+        info["cpu_time"] = et.to_s
         self.infos.append(info)
         self.write_stats()
         
@@ -618,7 +660,7 @@ class AssignmentModel(BaseM4IModel):
     def calculate_ass_matrix(self):
         self.log.info ("Assignment matrix calculation...")
 
-        def fn_calc_mat_ass(tasks, eq_factors, G, links_cost, nodes_cost, turns_cost, current_time_start, OD):
+        def fn_calc_mat_ass(tasks, eq_factors, G, links_cost, nodes_cost, turns_cost, current_time_start, OD, detectors):
             ret = []
             for (source, target, t_start, mode), paths in tasks:
                 for path in paths:
@@ -627,8 +669,9 @@ class AssignmentModel(BaseM4IModel):
                         continue
                     costs = tuple(path.get_costs(G, links_cost=links_cost, nodes_cost=nodes_cost, turns_cost=turns_cost))
                     links = path.get_links()
-                    for t, l_idx in zip(costs, links):  # [t for t in zip(idxs, links) if t[1] in self.matrix_ass.detectors]:                
-                        ret.append((source, target, l_idx, t_start, t, path["path_flow"] / f))
+                    for t, l_idx in zip(costs, links):  # [t for t in zip(idxs, links) if t[1] in self.matrix_ass.detectors]:   
+                        if l_idx in detectors:             
+                            ret.append((source, target, l_idx, t_start, t, path["path_flow"] / f))
             return ret        
         tasks = list(self.m_paths.all_kpaths()) 
         
@@ -637,29 +680,58 @@ class AssignmentModel(BaseM4IModel):
             for params in Parallel.execute(fn_calc_mat_ass, tasks, n_workers=n_workers, 
                                         eq_factors=self.eq_factors, G=self.G, 
                                         links_cost=self.links_cost, nodes_cost=self.nodes_cost, turns_cost=self.turns_cost,
-                                        current_time_start=self.current_time_start, OD=self.OD):
-                for (source, target, l, t_start, t_enter, flow) in params:
+                                        current_time_start=self.current_time_start, OD=self.OD, detectors=self.ass_matrix.detectors):
+                for (source, target, l, t_start, t, flow) in params:
+                    t_start = int(np.floor(t_start))
+                    t_enter = int(t_start + np.floor(t/self.delta_t))
                     self.ass_matrix.add(source, target, l=l, t_start=t_start, t_enter=t_enter, flow=flow)
         else:
-            for (source, target, l, t_start, t_enter, flow) in fn_calc_mat_ass(tasks, 
+            for (source, target, l, t_start, t, flow) in fn_calc_mat_ass(tasks, 
                                         eq_factors=self.eq_factors, G=self.G, 
                                         links_cost=self.links_cost, nodes_cost=self.nodes_cost, turns_cost=self.turns_cost,
-                                        current_time_start=self.current_time_start, OD=self.OD):
+                                        current_time_start=self.current_time_start, OD=self.OD, detectors=self.ass_matrix.detectors):
+                    t_start = int(np.floor(t_start))
+                    t_enter = int(t_start + np.floor(t/self.delta_t))
                     self.ass_matrix.add(source, target, l=l, t_start=t_start, t_enter=t_enter, flow=flow)
         self.log.info ("Assignment matrix calculated")
 
-    
-    def get_aggregated_results_dataframe(self):
-        from ..utils import ST_Multi
-        import geopandas as gpd
-
-        G = self.loader.G
+    def get_trace_results_dataframe(self):
         if self.simulator is None:
             return None
+<<<<<<< HEAD
         res = self.simulator.agg_results(self.global_t_start, self.global_t_end, agg_int=self.loader.ini.OUTPUT_AGG_INT)
         trace_res = self.simulator.get_trace_res(self.global_t_start, self.global_t_end)
         sign_res = self.simulator.get_signalized_res(self.global_t_start, self.global_t_end)
         stats = self.simulator.agg_stats(self.global_t_start, self.global_t_end)
+=======
+        return self.simulator.get_trace_res(self.global_t_start, self.global_t_end)
+
+    def get_signal_results_dataframe(self):
+        if self.simulator is None:
+            return None
+        return self.simulator.get_signalized_res(self.global_t_start, self.global_t_end)
+
+    def get_aggregated_results_stats_dataframe(self):
+        if self.simulator is None:
+            return None
+        return self.simulator.agg_stats(self.global_t_start, self.global_t_end)
+
+    def get_aggregated_results_dataframe(self):
+        if self.simulator is None:
+            return None
+        #from ..utils import ST_Multi
+        #import geopandas as gpd
+
+        #G = self.loader.G
+        #results = self.simulator.agg_results(self.global_t_start, self.global_t_end, agg_int=self.loader.ini.OUTPUT_AGG_INT)
+        #id_links = results["id_link"].unique()
+        #df_geometry = pd.DataFrame([[id_link,ST_Multi(G.get_link(id_link).get_value("geometry"))] for id_link in id_links], columns=["id_link","geometry"])     
+        #results = results.merge(df_geometry, on="id_link").merge(self.loader.df_links[["id_link", "length", "lanes"]], on="id_link")
+        #results["q_length"] = (results["max_q"] / results["lanes"]) * self.ini.CAR_LENGTH / results["length"] * 100
+        #results = gpd.GeoDataFrame(results, geometry="geometry" ,crs=self.loader.ini.CRS_CALC)
+        #return results
+        res = self.simulator.agg_results(self.global_t_start, self.global_t_end, agg_int=self.loader.ini.OUTPUT_AGG_INT)
+>>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
         
 
 
@@ -667,7 +739,11 @@ class AssignmentModel(BaseM4IModel):
         #df_geometry = pd.DataFrame([[id_link,ST_Multi(G.get_link(id_link).get_value("geometry"))] for id_link in id_links], columns=["id_link","geometry"])
         #results = results.merge(df_geometry, on="id_link")
         #results = gpd.GeoDataFrame(results, geometry="geometry" ,crs=self.loader.ini.CRS_CALC)
+<<<<<<< HEAD
         return res
+=======
+        return res		
+>>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
         
     def get_paths_dataframe(self, t=None):
         from shapely import MultiLineString

@@ -30,7 +30,9 @@ class ODEstimation(OP):
         tstart:int=max(0,self.loader.start-int(self.ini.OD_ESTIMATION_WHISKERS))
         tend:int=min(1440,int(self.loader.end+self.ini.OD_ESTIMATION_WHISKERS))
         timestamps=list(range(tstart,tend,self.ini.DELTA_T))
+        #loader.reset(tstart=tstart, tend=tend)        
         loader.load_demand(timestamps=timestamps)
+        loader.load_counts(tstart=tstart, tend=tend)
         self.ODz2z: MatrixODT = loader.OD
         self.G: AbstractGraph = loader.G
         self.MSA = MSA
@@ -98,7 +100,7 @@ class ODEstimation(OP):
         msa.run()
         tstart=int(start - self.loader.ini.OD_ESTIMATION_WHISKERS)
         tend=int(end + self.loader.ini.OD_ESTIMATION_WHISKERS)
-        self.df_grouped, self.stats, self.vsl_results = msa.sim.agg_results(tstart = tstart*60, tduration = (tend-tstart)*60)
+        #self.df_grouped, self.stats, self.vsl_results = msa.sim.agg_results(tstart = tstart*60, tduration = (tend-tstart)*60)
         self.log.info("Fine")
         return self.ODz2z
     

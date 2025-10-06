@@ -1,15 +1,15 @@
 {
-    "simulation_id": 2,
+    "simulation_id": 6,
     "description": "Demo",
-    "date_simulation": "2024-05-07",
     "start": "07:00",
-    "end": "10:00",  
+    "end": "07:30",  
     "op": "assignment",
-    "scenario_id": 30,
+    "scenario_id": 31,
     "settings": {
-        "MSA_MAX_ITE": 10,
-        "MSA_K": 3,
-        "MSA_SPP_NUMCPUS": 0,
-        "MSA_K_BALANCING": 1
+        "MSA_MAX_ITE": 1,
+        "MSA_K": 2,
+        "MSA_SPP_NUMCPUS": 24,
+        "MSA_K_BALANCING": 2,
+        "USE_OBSERVED_PATHS": false
     }
 }
