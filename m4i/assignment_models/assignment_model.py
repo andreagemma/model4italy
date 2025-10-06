@@ -698,6 +698,12 @@ class AssignmentModel(BaseM4IModel):
     def get_trace_results_dataframe(self):
         if self.simulator is None:
             return None
+<<<<<<< HEAD
+        res = self.simulator.agg_results(self.global_t_start, self.global_t_end, agg_int=self.loader.ini.OUTPUT_AGG_INT)
+        trace_res = self.simulator.get_trace_res(self.global_t_start, self.global_t_end)
+        sign_res = self.simulator.get_signalized_res(self.global_t_start, self.global_t_end)
+        stats = self.simulator.agg_stats(self.global_t_start, self.global_t_end)
+=======
         return self.simulator.get_trace_res(self.global_t_start, self.global_t_end)
 
     def get_signal_results_dataframe(self):
@@ -725,6 +731,7 @@ class AssignmentModel(BaseM4IModel):
         #results = gpd.GeoDataFrame(results, geometry="geometry" ,crs=self.loader.ini.CRS_CALC)
         #return results
         res = self.simulator.agg_results(self.global_t_start, self.global_t_end, agg_int=self.loader.ini.OUTPUT_AGG_INT)
+>>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
         
 
 
@@ -732,7 +739,11 @@ class AssignmentModel(BaseM4IModel):
         #df_geometry = pd.DataFrame([[id_link,ST_Multi(G.get_link(id_link).get_value("geometry"))] for id_link in id_links], columns=["id_link","geometry"])
         #results = results.merge(df_geometry, on="id_link")
         #results = gpd.GeoDataFrame(results, geometry="geometry" ,crs=self.loader.ini.CRS_CALC)
+<<<<<<< HEAD
+        return res
+=======
         return res		
+>>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
         
     def get_paths_dataframe(self, t=None):
         from shapely import MultiLineString

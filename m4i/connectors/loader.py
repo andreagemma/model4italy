@@ -26,8 +26,13 @@ from os.path import join
 
 import warnings
 import websockets.sync.client
+<<<<<<< HEAD
+from m4i.utils.util import min2hhmm
+from ..utils.util import to_datetime_auto, hhmm2min
+=======
 
 from ..utils.util import to_datetime_auto, hhmm2min, min2hhmm, normalize_name
+>>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
 from ..matrix import MatrixODT, MatrixOD
 from ..graphs import DynamicGraph, DynamicTimeArrayAttribute, DynamicCallableAttribute, KPathList, Path, KPathContainer
 from ..utils import util

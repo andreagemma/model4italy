@@ -127,6 +127,11 @@
         "traffic_lights": [
              "sign_nodes_newlast.json"
         ],
+<<<<<<< HEAD
+        "aggregated_results": "aggregated_results_{simulation_id}.parquet",
+        "individual_results": "individual_results_{simulation_id}.geoparquet",
+        "stats_results": "stats_{simulation_id}.csv",
+=======
         "aggregated_results": "aggregated_results_{simulation_id}.geoparquet",
         "trace_results": "trace_results_{simulation_id}.geoparquet",
         "aggregated_results_stats": "aggregated_results_stats_{simulation_id}.parquet",
@@ -135,6 +140,7 @@
             "src": "aggregated_results_{simulation_id}_dir.geoparquet",
             "partition_cols": ["t"]
         },
+>>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
         "paths": "path_{simulation_id}.geoparquet",
         "fcd_paths": {
             "src": "fcd_paths.geoparquet",
@@ -142,7 +148,7 @@
                 "day_type": "{day_type_simulation}"
             }
         },
-        "fcd_paths_clustered": {
+        "fcd_paths_clustered_no": {
             "src": "fcd_paths_clustered.geoparquet"            
         },
         "fcd_trips": {

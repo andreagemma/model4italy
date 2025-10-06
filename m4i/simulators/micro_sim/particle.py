@@ -142,7 +142,11 @@ class car:
                 nl = self.next_link["idx"]
 
                 try:
+<<<<<<< HEAD
+                    nnl = self.path["links"][self.n_l+1]
+=======
                     nnl = None if self.n_l+1 >= len(self.path_links) else self.path_links[self.n_l+1]
+>>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
                 except:
                     nnl = None
                         
@@ -213,7 +217,11 @@ class car:
     def move(self, t):
    
         if self.status == "arrived" and not self.monitored_veh:
+<<<<<<< HEAD
+            return False # UPDATE: GEMMA: se il veicolo è arrivato non deve più muoversi
+=======
             return False 
+>>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
         
         if self.status == "sleeping":
             if t>=self.ent_time:
@@ -242,7 +250,11 @@ class car:
         elif self.status == "queue":
             self.status = "at node"
         
+<<<<<<< HEAD
+        return self.status != "arrived" if not self.monitored_veh else True # UPDATE: GEMMA: se il veicolo è arrivato non deve più muoversi
+=======
         return self.status != "arrived" if not self.monitored_veh else True 
+>>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
 
     def update_cap(self, current_link, next_link):
         #update variable when transfering from current link to next link
