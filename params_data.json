@@ -11,12 +11,12 @@
         },
         "modes": [
             {
-                "id": "c",
+                "code": "c",
                 "description": "car",
                 "eq_factor": 1
             },
             {
-                "id": "h",
+                "code": "h",
                 "description": "heavy",
                 "eq_factor": 2
             }
@@ -127,8 +127,11 @@
         "traffic_lights": [
              "sign_nodes_newlast.json"
         ],
-        "aggregated_results_file": "aggregated_results_{simulation_id}.geoparquet",
-        "aggregated_results": {
+        "aggregated_results": "aggregated_results_{simulation_id}.geoparquet",
+        "trace_results": "trace_results_{simulation_id}.geoparquet",
+        "aggregated_results_stats": "aggregated_results_stats_{simulation_id}.parquet",
+        "signal_results": "signal_results_{simulation_id}.geoparquet",
+        "aggregated_results_tmp": {
             "src": "aggregated_results_{simulation_id}_dir.geoparquet",
             "partition_cols": ["t"]
         },

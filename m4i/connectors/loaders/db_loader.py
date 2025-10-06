@@ -11,6 +11,8 @@ import sqlalchemy as sa
 
 
 from .base_loader import BaseLoader
+from ...utils.util import filters_to_query_expression
+from ...utils.util import pandas_query_to_sql, sql_where_to_pandas
 
 class DBLoader(BaseLoader):
 
@@ -31,8 +33,12 @@ class DBLoader(BaseLoader):
         # if sqlite then load extension
         sql = f"select * from {src}"
         if filters:
-            filters = BaseLoader.filters_to_query_expression(filters=filters)
-            sql += f" WHERE {filters}"
+            if isinstance(filters, str):
+                df_filters = filters
+            else:
+                df_filters = filters_to_query_expression(filters,quoting='', op_boolean_symbols=True)
+            sql_filters = pandas_query_to_sql(df_filters)
+            sql = f"{sql} {sql_filters}"
 
         if engine.dialect.name == 'sqlite':
             import sqlite3
@@ -43,8 +49,14 @@ class DBLoader(BaseLoader):
                     dbapi_conn.load_extension("mod_spatialite")
                     dbapi_conn.enable_load_extension(False)  
 
-        with engine.connect() as conn:                                          
-            df = pd.read_sql(sql,con=conn)
+        with engine.connect() as conn:           
+            schema = parameters.get("schema", None)                               
+            if schema:
+                conn.execute(sa.text(f"SET LOCAL search_path TO {schema}"))
+            try:
+                df = pd.read_sql(sql,con=conn)
+            except Exception as e:
+                raise e
         
         df = BaseLoader.apply_dtype(df, dtype=dtype)
         return df

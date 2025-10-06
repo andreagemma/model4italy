@@ -754,10 +754,6 @@ class DynamicTimeArrayAttribute(DynamicAttribute, Generic[T]):
         return ret
 
 
-# TODO: Callable works with time starting from t=0 but should work from t_start.
-# TODO: TimeArray works with time starting from t=0 to access the array.
-# TODO: Make consistent. If t_Start is in graph, then issues arise with different t_start in msa.
-# TODO: Perhaps use t_start in each call or pass t_start to the function. Does SPP contain t_Start?
 
 
 class DynamicCallableAttribute(DynamicAttribute, Generic[T]):

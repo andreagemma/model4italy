@@ -12,8 +12,8 @@ from datetime import datetime
 import random
 import pdb
 
-transfer_condition = {'mov', 'queue', 'arrived', "sleeping"} # UPDATE: GEMMA
-node_conditions = {'queueing', 'at node'} # UPDATE: GEMMA
+transfer_condition = {'mov', 'queue', 'arrived', "sleeping"} 
+node_conditions = {'queueing', 'at node'} 
 class car:
     ini: IniClass
     loader: Loader 
@@ -72,10 +72,6 @@ class car:
     
     def update_graph(self, graph):
         self.G = graph
-        #new_path = [] #UPDATE: GEMMA inutile perchè il cammino rimane in memoria e associato al veicolo
-        #for link in self.path_links:
-        #   new_path.append(self.G.get_link(link["idx"]))
-        #self.path_links = new_path
         self.current_link = self.G.get_link(self.path_links[self.c_l])
         self.last_link = self.G.get_link(self.path_links[-1])
         if self.status == "sleeping":
@@ -86,8 +82,7 @@ class car:
             
 
     def link_transfer(self, t):            
-        #if self.status == "moving": # UPDATE: GEMMA: implementato a livello superiore per evitare la chiamata
-
+        
         tt = t + self.deltat
         dt = (self.c_l_tf - self.c_l_ti)
             
@@ -135,7 +130,7 @@ class car:
             self.status = "queue"
 
         else:  # the vehicle arrived to a node and needs to check capacity constraints
-            if self.current_link is self.last_link:  # arrived at the end of the last link # UPDATE: GEMMA
+            if self.current_link is self.last_link:  # arrived at the end of the last link 
                 self.status = "arrived"
                 self.current_link["que_vehs"] -= 1
                 self.current_link["storage_cap"] += 1
@@ -218,7 +213,7 @@ class car:
     def move(self, t):
    
         if self.status == "arrived" and not self.monitored_veh:
-            return False # UPDATE: GEMMA: se il veicolo è arrivato non deve più muoversi
+            return False 
         
         if self.status == "sleeping":
             if t>=self.ent_time:
@@ -226,11 +221,11 @@ class car:
                 self.c_l_tf = self.c_l_ti + self.current_link["ta"]  # exit time on current link
         
         test = 0
-        while self.status not in transfer_condition: #UPDATE: GEMMA
+        while self.status not in transfer_condition: 
             test += 1
             if test == 1000:
                 print ("Vehicle locked", str(self.ID), self.status, self.current_link["idx"], self.next_link["idx"])
-            if self.status == "moving": # UPDATE: GEMMA
+            if self.status == "moving": 
                 self.link_transfer(t)
             if self.status in node_conditions:
                 self.node_transfer(t)
@@ -247,7 +242,7 @@ class car:
         elif self.status == "queue":
             self.status = "at node"
         
-        return self.status != "arrived" if not self.monitored_veh else True # UPDATE: GEMMA: se il veicolo è arrivato non deve più muoversi
+        return self.status != "arrived" if not self.monitored_veh else True 
 
     def update_cap(self, current_link, next_link):
         #update variable when transfering from current link to next link

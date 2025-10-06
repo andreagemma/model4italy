@@ -143,6 +143,8 @@ class FileDriver(BaseDriver):
         ext = pathg.suffix.lower()        
 
         # rimuovo i file se "w"
+        if mode == "t":
+            mode = "w"
         if mode == "w":
             if ext == ".shp":
                 files = pathg.glob(os.path.join("*",pathg.with_suffix(".*").name))

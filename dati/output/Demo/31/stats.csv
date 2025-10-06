@@ -1,2 +1,2 @@
 global_t_start,global_t_end,interval,real_time_start,real_time_end,iteration,current_time_start,current_time_end,rgap_time,tot_tt,tot_tt_current,tot_domand,tot_vehicles,cpu_time,total_paths,unique_paths,k_paths
-420,450,0,420,450,0,420,450,,154483050.74573877,154483050.74573877,24062.286123628954,404,15.0 s,6498,3249,1
+420,450,0,420,450,0,420,450,,154483050.74573892,154483050.74573892,24062.286123628954,404,31.346600770950317,6498,3249,1

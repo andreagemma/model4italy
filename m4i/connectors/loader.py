@@ -33,7 +33,7 @@ from ..graphs import DynamicGraph, DynamicTimeArrayAttribute, DynamicCallableAtt
 from ..utils import util
 from .. import IniClass
 from ..log import Logger
-from ..utils import import_dataframe, filters_to_query_expression, rename_filters
+from ..utils import import_dataframe, filters_to_query_expression, rename_filters, pandas_query_to_sql, sql_where_to_pandas
 from ..utils.ipc.ipc import IPC
 from ..params_parser import ParamsParser
 from .loaders.base_loader import BaseLoader
@@ -133,6 +133,15 @@ class Loader(BaseLoader):
         mapping = parameters.get("mapping")
         if filters is not None:
             filters = rename_filters(filters=filters, rename=mapping)
+            if isinstance(filters, str):
+                pass
+            else:
+                filters = filters_to_query_expression(filters,quoting='', op_boolean_symbols=True)
+        if parameters.get("filters"):
+            if filters:
+                filters = f"({filters}) & {parameters.get('filters')}"
+            else:
+                filters = parameters.get("filters", None)
         if dtype is not None:
             dtype_inverse = {mapping.get(k, k): v for k, v in dtype.items()}
         else:
@@ -384,7 +393,25 @@ class Loader(BaseLoader):
         #df = pd.DataFrame(df)
         return df
 
+    def load_modes(self, parameters: dict, **kwargs) -> pd.DataFrame:
+        dtype = self.parser.get_dtype("modes")
+        if isinstance(parameters, list):
+            return pd.DataFrame(parameters)
+        df = self._load_dataset(parameters=parameters, dtype=dtype, geometry=None, **kwargs)
+        if df is None:
+            raise Exception(f"load_modes({parameters}) function return None value")
+        self.parser.check_fields("modes", df)
+        df = pd.DataFrame(df)
+        return df  
     
+    def load_paths(self, parameters: dict, **kwargs) -> pd.DataFrame:
+        dtype = self.parser.get_dtype("paths")
+        df = self._load_dataset(parameters=parameters, dtype=dtype, geometry=None, **kwargs)
+        if df is None:
+            raise Exception(f"load_paths({parameters}) function return None value")
+        self.parser.check_fields("paths", df)
+        df = pd.DataFrame(df)
+        return df  
 
     def load_links_sets(self, parameters: dict, **kwargs) -> pd.DataFrame:
         dtype = self.parser.get_dtype("links_sets")
@@ -719,15 +746,22 @@ class Loader(BaseLoader):
     def _load_modes(self):
         self.log.info("Loading Modes...")
         self._modes = {}
-        parameters = self.parser.get("params.modes")
-        if parameters is None:
-            raise KeyError("key 'modes' not found in execution parameters['params']")
+        if isinstance(self.parser.get("params.modes"), list):
+            parameters = self.parser.get("params.modes")
+        else:
+            parameters = self.parser.get_input_parameters("params.modes")
+            if parameters is None:
+                raise KeyError("key 'modes' not found in execution parameters['params']")
+            df = self.load_modes(parameters)
+            if df is None:
+                raise Exception(f"load_modes({parameters}) function return None value")
+            parameters = df.to_dict(orient="records")
         for mode in parameters:
             if not isinstance(mode,dict):
                 raise KeyError("a single mode must to be a dictionary in parameters['params']['modes']")
-            if "id" not in mode:
+            if "code" not in mode:
                 raise KeyError("a single mode must to contains 'id' key")
-            key=str(mode.pop("id").lower())
+            key=str(mode.pop("code").lower())
             if key == "all":
                 raise KeyError(f"mode '{key}' is reserved")
             

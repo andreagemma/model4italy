@@ -63,9 +63,15 @@ class Writer(ABC):
             parameters = copy.deepcopy(parameters)
             additional_fields = parameters.get("additional_fields", {})
             if additional_fields:
-                for additional_field, v in additional_fields.items():
+                for additional_field, p in additional_fields.items():
                     if additional_field not in df.columns:
+                        if isinstance(p, str):
+                            p = {"value" : p}
+                        v = p.get("value", None)
+                        t = p.get("dtype", None)
                         df[additional_field] = v
+                        if t:
+                            df[additional_field] = df[additional_field].astype(t)
             """
             for k, v in parameters.items():
                 if isinstance(v, (str, int, float)):
@@ -88,15 +94,18 @@ class Writer(ABC):
                         df.to_crs(crs, inplace=True)
 
             partition_cols = parameters.get("partition_cols", None)
-            if parameters.get("mode",None) is not None:
-                m = parameters.get("mode")
-                if m in ["wa","aw","a"]:
-                    mode = m
-                elif m in ["w"]:
-                    warnings.warn(f"Mode {m} is not possibile as parameters for dataset {parameters} are not set to append. Using 'a','wa' mode instead.")
+                        
+            if mode is None:
+                m = parameters.get("mode", "w")
+            else:
+                m = parameters.get("mode", "w")
+                if mode == "a" and m == "w":
+                    m = "a"
                 else:
-                    raise ValueError(f"Invalid mode {m} for dataset {parameters}")  
-            ret = writer.write_dataset(df,parameters=parameters, mode=mode, partition_cols=partition_cols, **kwargs)
+                    m = mode
+            if m not in ["a", "t", "w"]:
+                raise ValueError(f"Invalid mode {mode} for dataset {parameters}")                      
+            ret = writer.write_dataset(df,parameters=parameters, mode=m, partition_cols=partition_cols, **kwargs)
             if ret == False:
                 self.log.warning(f"Failed to write dataset for {parameters}")
                 return False
@@ -118,6 +127,15 @@ class Writer(ABC):
     def has_write_agg_results(self):
         return self.parser.get("params.aggregated_results") is not None
         
+    def has_write_agg_results_stats(self):
+        return self.parser.get("params.aggregated_results_stats") is not None
+
+    def has_write_trace_results(self):
+        return self.parser.get("params.trace_results") is not None
+
+    def has_write_signal_results(self):
+        return self.parser.get("params.signal_results") is not None
+
     def has_write_paths(self):
         return self.parser.get("params.paths") is not None
     
@@ -131,6 +149,26 @@ class Writer(ABC):
         kwargs["mode"] = mode
         return self._write_dataset(**kwargs)
 
+    def write_agg_results_stats(self, results: gpd.GeoDataFrame, mode=None, **kwargs):
+        kwargs["df"] = results
+        #kwargs["dtype"] = self.parser.get_dtype("aggregated_results_stats")
+        kwargs["parameters"] = self.parser.get_output_parameters("params.aggregated_results_stats", df=results)
+        kwargs["mode"] = mode
+        return self._write_dataset(**kwargs)
+    
+    def write_trace_results(self, results: gpd.GeoDataFrame, mode=None, **kwargs):
+        kwargs["df"] = results
+        #kwargs["dtype"] = self.parser.get_dtype("trace_results")
+        kwargs["parameters"] = self.parser.get_output_parameters("params.trace_results", df=results)
+        kwargs["mode"] = mode
+        return self._write_dataset(**kwargs)    
+    
+    def write_signal_results(self, results: gpd.GeoDataFrame, mode=None, **kwargs):
+        kwargs["df"] = results
+        #kwargs["dtype"] = self.parser.get_dtype("signal_results")
+        kwargs["parameters"] = self.parser.get_output_parameters("params.signal_results", df=results)
+        kwargs["mode"] = mode
+        return self._write_dataset(**kwargs)    
     
     def write_paths(self, results: gpd.GeoDataFrame, mode=None, **kwargs):
         kwargs["df"] = results

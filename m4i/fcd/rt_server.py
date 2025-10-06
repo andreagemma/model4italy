@@ -427,6 +427,7 @@ class RTServer(BaseM4IModel):
     
     
     def save_paths(self, paths: PathList, mode) -> None:
+        # TODO: Verificare formato con DB
         """
         Save the calculated paths to a file.
         """
@@ -520,7 +521,8 @@ class RTServer(BaseM4IModel):
         return True
         
     def save_graph(self, graph: AbstractGraph, mode) -> None:
-        #TODO: salvare solo i dati modificati in json o altor
+        #TODO: salvare solo i dati modificati in json o altro
+        # TODO: Verificare formato con DB
         """
         Save the calculated paths to a file.
         """

@@ -43,7 +43,7 @@ CREATE TABLE nodes
     id          bigint                NOT NULL,
     centroid    smallint              NOT NULL,
     modes       text                  NULL,
-    geom        geometry(Point, 4326) NOT NULL,
+    geometry    geometry(Point, 4326) NOT NULL,
 
     CONSTRAINT nodes_pk PRIMARY KEY (id)
 );
@@ -74,7 +74,7 @@ CREATE TABLE links
     rcr         double precision                 NOT NULL,
     capacity    double precision                 NOT NULL,
     modes       text                             NULL,    
-    geom        geometry(MultiLineString, 4326)  NOT NULL,
+    geometry    geometry(MultiLineString, 4326)  NOT NULL,
 
     CONSTRAINT links_pk PRIMARY KEY (id)
 );
@@ -105,7 +105,7 @@ CREATE TABLE detectors
 (
     id           bigint                           NOT NULL,
     id_link      bigint                           NOT NULL,
-    geom         geometry(MultiLineString, 4326)  NOT NULL,
+    geometr      geometry(MultiLineString, 4326)  NOT NULL,
 
     CONSTRAINT detectors_pk PRIMARY KEY (id)
 );
@@ -123,7 +123,7 @@ COMMENT ON COLUMN detectors.geom        IS 'Geometria del tratto di rilevazione,
 CREATE TABLE zones
 (    
     id           bigint                       NOT NULL,
-    geom         geometry(MultiPolygon, 4326) NOT NULL,
+    geometry     geometry(MultiPolygon, 4326) NOT NULL,
 
     CONSTRAINT zones_pk PRIMARY KEY (id)
 );
