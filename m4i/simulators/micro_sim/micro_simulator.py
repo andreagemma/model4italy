@@ -78,11 +78,7 @@ class SigNode:
                 self.G["signalized_turns"][key]["state"] = "red"
                 
                 
-<<<<<<< HEAD
-    def update_graph(self, new_graph): #UPDATE: Gemma 
-=======
     def update_graph(self, new_graph): 
->>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
         for k,v in self.G["signalized_turns"].items():
             new_graph["signalized_turns"][k] = v
         self.G = new_graph
