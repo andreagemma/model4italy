@@ -171,11 +171,7 @@ class MicroSimulator(BaseSimulator):
         car.ind_res = self.ind_res
         car.mon_veh = self.mon_veh
 
-<<<<<<< HEAD
-        self.ini = loader.ini # UPDATE: GEMM
-=======
         self.ini = loader.ini 
->>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
         self.res = None
 
     def set_params(self):
@@ -470,11 +466,7 @@ class MicroSimulator(BaseSimulator):
         result[avg_speed] = result[length]/result[avg_tt]*60
         result[avg_speed] = np.minimum(result[avg_speed], result[v_max])
         result[max_q] = result[max_q].clip(lower=0)
-<<<<<<< HEAD
-        result["q_length"] = (result["max_q"] / result["lanes"]) * self.ini.CAR_LENGTH / result[length] * 100
-=======
         result["q_length"] = (result["max_q"] / result["lanes"]) * (self.ini.CAR_LENGTH / 1000) / result[length] * 100
->>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
         result["q_length"] = result["q_length"].clip(upper= 100)
         
 
@@ -486,19 +478,11 @@ class MicroSimulator(BaseSimulator):
 
         result["mode"] = "all"
         result.rename(columns={avg_mov_vehs: "mov_vehs",avg_que_vehs:"que_vehs",avg_speed: "speed", avg_density: "density", avg_tt: "tt", id_link: "id_link"}, inplace=True)
-<<<<<<< HEAD
-        result_light = result[["time", "mode", "id_link", light_flow_in, light_flow_out, max_q, "mov_vehs", "que_vehs", "speed", "density", "tt"]].copy()
-        result_light["mode"] = "c"
-        result_light.rename(columns={light_flow_in: "flow_in", light_flow_out: "flow_out"}, inplace=True)
-
-        result_heavy = result[["time", "mode", "id_link", heavy_flow_in, heavy_flow_out, max_q, "mov_vehs", "que_vehs", "speed", "density", "tt"]].copy()
-=======
         result_light = result[["time", "mode", "id_link", light_flow_in, light_flow_out, max_q, "mov_vehs", "que_vehs", "speed", "density", "tt", "geometry", "q_length"]].copy()
         result_light["mode"] = "c"
         result_light.rename(columns={light_flow_in: "flow_in", light_flow_out: "flow_out"}, inplace=True)
 
         result_heavy = result[["time", "mode", "id_link", heavy_flow_in, heavy_flow_out, max_q, "mov_vehs", "que_vehs", "speed", "density", "tt", "geometry", "q_length"]].copy()
->>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
         result_heavy["mode"] = "h"
         result_heavy.rename(columns={heavy_flow_in: "flow_in", heavy_flow_out: "flow_out"}, inplace=True)
 
@@ -562,11 +546,7 @@ class MicroSimulator(BaseSimulator):
 
             stat = []
             for seg, links in segment.items():
-<<<<<<< HEAD
-                mask = (result_stats["id"].isin(links))
-=======
                 mask = (result_stats["id_link"].isin(links))
->>>>>>> fdca169cce56362b2a49e34baab62fad6758cf32
                 if mask.any():
                     _ = f_stat(result_stats[mask])
                     _["segment_id"] = seg
