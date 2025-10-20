@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from typing import List, Callable, Dict, Union, Optional
 from types import MappingProxyType
+import warnings
 
 
 def _convert_to_dict(labels: Union[List, np.ndarray, Dict]) -> Dict:
@@ -63,9 +64,10 @@ class MatrixOD:
         i, j = pos
         vi = self.rows.get(i)
         vj = self.cols.get(j)
-        #if vi is None or vj is None:
-        #    raise KeyError(f"Keys {i}, {j} not found in rows or columns.")
-        self.mat[vi, vj] = v
+        if vi is None or vj is None:
+            warnings.warn(f"Keys {i}, {j} not found in rows or columns.")
+        else:
+            self.mat[vi, vj] = v
 
     def __repr__(self) -> str:
         return repr(self.mat)

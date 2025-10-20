@@ -51,7 +51,9 @@ class Logger:
             l = logging.getLogger()
         else:
             l = logging.getLogger(Logger.log_name)
-        if l.level != logging.NOTSET:
+        if hasattr(Logger, 'level'):
+            ret.setLevel(Logger.level)
+        elif l.level != logging.NOTSET:
             ret.setLevel(l.level)
         else:
             ret.setLevel(l.parent.level)
@@ -107,7 +109,7 @@ class Logger:
         else:
             Logger.engine = None
         
-        Logger.level = logging.DEBUG if level is not None else level
+        Logger.level = logging.DEBUG if level is None else level
         Logger.log_name = log_name
         logging.getLogger("filelock").setLevel(logging.WARNING)
         logging.getLogger("pyogrio._io").setLevel(logging.WARNING)
@@ -156,13 +158,15 @@ class Logger:
                 'default': {
                     'formatter': 'm4iformatter',
                     'class': 'logging.StreamHandler',
+                    'level': Logger.level,
                 },
                 'file': {
                     'formatter': 'timing',
                     'class': 'logging.handlers.RotatingFileHandler',
                     'filename': os.path.join(Logger.dir_log, "traffic_simulator.log"),
                     'maxBytes': 10485760,
-                    'backupCount': 10
+                    'backupCount': 10,
+                    'level': Logger.level,
                 }
             },
             'loggers': {

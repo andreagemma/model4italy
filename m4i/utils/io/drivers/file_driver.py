@@ -100,7 +100,8 @@ class FileDriver(BaseDriver):
                 df = gpd.GeoDataFrame(df,geoemtry=geom, crs=crs) if crs else gpd.GeoDataFrame(df,geometry=geom)
         elif ext in (".shp",".gpkg"):
             if pathg.is_file():
-                df = gpd.read_file(pathg.as_posix())
+                layer = kwargs.pop("layer", None)
+                df = gpd.read_file(pathg.as_posix(), layer=layer)
             else:
                 files = pathg.glob(os.path.join("*","*"+pathg.suffix))
                 df = None
@@ -137,89 +138,91 @@ class FileDriver(BaseDriver):
         crs: Optional[str] = None,        
         **kwargs
     ):
-        partition_cols=partitionby
-        
-        pathg: Path = Path(path)
-        ext = pathg.suffix.lower()        
+        with warnings.catch_warnings(record=True) as w:
+            partition_cols=partitionby
+            
+            pathg: Path = Path(path)
+            ext = pathg.suffix.lower()        
 
-        # rimuovo i file se "w"
-        if mode == "t":
-            mode = "w"
-        if mode == "w":
-            if ext == ".shp":
-                files = pathg.glob(os.path.join("*",pathg.with_suffix(".*").name))
-                files = [f for f in files if f.is_file() and f.suffix.lower() in (".shp", ".shx", ".dbf", ".prj", ".cpg", ".sbn", ".sbx", ".fbn", ".fbx", ".ain", ".aih", ".atx") or str(f).endswith(".shp.xml")]
-            else:
-                files = [pathg]
-            for f in files:
-                remove_path(str(f))      
-            # rimuovo eventuale cartella principale
-            remove_path(pathg)
-        
-        
-        if partition_cols:
-            sql_partition_by = f", PARTITION_BY ({','.join(partition_cols)})"
-        else:
-            sql_partition_by = ''
-        if ext==".csv":
-            #geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="ignore")
-            df = BaseDriver.to_dataframe(df, geometry_col=geometry_col, crs=crs)
-            if df is None:
-                raise ValueError ("Impossible to export. The data is not a dataframe or geodataframe")
+            # rimuovo i file se "w"
+            if mode == "t":
+                mode = "w"
+            if mode == "w" and not (ext in (".gpkg", ".geopackage")):
+                if ext == ".shp":
+                    files = pathg.glob(os.path.join("*", pathg.with_suffix(".*").name))
+                    files = [f for f in files if f.is_file() and f.suffix.lower() in (".shp", ".shx", ".dbf", ".prj", ".cpg", ".sbn", ".sbx", ".fbn", ".fbx", ".ain", ".aih", ".atx") or str(f).endswith(".shp.xml")]
+                else:
+                    files = [pathg]
+                for f in files:
+                    remove_path(str(f))      
+                # rimuovo eventuale cartella principale
+                remove_path(pathg)
+            
+            
             if partition_cols:
+                sql_partition_by = f", PARTITION_BY ({','.join(partition_cols)})"
+            else:
+                sql_partition_by = ''
+            if ext==".csv":
+                #geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="ignore")
+                df = BaseDriver.to_dataframe(df, geometry_col=geometry_col, crs=crs)
+                if df is None:
+                    raise ValueError ("Impossible to export. The data is not a dataframe or geodataframe")
+                if partition_cols:
+                    if index:
+                        df = df.reset_index()
+                    con = duckdb.connect()
+                    con.register("df",df)
+                    con.execute(f"""
+                        COPY (SELECT * FROM df)
+                        TO '{pathg.as_posix()}'
+                        (FORMAT CSV {sql_partition_by}{", APPEND true" if mode=="a" else ""}, FILENAME_PATTERN '{{uuidv7}}-{{i}}');
+                    """)
+                else:
+                    header = kwargs.pop("header",True)
+                    if header:
+                        if pathg.exists() and mode=="a":
+                            header=False
+                    df.to_csv(pathg,index=index, mode=mode, header = header, **kwargs)
+            elif ext == '.parquet':
+                geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="ignore")    
+                df = BaseDriver.to_dataframe(df, geometry_col=geometry_col, crs=crs)
+                if df is None:
+                    raise ValueError ("Impossible to export. The data is not a dataframe or geodataframe")
+                write_parquet(df, path=pathg, partition_cols=partition_cols, mode=mode, index=index)        
+            elif ext == '.geoparquet':    
+                geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="warn")    
+                df = BaseDriver.to_geodataframe(df, geometry_col=geometry_col, crs=crs)
+                if df is None:
+                    raise ValueError ("Impossible to export. The data is not a dataframe or geodataframe")
+                write_geoparquet(df, path=pathg, geom_col=geometry_col, partition_cols=partition_cols, mode=mode, index=index)
+            elif ext == '.shp':
+                geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="warn")    
+                df = BaseDriver.to_geodataframe(df, geometry_col=geometry_col, crs=crs)
+                if df is None:
+                    raise ValueError ("Impossible to export. The data is not a dataframe or geodataframe")
                 if index:
                     df = df.reset_index()
-                con = duckdb.connect()
-                con.register("df",df)
-                con.execute(f"""
-                    COPY (SELECT * FROM df)
-                    TO '{pathg.as_posix()}'
-                    (FORMAT CSV {sql_partition_by}{", APPEND true" if mode=="a" else ""}, FILENAME_PATTERN '{{uuidv7}}-{{i}}');
-                """)
-            else:
-                header = kwargs.pop("header",True)
-                if header:
-                    if pathg.exists() and mode=="a":
-                        header=False
-                df.to_csv(pathg,index=index, mode=mode, header = header, **kwargs)
-        elif ext == '.parquet':
-            geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="ignore")    
-            df = BaseDriver.to_dataframe(df, geometry_col=geometry_col, crs=crs)
-            if df is None:
-                raise ValueError ("Impossible to export. The data is not a dataframe or geodataframe")
-            write_parquet(df, path=pathg, partition_cols=partition_cols, mode=mode, index=index)        
-        elif ext == '.geoparquet':    
-            geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="warn")    
-            df = BaseDriver.to_geodataframe(df, geometry_col=geometry_col, crs=crs)
-            if df is None:
-                raise ValueError ("Impossible to export. The data is not a dataframe or geodataframe")
-            write_geoparquet(df, path=pathg, geom_col=geometry_col, partition_cols=partition_cols, mode=mode, index=index)
-        elif ext == '.shp':
-            geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="warn")    
-            df = BaseDriver.to_geodataframe(df, geometry_col=geometry_col, crs=crs)
-            if df is None:
-                raise ValueError ("Impossible to export. The data is not a dataframe or geodataframe")
-            if index:
-                df = df.reset_index()
-            if partition_cols:
-                BaseDriver.write_partitioned(df, file=pathg, partition_cols=partition_cols, support_append=True, 
-                                fn_save=lambda x,f: gpd.GeoDataFrame.to_file(x, Path(f).as_posix(), driver="ESRI Shapefile", mode="a"))
-            else:
-                df.to_file(pathg.as_posix(), driver="ESRI Shapefile", mode=mode)
-        elif ext == '.gpkg':
-            geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="warn")    
-            df = BaseDriver.to_geodataframe(df, geometry_col=geometry_col, crs=crs)
-            if df is None:
-                raise ValueError ("Impossible to export. The data is not a dataframe or geodataframe")
-            if index:
-                df = df.reset_index()
-            if partition_cols:
-                BaseDriver.write_partitioned(df, file=pathg, partition_cols=partition_cols, support_append=True, 
-                                fn_save=lambda x,f: gpd.GeoDataFrame.to_file(x, Path(f).as_posix(), driver="GPKG", mode="a",layer = kwargs.get("layer", Path(f).stem)))
-            else:
-                layer = kwargs.get("layer", pathg.stem)
-                df.to_file(pathg.as_posix(), driver="GPKG", mode=mode, layer=layer)
-                
+                if partition_cols:
+                    BaseDriver.write_partitioned(df, file=pathg, partition_cols=partition_cols, support_append=True, 
+                                    fn_save=lambda x,f: gpd.GeoDataFrame.to_file(x, Path(f).as_posix(), driver="ESRI Shapefile", mode="a"))
+                else:
+                    df.to_file(pathg.as_posix(), driver="ESRI Shapefile", mode=mode)
+            elif ext in ('.gpkg', '.geopackage'):        
+                geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="warn")    
+                df = BaseDriver.to_geodataframe(df, geometry_col=geometry_col, crs=crs)
+                if df is None:
+                    raise ValueError ("Impossible to export. The data is not a dataframe or geodataframe")
+                if index:
+                    df = df.reset_index()
+                if partition_cols:
+                    BaseDriver.write_partitioned(df, file=pathg, partition_cols=partition_cols, support_append=True, 
+                                    fn_save=lambda x,f: gpd.GeoDataFrame.to_file(x, Path(f).as_posix(), driver="GPKG", mode="a",layer = kwargs.get("layer", Path(f).stem)))
+                else:
+                    layer = kwargs.get("layer", pathg.stem)
+                    df.to_file(pathg.as_posix(), driver="GPKG", mode=mode, layer=layer)
+        for warning in w:
+            warnings.warn(f"Warning for file {pathg}: {warning.message}")
 
 def write_geoparquet(
     gdf: gpd.GeoDataFrame,

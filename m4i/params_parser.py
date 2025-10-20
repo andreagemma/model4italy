@@ -3,7 +3,7 @@ import copy
 import datetime
 import operator
 import time
-from typing import Union, Any, Iterable, Callable
+from typing import Union, Any, Iterable, Callable, Optional
 import json
 import ast
 import pandas as pd
@@ -24,7 +24,13 @@ class ParamsParser:
     """
     A class to parse parameters from a string.
     """
-
+    def __init__(self, params: Union[str,dict, list,tuple], settings: Optional[IniClass] = None, options: Optional[dict] = None):        
+        self.params:dict | None = ParamsParser.params_to_dict(params)
+        deep_update(self.params, options)
+        self.fields:dict = self.init_fields()
+        self.ini:IniClass | None = settings
+        self.update_params()
+    
     def update_date(self, dt=None, name="simulation", override=True, time=True, date=True) -> None:
         if dt:
             dt = to_datetime_auto(dt)
@@ -68,7 +74,7 @@ class ParamsParser:
             return "weekday"
         
     @staticmethod
-    def params_to_dict(params: Union[str,dict, list,tuple]) -> dict:
+    def params_to_dict(params: Union[str,dict, list,tuple]) -> dict | None:
         if isinstance(params, str):
             try:
                 params=params.strip()
@@ -82,21 +88,20 @@ class ParamsParser:
             except Exception as ex:
                 raise ValueError(f"Invalid parameters: {params}") from ex
         elif isinstance(params, (list,tuple)):
-            ret = {}
+            ret: dict | None = None
             for p in params:
-                if p:
-                    ret.update(ParamsParser.params_to_dict(p))
+                if ret is None:
+                    ret = ParamsParser.params_to_dict(p)
+                else:
+                    d: dict | None = ParamsParser.params_to_dict(p)
+                    if d:
+                        d.update(ret)
+                        ret = d
             params = ret
         if not isinstance(params, dict):    
             raise ValueError("Invalid parameters: %s" % params)        
         return params
-    def __init__(self, params: Union[str,dict, list,tuple], settings: IniClass=None, options: dict = None):        
-        self.params:dict = ParamsParser.params_to_dict(params)
-        deep_update(self.params, options)
-        self.fields:dict = self.init_fields()
-        self.ini:IniClass = settings
-        self.update_params()
-
+    
     def get_dict(self) -> dict:
         from copy import deepcopy
         settings = self.ini.get_dict()
@@ -112,13 +117,12 @@ class ParamsParser:
         return parser
 
     @staticmethod
-    def from_file(params_path: str="params.ini", settings_path: str="settings.ini") -> ParamsParser:
+    def from_file(params: Union[str,dict, list,tuple], settings: str="settings.ini") -> ParamsParser:
         """
         Load parameters from a JSON file.
         """
-        with open(params_path, "r") as f:
-            params = json.load(f)
-        ini = IniClass(settings_path)
+
+        ini = IniClass(settings)
         parser = ParamsParser(params=params, settings=ini)
         return parser
     

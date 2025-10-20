@@ -241,7 +241,7 @@ class AssignmentModel(BaseM4IModel):
                 mode = None if self.interval==0 else "a"
                 self.writer.write(df,"params.statistics", mode=mode)
         except Exception as e:
-            self.log.error("Failed to save paths:", exc_info=e, stack_info=True)     
+            self.log.error("Failed to save statistics:", exc_info=e, stack_info=True)     
 
     def write_paths(self):
         try:

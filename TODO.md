@@ -10,6 +10,7 @@
 - [x] Salvataggio dati micro di simulazione
 - [x] Salvataggio dati stats
 - [x] Salvataggio dati intersezione
+- [ ] Calcolo e salvataggio splitting rates di arco
 - [ ] Correggere formato cammini offline secondo specifiche DB
 - [ ] Stima OD Online con gestione day_type
 - [ ] Stima OD Offline con gestione day_type

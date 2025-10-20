@@ -1,3 +1,4 @@
+import os
 import time
 from .ops import *
 from .simulators import BaseSimulator, MicroSimulator, StaticSimulator
@@ -40,11 +41,13 @@ class Dispatcher(BaseM4IModel):
         self.op = self.parser.get("op")
         self._ipc = None
         if self.parser.ini.PARALLEL_USE:
+            self.log.debug(f"Initializing parallel engine {self.parser.ini.PARALLEL_ENGINE} with {self.parser.ini.PARALLEL_NUMCPUS} cpus...")
             Parallel.initialize_parallel(
                 engine=self.parser.ini.PARALLEL_ENGINE,
                 num_cpus=self.parser.ini.PARALLEL_NUMCPUS,  
                 address=self.parser.ini.PARALLEL_CLUSTER_ADDRESS
             )
+            self.log.info(f"Parallel engine {Parallel.parallel_engine} initialized with {Parallel.num_cpus} cpus")
         else:
             Parallel.initialize_parallel(
                 engine=Parallel.ENGINE_NONE,
@@ -61,7 +64,12 @@ class Dispatcher(BaseM4IModel):
                     "execution_id": [self.execution_id],
                     "params": [json.dumps(self.parser.get_dict())]
                 })
-                self.writer.write(df, "params.params", mode="w")
+                p = self.parser.get_output_parameters("params.params")
+                if "src" in p and p["src"].lower().endswith(".json"):
+                    with open(os.path.join(p["location"], p["src"]), 'w') as f:
+                        json.dump(self.parser.get_dict(), f, indent=4)
+                else:
+                    self.writer.write(df, "params.params", mode="w")
             except Exception as ex:
                 self.log.error(f"Error writing params.json: {ex}")
     @property
@@ -81,7 +89,7 @@ class Dispatcher(BaseM4IModel):
                 self._ipc = None
         return self._ipc
     
-    def run(self):
+    def run(self) -> "Dispatcher":
         try:
             if self.execution_id is None:
                 self.log.info(f"Running op:{self.op}...")
@@ -107,6 +115,8 @@ class Dispatcher(BaseM4IModel):
                 self.run_rt_server_clustering()
             elif self.op == "ipc":
                 self.run_ipc_client()                
+            elif self.op == "init":
+                self.log.info("System initialized")
             else:
                 raise ValueError(f"Operation {self.op} not recognized")
             
@@ -114,7 +124,8 @@ class Dispatcher(BaseM4IModel):
                 self.log.info("Execution finished in %.2f seconds", time.time() - self.t_start)
             else:
                 Execution.set_execution_success(self.execution_id)
-                self.log.info(f"Execution ({self.execution_id}) finished in %.2f seconds", time.time() - self.t_start)            
+                self.log.info(f"Execution ({self.execution_id}) finished in %.2f seconds", time.time() - self.t_start)          
+            return self  
         except Exception as ex:
             if self.execution_id is None:
                 self.log.info("Execution terminated abnormally in %.2f seconds", time.time() - self.t_start)  

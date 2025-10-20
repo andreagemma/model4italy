@@ -1,47 +1,78 @@
 import logging
-from .utils.util import nested_dict_from_key_value_list
 
-def main():    
+from .base_m4i_model import BaseM4IModel
+from .utils.util import get_parametric_name, nested_dict_from_key_value_list
+from typing import Optional
+import sys
+import json
+def main(**kwargs)->Optional[BaseM4IModel]:    
     import argparse
     import os
         
     prc = None
     try:
-        parser = argparse.ArgumentParser(description="Run an elaboration or start the server")
-        parser.add_argument('-p', '--params', default='params.json', help='JSON file with parameters (default: params.json)')
-        parser.add_argument('-d', '--params_data', help='JSON file with data parameters (default: params_data.json)')
-        parser.add_argument('-c', '--config', default='settings.ini', help='Configuration file (default: settings.ini)')
-        parser.add_argument('-m', '--monitor', help='Folder of results of monitor process. If not specified, the process is not monitored')
-        parser.add_argument('-O', '--option', action='append', help='Option parameter. Override JSON setting.')
-        parser.add_argument('-e', '--env', action='append', help='Override Enviroment Variables.')
-        subparsers = parser.add_subparsers(dest='command', help='Sub-command help')
+        # Controlla se esistono argomaenti passati alla line di comando
+        if len(sys.argv) > 1 and not kwargs:
+            parser = argparse.ArgumentParser(description="Run an elaboration or start the server")
+            parser.add_argument('-p', '--params', default='params.json', help='JSON file with parameters (default: params.json)')
+            parser.add_argument('-d', '--params_data', help='JSON file with data parameters (default: params_data.json)')
+            parser.add_argument('-c', '--config', default='settings.ini', help='Configuration file (default: settings.ini)')
+            parser.add_argument('-m', '--monitor', help='Folder of results of monitor process. If not specified, the process is not monitored')
+            parser.add_argument('-O', '--option', action='append', help='Option parameter. Override JSON setting.')
+            parser.add_argument('-e', '--env', action='append', help='Override Enviroment Variables.')
+            subparsers = parser.add_subparsers(dest='command', help='Sub-command help')
 
-        # Subparser for the "run" command
-        parser_run = subparsers.add_parser('run', help='Run an elaboration')
-        parser_run.add_argument('-p', '--params', default='params.json', help='JSON file with parameters (default: params.json)')
-        parser_run.add_argument('-d', '--params-data', help='JSON file with data parameters (default: params_data.json)')
-        parser_run.add_argument('-c', '--config', default='settings.ini', help='Configuration file (default: settings.ini)')        
-        parser_run.add_argument('-o', '--op', help='Operation. Override JSON setting (default: None)')
-        parser_run.add_argument('-O', '--option', action='append', help='Option parameter. Override JSON setting.')
-        parser_run.add_argument('-e', '--env', action='append', help='Override Enviroment Variables.')
+            # Subparser for the "run" command
+            parser_run = subparsers.add_parser('run', help='Run an elaboration')
+            parser_run.add_argument('-p', '--params', default='params.json', help='JSON file with parameters (default: params.json)')
+            parser_run.add_argument('-d', '--params-data', help='JSON file with data parameters (default: params_data.json)')
+            parser_run.add_argument('-c', '--config', default='settings.ini', help='Configuration file (default: settings.ini)')        
+            parser_run.add_argument('-o', '--op', help='Operation. Override JSON setting (default: None)')
+            parser_run.add_argument('-O', '--option', action='append', help='Option parameter. Override JSON setting.')
+            parser_run.add_argument('-e', '--env', action='append', help='Override Enviroment Variables.')
 
-        # Subparser for the "server" command
-        parser_server = subparsers.add_parser('server', help='Start the web server')
-        parser_server.add_argument('-P', '--port', type=int, help='web server port')
-        parser_server.add_argument('-H', '--host', help='Web server host address')
-        parser_server.add_argument('-D', '--debug', action='store_true', help='Enable web server debug mode')
+            # Subparser for the "server" command
+            parser_server = subparsers.add_parser('server', help='Start the web server')
+            parser_server.add_argument('-P', '--port', type=int, help='web server port')
+            parser_server.add_argument('-H', '--host', help='Web server host address')
+            parser_server.add_argument('-D', '--debug', action='store_true', help='Enable web server debug mode')
 
-        parser_init_db = subparsers.add_parser('init_db', help='Initialize the database')
-        parser_init_db.add_argument('-u', '--url', help='Database URL')
-        parser_init_db.add_argument('-H', '--host', help='Database host address')
-        parser_init_db.add_argument('-P', '--port', help='Database port')
-        parser_init_db.add_argument('-U', '--user', help='Database user')
-        parser_init_db.add_argument('-W', '--password', help='Database password')
-        parser_init_db.add_argument('-N', '--name', help='Database name')
-        parser_init_db.add_argument('-T', '--type', help='Database type')
-        parser_init_db.add_argument('-D', '--driver', help='Database driver')
+            parser_init_db = subparsers.add_parser('init_db', help='Initialize the database')
+            parser_init_db.add_argument('-u', '--url', help='Database URL')
+            parser_init_db.add_argument('-H', '--host', help='Database host address')
+            parser_init_db.add_argument('-P', '--port', help='Database port')
+            parser_init_db.add_argument('-U', '--user', help='Database user')
+            parser_init_db.add_argument('-W', '--password', help='Database password')
+            parser_init_db.add_argument('-N', '--name', help='Database name')
+            parser_init_db.add_argument('-T', '--type', help='Database type')
+            parser_init_db.add_argument('-D', '--driver', help='Database driver')
 
-        args = parser.parse_args()
+            
+            args = parser.parse_args()
+        else: 
+            args = argparse.Namespace()
+            args.command = 'run'
+            args.op = None            
+            args.params = 'params.json'
+            args.params_data = None
+            args.config = 'settings.ini'
+            args.monitor = None
+            args.host = None
+            args.port = None
+            args.debug = None
+            args.user = None
+            args.password = None
+            args.name = None
+            args.type = None
+            args.driver = None
+            args.host = None
+            args.port = None
+            args.option = None
+            args.env = None
+
+        for k,v in kwargs.items():
+            if hasattr(args, k):
+                setattr(args, k, v)
         if args.monitor is not None:
             prc = launch_monitor(directory=args.monitor)
         else:
@@ -63,6 +94,8 @@ def main():
                     raise Exception(f"Invalid option format: {option}. Use key:subkey:subsubkey=value format.")
                 options[key] = value
             options = nested_dict_from_key_value_list(options)
+        if hasattr(args,"op") and args.op:
+            options["op"] = args.op
         if args.command == 'init_db':
             init_db(
                 ini_file=args.config,
@@ -76,7 +109,7 @@ def main():
             )
         else:
             if args.command == 'run':
-                run(ini_file=args.config,
+                return run(ini_file=args.config,
                 params=args.params,
                 params_data=args.params_data,
                 options=options)
@@ -192,9 +225,18 @@ def run(ini_file="settings.ini", params="params.json", params_data="params_data.
     if params_data:
         params = [params_data, params]                
     else:
-        if os.path.exists("params_data.json"):
-            params = ["params_data.json", params]
-    Dispatcher(params=params, options=options, ini=config).run()       
+        if os.path.exists("params_data.json") and isinstance(params, str):
+            try:
+                data = json.load(open(params))
+                if "data_file" in data:
+                    from .utils import get_parametric_name
+                    data_file = get_parametric_name(data["data_file"], **data)
+                    params = [params, data_file]
+                else:
+                    params = [params,"params_data.json"]
+            except:
+                params = [params,"params_data.json"]
+    return Dispatcher(params=params, options=options, ini=config).run()       
 
 def run_server(ini_file="settings.ini", host=None, port=None, debug=None):
     """

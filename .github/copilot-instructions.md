@@ -1,0 +1,1 @@
+Non generare automaticamente delle istruzioni di import durante l'editing dei file.

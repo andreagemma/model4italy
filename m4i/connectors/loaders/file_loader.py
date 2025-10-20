@@ -4,6 +4,7 @@ Created on Thu Jun 24 19:11:39 2021
 
 @author: andge
 """
+import copy
 import pandas as pd
 import geopandas as gpd
 from os.path import join

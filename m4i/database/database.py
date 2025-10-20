@@ -11,15 +11,20 @@ from sqlalchemy import (
 )
 
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session, scoped_session
+from sqlalchemy.orm import sessionmaker, Session, scoped_session, registry
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from sqlalchemy import event, text
 
+import warnings
 from ..log import Logger
 from ..server.status import Status
-
-Base = declarative_base()
-_LOCK = threading.Lock()
+import warnings
+try:
+    mapper_registry = registry()
+    Base = mapper_registry.generate_base()
+    _LOCK = threading.Lock()
+except:
+    warnings.warn("SQLAlchemy is required for database operations. Please install it using 'pip install SQLAlchemy'.")
 
 class Token(Base):
     __tablename__ = 'tokens'

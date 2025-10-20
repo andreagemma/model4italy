@@ -6,12 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "m4i"
 version = "0.1.0"
 authors = [
-    { name = "Andrea Ge,,a", email = "andrea.geoma@uniroma3.it" }
+    { name = "Andrea Gemma", email = "andrea.geoma@uniroma3.it" }
 ]
 description = "Modello di simulazione mesoscopico per l'analisi di sistemi di trasporto - Model4Italy"
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = [
     "numpy>=2.2.5",
     "shapely>=2.1.0",
@@ -39,5 +39,8 @@ dependencies = [
     "pyproj>=3.7.1",
     "polars>=1.30.0",
     "websockets>=15.0.1",
-    "redis>=6.1.0"
+    "redis>=6.1.0",
+    "scikit-learn==1.7.1",
+    "duckdb==1.4.0",
+    "ipywidgets"
 ]

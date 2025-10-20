@@ -27,6 +27,7 @@ from os.path import join
 import warnings
 import websockets.sync.client
 
+from m4i.utils.util import deserialize
 from ..utils.util import to_datetime_auto, hhmm2min, min2hhmm, normalize_name
 from ..matrix import MatrixODT, MatrixOD
 from ..graphs import DynamicGraph, DynamicTimeArrayAttribute, DynamicCallableAttribute, KPathList, Path, KPathContainer
@@ -405,12 +406,15 @@ class Loader(BaseLoader):
         return df  
     
     def load_paths(self, parameters: dict, **kwargs) -> pd.DataFrame:
-        dtype = self.parser.get_dtype("paths")
-        df = self._load_dataset(parameters=parameters, dtype=dtype, geometry=None, **kwargs)
-        if df is None:
-            raise Exception(f"load_paths({parameters}) function return None value")
-        self.parser.check_fields("paths", df)
-        df = pd.DataFrame(df)
+        if isinstance(parameters, dict):
+            dtype = self.parser.get_dtype("paths")
+            df = self._load_dataset(parameters=parameters, dtype=dtype, geometry=None, **kwargs)
+            if df is None:
+                raise Exception(f"load_paths({parameters}) function return None value")
+            self.parser.check_fields("paths", df)
+            df = pd.DataFrame(df)
+        elif isinstance(parameters, pd.DataFrame):
+            df = parameters            
         return df  
 
     def load_links_sets(self, parameters: dict, **kwargs) -> pd.DataFrame:
@@ -611,7 +615,7 @@ class Loader(BaseLoader):
         return self._df_turns
 
     def load_df_graph(self, name="params.supply"):
-        self.log.info("Loading Data Graph...")
+        self.log.debug("Loading Data Graph...")
         parameters = self.parser.get(name)
         if parameters is None:
             raise KeyError("key 'supply' not found in execution parameters['params']")
@@ -619,7 +623,7 @@ class Loader(BaseLoader):
         df_nodes = None
         df_turns = None
         for id_net, net_param in enumerate(parameters):
-            self.log.info(f"Loading Net {id_net}")
+            self.log.debug(f"Loading Net {id_net}")
             if "links" in net_param:
                 links_parameters = self.parser.get_input_parameters(f"params.supply.{id_net}.links")
                 tmp = self.load_links(links_parameters)
@@ -661,7 +665,7 @@ class Loader(BaseLoader):
                 self._coefficients =  json.load(json_file)
             
     def _load_zones(self):
-        self.log.info("Loading Zones...")
+        self.log.debug("Loading Zones...")
         parameters = self.parser.get_input_parameters("params.zones")
         if parameters is None:
             raise KeyError("key 'zones' not found in execution parameters['params']")
@@ -724,11 +728,10 @@ class Loader(BaseLoader):
         parameters = self.parser.get("params.paths")
         if parameters is None:
             raise KeyError("key 'paths' not found in execution parameters['params']")
-        
         pl: KPathList = KPathList()
         for id_paths, paths_params in enumerate(parameters):
             self.log.info(f"Loading Paths Set {id_paths}...")
-            paths_params = self.parser.get_output_parameters("params.paths", id_paths)
+            paths_params = self.parser.get_input_parameters(parameters, id_paths, from_output=True)
             if "src" not in paths_params:
                 raise KeyError("key 'src' required in paths parameters")
 
@@ -744,7 +747,7 @@ class Loader(BaseLoader):
         return pl
     
     def _load_modes(self):
-        self.log.info("Loading Modes...")
+        self.log.debug("Loading Modes...")
         self._modes = {}
         if isinstance(self.parser.get("params.modes"), list):
             parameters = self.parser.get("params.modes")
@@ -773,7 +776,7 @@ class Loader(BaseLoader):
 
     
     def _load_traffic_ligths(self):
-        self.log.info("Loading Traffic Ligths...")
+        self.log.debug("Loading Traffic Ligths...")
         parameters = self.parser.get("params.traffic_lights")
         
         if parameters is None:
@@ -782,7 +785,7 @@ class Loader(BaseLoader):
         else:
             self._sign_nodes = []
             for id_tl, tl_params in enumerate(self.dparams["params"]["traffic_lights"]):
-                self.log.info(f"Loading Traffic Light {id_tl}...")
+                self.log.debug(f"Loading Traffic Light {id_tl}...")
                 tl_params = self.parser.get_input_parameters("params.traffic_lights", id_tl)                
                 if "src" not in tl_params:
                     raise KeyError("key 'src' required in traffic_lights parameters")                
@@ -804,7 +807,7 @@ class Loader(BaseLoader):
 
     def _load_events(self):
         self._load_links_sets()
-        self.log.info(f"Loading Events...")
+        self.log.debug(f"Loading Events...")
         parameters = self.parser.get("params.events")
         if parameters is None:
             self._events = {}
@@ -812,7 +815,7 @@ class Loader(BaseLoader):
         else:
             df_events = pd.DataFrame()
             for id_set, event_params in enumerate(parameters):
-                self.log.info(f"Loading Events {id_set}...")
+                self.log.debug(f"Loading Events {id_set}...")
                 event_params = self.parser.get_input_parameters("params.events", id_set)
                 if "src" not in event_params:
                     raise KeyError("key 'src' required in events parameters")
@@ -868,7 +871,7 @@ class Loader(BaseLoader):
         return id_links
 
     def _load_links_sets(self):
-        self.log.info(f"Loading Links Sets...")
+        self.log.debug(f"Loading Links Sets...")
         parameters = self.parser.get("params.links_sets")
         if parameters is None:
             self._links_sets = {}
@@ -876,7 +879,7 @@ class Loader(BaseLoader):
         else:
             df_links_sets = pd.DataFrame()
             for id_set, set_params in enumerate(parameters):                
-                self.log.info(f"Loading Links Set {id_set}...")
+                self.log.debug(f"Loading Links Set {id_set}...")
                 set_params = self.parser.get_input_parameters("params.links_sets", id_set)
                 if "src" not in set_params:
                     raise KeyError("key 'src' required in links_sets parameters")
@@ -891,7 +894,7 @@ class Loader(BaseLoader):
             self.log.info(f"Links Sets identified {len(self.links_sets)}")
             
     def _load_detectors(self):
-        self.log.info("Loading Detectors...")
+        self.log.debug("Loading Detectors...")
         parameters = self.parser.get("params.detectors")
         if parameters is None:            
             self.log.warning("key 'detectors' not found in execution parameters['params']")
@@ -899,7 +902,7 @@ class Loader(BaseLoader):
         else:
             detectors = pd.DataFrame()
             for id_det, set_detect in enumerate(parameters):                
-                self.log.info(f"Loading Detectors {id_det}...")
+                self.log.debug(f"Loading Detectors {id_det}...")
                 set_detect = self.parser.get_input_parameters("params.detectors", id_det)
                 if "src" not in set_detect:
                     raise KeyError("key 'src' required in links_sets parameters")
@@ -908,9 +911,13 @@ class Loader(BaseLoader):
                     raise Exception(f"load_detectors({set_detect}) function return None value")
                 detectors = detectors.combine_first(tmp)
         self._detectors = detectors
+        if self._detectors is None:
+            self.log.warning("No detectors found")
+        else:
+            self.log.info(f"Detectors identified {len(self._detectors)}")
 
     def load_counts(self, tstart:int=None, tend:int=None):
-        self.log.info("Loading Counts...")
+        self.log.debug("Loading Counts...")
         parameters = self.parser.get("params.counts")
         self._counts = {}
         if parameters is None:            
@@ -918,7 +925,7 @@ class Loader(BaseLoader):
             return
         counts =pd.DataFrame()
         for id_count, set_counts in enumerate(parameters):                
-            self.log.info(f"Loading Counts {id_count}...")
+            self.log.debug(f"Loading Counts {id_count}...")
             set_counts = self.parser.get_input_parameters("params.counts", id_count).copy()
             if "src" not in set_counts:
                 raise KeyError("key 'src' required in counts parameters")
@@ -946,9 +953,10 @@ class Loader(BaseLoader):
                 counts.loc[b, ["eq_counts","mode"]] = df_mode[["eq_counts","mode"]]
         # TODO: Group by class of timestamps
         self._counts["all"] = counts.groupby(["id", "timestamp"]).agg(counts=("eq_counts", "sum"))["counts"].reset_index()
+        self.log.info(f"Counts identified {len(self._counts)}. Read Counts : {counts.shape[0]}")
 
     def load_demand(self, timestamps: list[int] = None):
-        self.log.info("Loading OD Matrices...")
+        self.log.debug("Loading OD Matrices...")
         parameters = self.parser.get("params.demand")
         if parameters is None:
             self.log.warning("key 'demand' not found in execution parameters['params']")
@@ -958,7 +966,7 @@ class Loader(BaseLoader):
         timestamps = timestamps or self.timestamps
         self._OD = MatrixODT(rows=self.origins, cols=self.destinations, timestamps=timestamps, init=0, mode=None)
         for id_mat, od_param in enumerate(parameters):
-            self.log.info(f"Loading OD Matrix '{id_mat}'...")
+            self.log.debug(f"Loading OD Matrix '{id_mat}'...")
             mode = od_param.get("mode", "c")            
             if mode not in self.modes:
                 raise KeyError("mode '{mode}' not defined in modes parameter")
@@ -974,7 +982,7 @@ class Loader(BaseLoader):
             tot_od_pairs=0
             for id_m, mat_params in enumerate(od_param["matrices"]):
                 tmp = None
-                self.log.info(f"Loading OD Sub Matrix '{id_mat}'-'{id_m}'...")
+                self.log.debug(f"Loading OD Sub Matrix '{id_mat}'-'{id_m}'...")
                 if "scalar" in mat_params:
                     if not isinstance(mat_params["scalar"], (int, float)):
                         raise TypeError("key 'scalar' must be a number")
@@ -983,12 +991,13 @@ class Loader(BaseLoader):
                     mat_params = self.parser.get_input_parameters(f"params.demand.{id_mat}.matrices", id_m)
                     if "src" not in mat_params:
                         raise KeyError("key 'src' required in matrices element")
-                    tmp = self.load_matrix(mat_params, start = min(timestamps), end = max(timestamps))
+                    tmp = self.load_matrix(mat_params, start = min(timestamps), end = max(timestamps)+self.delta_t)
                     if tmp is None:
                         raise Exception(f"load_matrix({mat_params}) function return None value")
-                    tot_od_pairs += tmp.shape[0]                    
-                    current_od = MatrixODT.read_df(rows=self.origins,cols=self.destinations, timestamps=timestamps, df=tmp)
-                if id_m==0:                    
+                    tmp = tmp[(tmp["o"].isin(self.origins)) & (tmp["d"].isin(self.destinations))]
+                    tot_od_pairs += tmp.shape[0]
+                    current_od = MatrixODT.read_df(rows=self.origins, cols=self.destinations, timestamps=timestamps, df=tmp)
+                if id_m==0:
                     OD += current_od
                 else:
                     op = mat_params.get("op", "+")                    
@@ -1020,17 +1029,17 @@ class Loader(BaseLoader):
             
             
     def load_graph(self, df_links=None, df_nodes=None, df_turns=None):
-        self.log.info("Loading Graph...")
+        self.log.debug("Loading Graph...")
         if self.ini.LOAD_GRAPH and (df_links is None or df_nodes is None):
-            self.log.info("Loading State (Graph)...")
+            self.log.debug("Loading State (Graph)...")
             from .state_manager import StateManager
             sm = StateManager(parser=self.parser)
             self._G = sm.load_state("graph")
             if self._G is not None:
-                self.log.info("State loaded (Graph)")
+                self.log.debug("State loaded (Graph)")
                 return
             else:
-                self.log.info("State not found (Graph)")
+                self.log.warning("State not found (Graph)")
                 self._G = None
         if df_links is None or df_nodes is None:
             df_links, df_nodes, df_turns = self.df_links, self.df_nodes, self.df_turns
@@ -1040,7 +1049,7 @@ class Loader(BaseLoader):
         assert df_links is not None, "links not loaded"
 
         G = DynamicGraph(total_time=0, delta_t=self.delta_t, modes=self.modes)
-        self.log.info("Transforming to graph")
+        self.log.debug("Transforming to graph")
 
         self._bounds = None
         if self._bounds is None and "geometry" in df_links.columns:
@@ -1050,21 +1059,61 @@ class Loader(BaseLoader):
             tb = gpd.GeoDataFrame(df_nodes, geometry="geometry").total_bounds
             self._bounds = shapely.geometry.box(*tb)
 
+        if self.ini.CHECK_INPUT:        
+            tmp = df_links.merge(df_nodes["id"].rename("from_node"), on="from_node", how="left", indicator=True)
+            if len(tmp[tmp["_merge"]=="left_only"]) > 0:
+                self.log.warning(f"Links with from nodes not in nodes dataset {tmp[tmp['_merge']=='left_only'][['id','from_node','to_node']]}")                             
+                df_links = tmp[tmp["_merge"]=="both"].drop(columns=["_merge"])
+            tmp = df_links.merge(df_nodes["id"].rename("to_node"), on="to_node", how="left", indicator=True)
+            if len(tmp[tmp["_merge"]=="left_only"]) > 0:
+                self.log.warning(f"Links with to nodes not in nodes dataset {tmp[tmp['_merge']=='left_only'][['id','from_node','to_node']]}")                             
+                df_links = tmp[tmp["_merge"]=="both"].drop(columns=["_merge"])
+
+            nodes = (set(df_links["from_node"].unique()) | set(df_links["to_node"].unique())) - set(df_nodes["id"])
+            if len(nodes) > 0:
+                self.log.warning(f"Nodes not connected with any link {nodes}")        
+                df_nodes = df_nodes[~df_nodes["id"].isin(nodes)]
+
+            cond = df_links["length"] > 0
+            if not cond.all():
+                self.log.warning(f"Links with length <=0 {df_links[~cond][['id','from_node','to_node','length']]}")
+                df_links = df_links[cond]
+
+            if df_turns is not None:
+                cond = df_turns["from_node"].isin(df_nodes["id"]) & df_turns["via_node"].isin(df_nodes["id"]) & df_turns["to_node"].isin(df_nodes["id"])
+                if not cond.all():
+                    self.log.warning(f"Turns with nodes not in nodes dataset {df_turns[~cond][['from_node','via_node','to_node']]}")
+                    df_turns = df_turns[cond]
+
+                cond = (df_turns["from_node"]!=df_turns["via_node"]) & (df_turns["to_node"]!=df_turns["via_node"])
+                if not cond.all():
+                    self.log.warning(f"Invalid turns detected {df_turns[~cond][['from_node','via_node','to_node']]}")
+                    df_turns = df_turns[cond]
+
+            
+
+        modes = set(self.modes.keys())
         for _, row in df_nodes.iterrows():
             kwargs = {k: row[k] for k in df_nodes.columns if k not in {"id"}}
             if "modes" in row:
-                if pd.isna(row["modes"]) is None:
-                    row["modes"] = set(self.modes.keys())
+                if pd.isna(row["modes"]):
+                    row["modes"] = modes.copy()
                 elif isinstance(row["modes"], str):
                     if row["modes"].strip().lower() == "all":
-                        row["modes"] = set(self.modes.keys())
+                        row["modes"] = modes.copy()
                     if row["modes"].strip().lower() == "none":
                         row["modes"] = set()
                     elif row["modes"].strip() == "":
-                        row["modes"] = set(self.modes.keys())
+                        row["modes"] = modes.copy()
                     else:
                         row["modes"] = set([m.strip() for m in row["modes"].split(",")])
-                kwargs["modes"]=row["modes"]            
+                if self.ini.CHECK_INPUT:
+                    m = row["modes"] & modes
+                    if m != row["modes"]:
+                        self.log.warning(f"Node {row['id']} modes {row['modes']} not defined in modes parameter, using {m}")
+                    kwargs["modes"]=m
+                else:
+                    kwargs["modes"]=row["modes"]
             kwargs["idx"]=int(row["id"])
             kwargs["is_centroid"]=int(row["id"]) in self.zones
             kwargs["time"]=DynamicTimeArrayAttribute(0)
@@ -1099,18 +1148,24 @@ class Loader(BaseLoader):
             kwargs["alpha"]=float(row["alpha"])
             kwargs["r_cr"]=float(row["rcr"])
             if "modes" in row:
-                if pd.isna(row["modes"]) is None:
-                    row["modes"] = set(self.modes.keys())
+                if pd.isna(row["modes"]):
+                    row["modes"] = modes.copy()
                 elif isinstance(row["modes"], str):
                     if row["modes"].strip().lower() == "all":
-                        row["modes"] = set(self.modes.keys())
+                        row["modes"] = modes.copy()
                     if row["modes"].strip().lower() == "none":
                         row["modes"] = set()
                     elif row["modes"].strip() == "":
                         row["modes"] = set(self.modes.keys())
                     else:
                         row["modes"] = set([m.strip() for m in row["modes"].split(",")])
-                kwargs["modes"]=row["modes"]      
+                if self.ini.CHECK_INPUT:
+                    m = row["modes"] & modes
+                    if m != row["modes"]:
+                        self.log.warning(f"Link {row['id']} modes {row['modes']} not defined in modes parameter, using {m}")
+                    kwargs["modes"]=m
+                else:
+                    kwargs["modes"]=row["modes"]
             kwargs["t0"]=float(row["length"] / row["v0"] * 60)
             kwargs["time"]=DynamicTimeArrayAttribute(float(row["length"] / row["v0"] * 60))
             kwargs["flow"]=DynamicTimeArrayAttribute(0)
@@ -1151,27 +1206,49 @@ class Loader(BaseLoader):
                     kwargs["out_link"]=to_link                    
                     kwargs["time"]=float("inf") if "penalty" not in row or pd.isna(row["penalty"]) else float(row["penalty"])
                     if "modes" in row:
-                        if pd.isna(row["modes"]) is None:
-                            row["modes"] = set(self.modes.keys())
+                        if pd.isna(row["modes"]):
+                            row["modes"] = modes.copy()
                         elif isinstance(row["modes"], str):
                             if row["modes"].strip().lower() == "all":
-                                row["modes"] = set(self.modes.keys())
+                                row["modes"] = modes.copy()
                             if row["modes"].strip().lower() == "none":
                                 row["modes"] = set()
                             elif row["modes"].strip() == "":
-                                row["modes"] = set(self.modes.keys())
+                                row["modes"] = modes.copy()
                             else:
                                 row["modes"] = set([m.strip() for m in row["modes"].split(",")])
-                        kwargs["modes"]=row["modes"]      
+                        if self.ini.CHECK_INPUT:
+                            m = row["modes"] & modes
+                            if m != row["modes"]:
+                                self.log.warning(f"Turn {id_turn} modes {row['modes']} not defined in modes parameter, using {m}")
+                            kwargs["modes"]=m   
+                        else:
+                            kwargs["modes"]=row["modes"]
 
                     G.add_turn(**kwargs)
 
         G["origins"] = list(self.origins)
         G["destinations"] = list(self.destinations)
-        G["zones"] = list(self.zones)        
+        G["zones"] = list(self.zones) 
+        if self.ini.CHECK_INPUT:
+            self.check_graph(G)
         self._G = G
         self.log.info("Links identified {0}".format(G.n_links))
         self.log.info("Nodes identified {0}".format(G.n_nodes))
         self.log.info("Turns identified {0}".format(G.n_turns))
         return G
 
+    def check_graph(self, G: DynamicGraph):
+        for o in self.origins:
+            n = G.get_node(o)
+            if n is None:
+                self.log.warning(f"Origin zone {o} not in graph nodes")
+            elif n["is_centroid"]==0:
+                    self.log.warning(f"Origin zone {o} is not marked as centroid")
+        for d in self.destinations:
+            n = G.get_node(d)
+            if n is None:
+                self.log.warning(f"Destination zone {d} not in graph nodes")
+            elif n["is_centroid"]==0:
+                    self.log.warning(f"Destination zone {d} is not marked as centroid")
+        

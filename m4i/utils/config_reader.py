@@ -7,14 +7,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 import warnings
+from typing import Union
 
 class ConfigReader:
-    def __init__(self, ini_file='settings.ini', db_url=None, use_db=False, db_query=None):
+    def __init__(self, settings:Union[str,dict,tuple,list]='settings.ini', db_url=None, use_db=False, db_query=None):
         self.config = configparser.ConfigParser()
-        if not os.path.exists(ini_file):
-            warnings(f"Configuration file '{ini_file}' not found.")
-        else:
-            self.config.read(ini_file)
+        self.config_from_settings(settings)            
         self.use_db = use_db
         self.db_url = db_url
         self.db_query = db_query or "SELECT value FROM settings WHERE name = :name"
@@ -23,6 +21,20 @@ class ConfigReader:
         if self.use_db and self.db_url:
             self._init_db()
 
+    def config_from_settings(self, settings: Union[str,dict,tuple,list]):
+        if isinstance(settings, str):
+            if os.path.exists(settings):
+                self.config.read(settings)
+            else:
+                warnings.warn(f"Configuration file '{settings}' not found.")
+        elif isinstance(settings, dict):
+            self.config.read_dict(settings)
+        elif isinstance(settings, (list, tuple)):
+            for item in settings:
+                self.config_from_settings(item)
+        else:
+            raise ValueError("Invalid settings format. Must be a file path, dict, list or tuple.")
+        
     def items(self):
         for sec in self.config.sections():
             for name, value in self.config.items(sec):

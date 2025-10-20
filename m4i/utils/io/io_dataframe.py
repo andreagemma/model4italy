@@ -92,10 +92,10 @@ class IO_DataFrame:
         if not isinstance(kwargs_driver, dict):
             raise ValueError(f"kwargs_driver deve essere un dizionario.")     
         kwargs_driver.update(kwargs)
-        kwargs.pop("path", None)
-        kwargs.pop("filters", None)
-        kwargs.pop("dtype", None)
-        df = driver.import_dataframe(path, filters=filters, dtype=dtype, **kwargs)
+        kwargs_driver.pop("path", None)
+        kwargs_driver.pop("filters", None)
+        kwargs_driver.pop("dtype", None)
+        df = driver.import_dataframe(path, filters=filters, dtype=dtype, **kwargs_driver)
         if force_geodataframe is not None and isinstance(df, pd.DataFrame):
             if force_geodataframe and not isinstance(df, gpd.GeoDataFrame):
                 df = gpd.GeoDataFrame(df)

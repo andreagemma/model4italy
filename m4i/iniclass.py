@@ -16,7 +16,7 @@ class IniClass:
     def __init__(self, ini_file='settings.ini', db_url=None, use_db=False, reload=True):
         # Inizializza il lettore di configurazione
         self.config_reader = ConfigReader(
-            ini_file=ini_file,
+            settings=ini_file,
             db_url=db_url,
             use_db=use_db,
             db_query="SELECT value FROM settings WHERE name = :name"
@@ -43,7 +43,7 @@ class IniClass:
                     db_name=self.DB_SETTINGS_NAME
                 )                   
             self.config_reader = ConfigReader(
-                ini_file='settings.ini',
+                settings='settings.ini',
                 db_url=self.DB_SETTINGS_URL,
                 use_db=self.DB_SETTINGS_USE,
                 db_query="SELECT value FROM settings WHERE name = :name"
@@ -76,6 +76,7 @@ class IniClass:
         self.CRS_CALC = self.config_reader.get("CRS_CALC", 'GENERAL', "EPSG:6875")  # Coordinate Reference System for calculation
         self.TZ_LOCAL = self.config_reader.get("TZ_LOCAL", 'GENERAL', "Europe/Rome")  # Timezone locale
         self.TZ_CALC = self.config_reader.get("TZ_CALC", 'GENERAL', "UTC")  # Timezone for calculations
+        self.CHECK_INPUT = self.config_reader.getboolean("CHECK_INPUT", 'GENERAL', False)  # Controlla la validità dei dati in ingresso
 
         # SIMULATOR
         self.SIMU_STEP = self.config_reader.getfloat("SIMU_STEP", 'SIMULATOR', 6)  # step di simulazione

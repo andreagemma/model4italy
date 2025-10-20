@@ -38,9 +38,10 @@ setup(
         "pyproj>=3.7.1",
         "polars>=1.30.0",
         "websockets>=15.0.1",
-        "redis>=6.1.0"
+        "redis>=6.1.0",
+        "duckdb>=1.4.0"
     ],
-    python_requires=">=3.12",
+    python_requires=">=3.10",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
