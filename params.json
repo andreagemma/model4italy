@@ -162,6 +162,7 @@
         "trace_results": "trace_results.gpkg",
         "aggregated_results_stats": "aggregated_results_stats.csv",
         "signal_results": "signal_results.gpkg",
+        "paths": "paths.gpkg",
         "statistics": "statistics.csv",
         "params": "params.json"
     }

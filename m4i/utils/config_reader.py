@@ -3,19 +3,20 @@
 import os
 import ast
 import configparser
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 import warnings
 from typing import Union
 
 class ConfigReader:
-    def __init__(self, settings:Union[str,dict,tuple,list]='settings.ini', db_url=None, use_db=False, db_query=None):
+    def __init__(self, settings:Union[str,dict,tuple,list]='settings.ini', db_url=None, use_db=False, db_query=None, table_name="settings"):
         self.config = configparser.ConfigParser()
         self.config_from_settings(settings)            
         self.use_db = use_db
         self.db_url = db_url
-        self.db_query = db_query or "SELECT value FROM settings WHERE name = :name"
+        self.table_name = table_name
+        self.db_query = db_query or f"SELECT value FROM {self.table_name} WHERE name = :name"
         self.db_session = None
 
         if self.use_db and self.db_url:
@@ -47,6 +48,25 @@ class ConfigReader:
             self.db_session = Session()
         except SQLAlchemyError as ex:
             print(f"Error initializing database connection: {ex}")
+    
+    @staticmethod
+    def check_db_connection(db_url):
+        try:
+            engine = create_engine(db_url)
+            connection = engine.connect()
+            connection.close()
+            return True
+        except SQLAlchemyError:
+            return False
+    
+    @staticmethod
+    def check_db_exists(db_url, table_name="settings"):
+        try:
+            engine = create_engine(db_url)
+            inspector = inspect(engine)
+            return inspector.has_table(table_name)
+        except SQLAlchemyError:
+            return False
 
     def _get_from_db(self, section, name):
         if not self.db_session:
@@ -62,7 +82,7 @@ class ConfigReader:
         return self.config.get(section, name, fallback=None)
 
     def _get_from_env(self, name):
-        return os.getenv(name)
+        return os.getenv("M4I_" + name)
 
     def get(self, name, section='DEFAULT', default=None):
         value_ini = self._get_from_ini(section, name)

@@ -13,15 +13,37 @@ class IniClass:
         tmp.pop('config_reader', None)  # Rimuove il lettore di configurazione
         return tmp
     
-    def __init__(self, ini_file='settings.ini', db_url=None, use_db=False, reload=True):
+    def __init__(self, ini_file='settings.ini', db_url=None, use_db=False, reload=True, options: dict | None = None):
         # Inizializza il lettore di configurazione
+        if options is not None:
+            db_url = options.get("settings", {}).get("DB_SETTINGS_URL", db_url)
+            use_db = options.get("settings", {}).get("DB_SETTINGS_USE", use_db)
+            db_table_name = options.get("settings", {}).get("DB_SETTINGS_TABLE_NAME", "settings")
+            db_query = options.get("settings", {}).get("DB_SETTINGS_QUERY", f"SELECT value FROM {db_table_name} WHERE name = :name")
+        else:
+            db_table_name = "settings"
+            db_query = f"SELECT value FROM {db_table_name} WHERE name = :name"
+        if not os.path.exists(ini_file):
+            if use_db:
+                if db_url:
+                    if not ConfigReader.check_db_connection(db_url):
+                        raise ConnectionError(f"Database connection failed for settings database '{db_url}'.")
+                    elif not ConfigReader.check_db_exists(db_url,db_table_name):
+                        raise FileNotFoundError(f"'{db_table_name}' table not found at '{db_url}'.")
+                else:
+                    raise ValueError("Database URL is required when using database for configuration.")
+            else:
+                raise FileNotFoundError(f"Configuration file '{ini_file}' not found and database usage is disabled.")
         self.config_reader = ConfigReader(
             settings=ini_file,
             db_url=db_url,
             use_db=use_db,
-            db_query="SELECT value FROM settings WHERE name = :name"
+            db_query=db_query,
+            table_name=db_table_name
         )
         self.DB_SETTINGS_USE = self.config_reader.getboolean("DB_SETTINGS_USE","DATABASE_SETTINGS", False)
+        self.DB_SETTINGS_TABLE_NAME = self.config_reader.get("DB_SETTINGS_TABLE_NAME", 'DATABASE_SETTINGS', "settings")
+        self.DB_SETTINGS_QUERY = self.config_reader.get("DB_SETTINGS_QUERY", 'DATABASE_SETTINGS', f"SELECT value FROM {self.DB_SETTINGS_TABLE_NAME} WHERE name = :name")
         self.DB_SETTINGS_TYPE = self.config_reader.get("DB_SETTINGS_TYPE", 'DATABASE_SETTINGS', 'sqlite')
         self.DB_SETTINGS_DRIVER = self.config_reader.get("DB_SETTINGS_DRIVER", 'DATABASE_SETTINGS', 'sqlite')
         self.DB_SETTINGS_USER = self.config_reader.get("DB_SETTINGS_USER", 'DATABASE_SETTINGS', '')
@@ -46,7 +68,8 @@ class IniClass:
                 settings='settings.ini',
                 db_url=self.DB_SETTINGS_URL,
                 use_db=self.DB_SETTINGS_USE,
-                db_query="SELECT value FROM settings WHERE name = :name"
+                db_query=self.DB_SETTINGS_QUERY,
+                table_name=self.DB_SETTINGS_TABLE_NAME
             )
         
 
@@ -202,8 +225,9 @@ class IniClass:
         IniClass.environ.update(os.environ)  # Copy existing environment variables
         IniClass.environ.update(self.get_dict())  # Update with IniClass settings
 
-        for key, value in self.get_dict().items():
-            os.environ[key.upper()] = str(value)  # Update environment variables with IniClass settings
+        #for key, value in self.get_dict().items():
+        #    os.environ["M4I_" + key.upper()] = str(value)  # Update environment variables with IniClass settings
+
 
 
         

@@ -76,17 +76,16 @@ class ParamsParser:
     @staticmethod
     def params_to_dict(params: Union[str,dict, list,tuple]) -> dict | None:
         if isinstance(params, str):
-            try:
-                params=params.strip()
-                if params.startswith("{") and params.endswith("}"):
-                    params = json.loads(params)
-                elif os.path.exists(params):
-                    with open(params, "r") as f:
-                        params = json.load(f)
-                else:
-                    raise ValueError(f"Invalid parameters: {params}")
-            except Exception as ex:
-                raise ValueError(f"Invalid parameters: {params}") from ex
+            params=params.strip()
+            if params.startswith("{") and params.endswith("}"):
+                params = json.loads(params)
+                return params
+            elif os.path.exists(params):
+                with open(params, "r") as f:
+                    params = json.load(f)
+                return params
+            else:
+                raise FileNotFoundError(f"Parameters file not found: {params}")
         elif isinstance(params, (list,tuple)):
             ret: dict | None = None
             for p in params:
@@ -97,9 +96,9 @@ class ParamsParser:
                     if d:
                         d.update(ret)
                         ret = d
-            params = ret
+            return ret
         if not isinstance(params, dict):    
-            raise ValueError("Invalid parameters: %s" % params)        
+            raise ValueError("Invalid parameters: %s" % params)
         return params
     
     def get_dict(self) -> dict:

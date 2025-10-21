@@ -23,7 +23,16 @@ class Dispatcher(BaseM4IModel):
         self.execution_id: int = execution.id if execution else None
 
         if self.execution_id is None:
-            self.execution = Execution.create_execution(params=params)        
+            try:
+                self.execution = Execution.create_execution(params=params)        
+            except Exception as ex:
+                import sys
+                appname = os.path.basename(sys.argv[0]) if len(sys.argv) > 0 else ""
+                if appname:
+                    raise Exception(f"Error creating execution in database. Try to initialize the database with {appname} init_db") from ex
+                else:
+                    parent_module_name = __name__.split(".")[0]
+                    raise Exception(f"Error creating execution in database. Try to initialize the database with '{parent_module_name}.init_db()' command") from ex                    
             self.execution_id = self.execution.id
 
         self.parser.set_value("execution_id", self.execution_id)

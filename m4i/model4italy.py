@@ -84,7 +84,7 @@ def main(**kwargs)->Optional[BaseM4IModel]:
         if args.env:
             for env in args.env:
                 key, value = env.split('=', 1)
-                os.environ[key] = value        
+                os.environ[key] = value                        
         options = {}
         if args.option:
             for option in args.option:
@@ -94,6 +94,17 @@ def main(**kwargs)->Optional[BaseM4IModel]:
                     raise Exception(f"Invalid option format: {option}. Use key:subkey:subsubkey=value format.")
                 options[key] = value
             options = nested_dict_from_key_value_list(options)
+        for k,v in os.environ.items():
+            if k.startswith("M4I_"):                
+                option_key = k[len("M4I_"):]
+                
+                try:
+                    key, value = option_key.split('=', 1)
+                except:
+                    key = option_key
+                    value = v
+                settings = options.setdefault("settings", {})
+                settings[key] = value
         if hasattr(args,"op") and args.op:
             options["op"] = args.op
         if args.command == 'init_db':
@@ -191,11 +202,11 @@ def init_db(ini_file="settings.ini", db_type=None, db_driver=None, db_user=None,
         url = generate_sqlalchemy_url(**url_dict)                
     DB.init_db(url) 
 
-def open_db(ini_file="settings.ini"):
+def open_db(ini_file="settings.ini", options: dict | None = None):
     from .iniclass import IniClass
     from .database import DB
     from .log import Logger
-    config = IniClass(ini_file=ini_file)
+    config = IniClass(ini_file=ini_file, options=options)
     Logger.initLogger(
         level=logging.getLevelName(config.LOG_LEVEL),
         console=config.LOG_ON_CONSOLE,
@@ -221,9 +232,19 @@ def run(ini_file="settings.ini", params="params.json", params_data="params_data.
     import os
     from .dispatcher import Dispatcher
 
-    config = open_db(ini_file=ini_file)
     if params_data:
-        params = [params_data, params]                
+        if isinstance(params_data, str) and os.path.exists(params_data):
+            params = [params_data, params]
+        elif isinstance(params_data, (tuple,list)):
+            if isinstance(params, (list,tuple)):
+                params = list(params_data) + list(params)
+            else:
+                params = list(params_data) + [params]
+        elif isinstance(params_data, dict):
+            if isinstance(params, (list,tuple)):
+                params = [params_data] + list(params)
+            else:
+                params = [params_data, params]
     else:
         if os.path.exists("params_data.json") and isinstance(params, str):
             try:
@@ -236,6 +257,7 @@ def run(ini_file="settings.ini", params="params.json", params_data="params_data.
                     params = [params,"params_data.json"]
             except:
                 params = [params,"params_data.json"]
+    config = open_db(ini_file=ini_file, options=options)
     return Dispatcher(params=params, options=options, ini=config).run()       
 
 def run_server(ini_file="settings.ini", host=None, port=None, debug=None):

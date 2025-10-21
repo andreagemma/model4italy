@@ -240,6 +240,7 @@ class AssignmentModel(BaseM4IModel):
                 df = pd.DataFrame.from_dict(self.infos)
                 mode = None if self.interval==0 else "a"
                 self.writer.write(df,"params.statistics", mode=mode)
+                self.log.info("Saved stats")
         except Exception as e:
             self.log.error("Failed to save statistics:", exc_info=e, stack_info=True)     
 
@@ -279,7 +280,7 @@ class AssignmentModel(BaseM4IModel):
                 df=self.get_aggregated_results_dataframe()
                 ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400 ) / 60
                 if df["time"].dt.tz is None:
-                    df["time"] = df["time"].dt.tz_localize(self.parser.ini.TZ_LOCAL)  
+                    df=df.assign(time = df["time"].dt.tz_localize(self.parser.ini.TZ_LOCAL).copy())
                 mode = None if self.interval==0 else "a"
                 df["t"] = ds_t.astype("Int64")
                 saved = self.writer.write_agg_results(df, crs=self.loader.ini.CRS, mode=mode)
@@ -341,11 +342,11 @@ class AssignmentModel(BaseM4IModel):
                 saved = self.writer.write_signal_results(df, mode=mode, crs=self.loader.ini.CRS)
                                 
                 if saved:                    
-                    self.log.info("Saved trace results")
+                    self.log.info("Saved signal results")
                 else:
-                    self.log.warning("Failed to save trace results")
+                    self.log.warning("Failed to save signal results")
         except Exception as e:
-            self.log.error("Failed to save trace results:", exc_info=e, stack_info=True)
+            self.log.error("Failed to save signal results:", exc_info=e, stack_info=True)
 
     def write_state_ass_matrix(self):
         try:
