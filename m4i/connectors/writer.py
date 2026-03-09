@@ -38,7 +38,7 @@ class Writer(ABC):
         self.log = Logger.getLogger(self.__class__.__name__, execution_id=self.execution_id)
         self.ini: IniClass = self.parser.ini
 
-    def _write_dataset(self, df: Union[pd.DataFrame, gpd.GeoDataFrame], parameters, mode=None, dtype=None, **kwargs) -> bool:
+    def _write_dataset(self, df: Union[pd.DataFrame, gpd.GeoDataFrame], parameters, mode=None, dtype=None, check_definition=None, **kwargs) -> bool:
         """
         Write a dataset based on the provided parameters and mode.
         Arguments:
@@ -61,39 +61,48 @@ class Writer(ABC):
             writer: BaseWriter  = ClassWriter()
 
             parameters = copy.deepcopy(parameters)
-            additional_fields = parameters.get("additional_fields", {})
-            if additional_fields:
-                for additional_field, p in additional_fields.items():
-                    if additional_field not in df.columns:
-                        if isinstance(p, str):
-                            p = {"value" : p}
-                        v = p.get("value", None)
-                        t = p.get("dtype", None)
-                        df[additional_field] = v
-                        if t:
-                            df[additional_field] = df[additional_field].astype(t)
-            """
-            for k, v in parameters.items():
-                if isinstance(v, (str, int, float)):
-                    parameters[k] = self.parser.get_parametric_name(v)
-            """
-            if dtype is not None:
-                df=self.parser.apply_dtype(df=df, dtype=dtype, copy=False, 
-                                           tz_src=self.ini.TZ_CALC,
-                                           tz_dest=parameters.get("tz_data", self.ini.TZ_LOCAL))
+            if isinstance(df, (pd.DataFrame, gpd.GeoDataFrame, dict)):
+                additional_fields = parameters.get("additional_fields", {})
+                if additional_fields:
+                    for additional_field, p in additional_fields.items():
+                        if additional_field not in df.columns:
+                            if isinstance(p, str):
+                                p = {"value" : p}
+                            v = p.get("value", None)
+                            t = p.get("dtype", None)
+                            df[additional_field] = v
+                            if t:
+                                if isinstance(df, (pd.DataFrame, gpd.GeoDataFrame)):
+                                    df[additional_field] = df[additional_field].astype(t)
+                                elif isinstance(df, dict):
+                                    df[additional_field] = pd.Series([v]).astype(t).tolist()[0]
+                            
+                """
+                for k, v in parameters.items():
+                    if isinstance(v, (str, int, float)):
+                        parameters[k] = self.parser.get_parametric_name(v)
+                """
+                if dtype is None and check_definition is not None:
+                    dtype = self.parser.get_dtype(check_definition, None)
+                if dtype is not None and isinstance(df, (pd.DataFrame, gpd.GeoDataFrame)):
+                    df=self.parser.apply_dtype(df=df, dtype=dtype, copy=False, 
+                                            tz_src=self.ini.TZ_CALC,
+                                            tz_dest=parameters.get("tz_data", self.ini.TZ_LOCAL))
 
-            mapping = parameters.get("mapping")
-            
-            self.parser.apply_mapping(df=df, mapping=mapping, reverse=True)
-            if isinstance(df, gpd.GeoDataFrame):
-                crs = parameters.get("crs", self.ini.CRS)
-                if crs is not None:
-                    if df.crs is None:
-                        df.set_crs(crs, inplace=True)
-                    elif df.crs != crs:
-                        df.to_crs(crs, inplace=True)
+                mapping = parameters.get("mapping")
+                
+                if mapping is not None and isinstance(df, (pd.DataFrame, gpd.GeoDataFrame)):
+                    self.parser.apply_mapping(df=df, mapping=mapping, reverse=True)
+                    
+                if isinstance(df, gpd.GeoDataFrame):
+                    crs = parameters.get("crs", self.ini.CRS)
+                    if crs is not None:
+                        if df.crs is None:
+                            df.set_crs(crs, inplace=True)
+                        elif df.crs != crs:
+                            df.to_crs(crs, inplace=True)
 
-            partition_cols = parameters.get("partition_cols", None)
+                partition_cols = parameters.get("partition_cols", None)
                         
             if mode is None:
                 m = parameters.get("mode", "w")
@@ -142,38 +151,44 @@ class Writer(ABC):
     def has(self, name):
         return self.parser.get(name) is not None
 
-    def write_agg_results(self, results: gpd.GeoDataFrame, mode=None, **kwargs):
+    def write_agg_results(self, results: gpd.GeoDataFrame, mode=None, params=None, **kwargs):
         kwargs["df"] = results
         kwargs["dtype"] = self.parser.get_dtype("aggregated_results")
-        kwargs["parameters"] = self.parser.get_output_parameters("params.aggregated_results", df=results)
+        kwargs["parameters"] = self.parser.get_output_parameters(params if params is not None else "params.aggregated_results", df=results)
         kwargs["mode"] = mode
+        kwargs["check_definition"] = "aggregated_results"
         return self._write_dataset(**kwargs)
 
-    def write_agg_results_stats(self, results: gpd.GeoDataFrame, mode=None, **kwargs):
+    def write_agg_results_stats(self, results: gpd.GeoDataFrame, mode=None, params=None, **kwargs):
         kwargs["df"] = results
         #kwargs["dtype"] = self.parser.get_dtype("aggregated_results_stats")
-        kwargs["parameters"] = self.parser.get_output_parameters("params.aggregated_results_stats", df=results)
+        kwargs["parameters"] = self.parser.get_output_parameters(params if params is not None else "params.aggregated_results_stats", df=results)
         kwargs["mode"] = mode
+        kwargs["check_definition"] = "aggregated_results_stats"
         return self._write_dataset(**kwargs)
     
-    def write_trace_results(self, results: gpd.GeoDataFrame, mode=None, **kwargs):
+    def write_trace_results(self, results: gpd.GeoDataFrame, mode=None, params=None, **kwargs):
         kwargs["df"] = results
         #kwargs["dtype"] = self.parser.get_dtype("trace_results")
-        kwargs["parameters"] = self.parser.get_output_parameters("params.trace_results", df=results)
+        kwargs["parameters"] = self.parser.get_output_parameters(params if params is not None else "params.trace_results", df=results)
         kwargs["mode"] = mode
+        kwargs["check_definition"] = "trace_results"
         return self._write_dataset(**kwargs)    
     
-    def write_signal_results(self, results: gpd.GeoDataFrame, mode=None, **kwargs):
+    def write_signal_results(self, results: gpd.GeoDataFrame, mode=None, params=None, **kwargs):
         kwargs["df"] = results
         #kwargs["dtype"] = self.parser.get_dtype("signal_results")
-        kwargs["parameters"] = self.parser.get_output_parameters("params.signal_results", df=results)
+        kwargs["parameters"] = self.parser.get_output_parameters(params if params is not None else "params.signal_results", df=results)
         kwargs["mode"] = mode
+        kwargs["check_definition"] = "signal_results"
         return self._write_dataset(**kwargs)    
     
-    def write_paths(self, results: gpd.GeoDataFrame, mode=None, **kwargs):
+    def write_paths(self, results: gpd.GeoDataFrame, mode=None, params=None, **kwargs):
         kwargs["df"] = results
         kwargs["dtype"] = self.parser.get_dtype("paths")
-        kwargs["parameters"] = self.parser.get_output_parameters("params.paths", df=results)
+        params_ = params if params is not None else "params.paths"
+        kwargs["parameters"] = self.parser.get_output_parameters(params_, df=results)
+        kwargs["check_definition"] = "paths"
         kwargs["mode"] = mode
         """
         kwargs["partition"] = partition
@@ -184,7 +199,7 @@ class Writer(ABC):
         """
         return self._write_dataset(**kwargs)
 
-    def write(self, results: gpd.GeoDataFrame, path:str=None, parameters:dict=None, mode=None, from_input=False, **kwargs):
+    def write(self, results: gpd.GeoDataFrame, path:str=None, parameters:dict=None, mode=None, from_input=False, check_definition=None, **kwargs):
         """
         Carica un dataset in base ai parametri forniti, ai filtri e al tipo di dato specificato.
 
@@ -215,7 +230,8 @@ class Writer(ABC):
                 raise KeyError("key 'parameters' not found in execution parameters")        
         kwargs["df"] = results
         kwargs["parameters"] = parameters
-        kwargs["mode"] = mode
+        kwargs["mode"] = mode        
+        kwargs.setdefault("check_definition", check_definition)
         """
         if partition is not None:
             if isinstance(partition, str):

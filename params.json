@@ -113,7 +113,7 @@
                 }
             }
         ],
-        "events": [
+        "events_no": [
             {
                 "src": "events.csv",
                 "mapping": {
@@ -156,6 +156,7 @@
                     "phases": "phases",
                     "geometry": "geometry"
                 }
+                
             }
         ],
         "aggregated_results": "aggregated_results.gpkg",

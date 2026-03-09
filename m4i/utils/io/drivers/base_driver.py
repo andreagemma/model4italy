@@ -109,8 +109,12 @@ class BaseDriver:
                 dtype = {k: v for k, v in dtype.items() if k in df.columns}
                 #remove dtype definition if dtype is a datetime
                 for col in df.columns:
+                    if col not in dtype:
+                        dtype[col] = 'string'
                     if pd.api.types.is_datetime64_any_dtype(df[col]) and col in dtype:
                         del dtype[col]
+                    
+
                 df=df.astype(dtype, copy=copy)            
             else:
                 df = df.astype(dtype, copy=copy)

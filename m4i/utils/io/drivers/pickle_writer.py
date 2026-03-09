@@ -85,7 +85,9 @@ class PickleWriter(BaseDriver):
                 filename=os.path.splitext(filename)[0],
                 i=str(int(i) + 1),
             )
-            Serializer.save(df, os.path.join(os.path.dirname(path), f"{file_name}{extension}"))
+            compression = kwargs.get("compression", None)
+            clevel = kwargs.get("clevel", 5)
+            Serializer.save(df, os.path.join(os.path.dirname(path), f"{file_name}{extension}"), compression=compression, clevel=clevel)
         else:
             Serializer.save(df, path)
         

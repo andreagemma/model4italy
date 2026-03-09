@@ -36,7 +36,7 @@ class FileDriver(BaseDriver):
             r"\.gpkg$",
             r"\.geoparquet$",
             r"\.csv$",
-            r"\.xlsx?$",
+            #r"\.xlsx?$",
             r"\.parquet$",
             r"\.feather$",
         ]
@@ -59,23 +59,75 @@ class FileDriver(BaseDriver):
                 df_filters = filters
             else:
                 df_filters = filters_to_query_expression(filters,quoting='', op_boolean_symbols=True)
-            sql_filters = pandas_query_to_sql(df_filters)
-                                    
+            sql_filters = pandas_query_to_sql(df_filters)                                    
         else:
             filters = ''
             df_filters = ''
-            sql_filters = ''
+            sql_filters = ''        
         if ext in (".csv",):
             if pathg.is_file():
+                df = pl.read_csv(pathg.as_posix(),n_rows=1)
+                schema = df.schema
+                if dtype:
+                    for col in schema.names():
+                        if col in dtype.keys():
+                            py_type = dtype[col]
+                            if py_type in {"string"}:
+                                schema[col] = pl.String()
+                            elif py_type in {"Float32"}:
+                                schema[col] = pl.Float32()
+                            elif py_type in {"Float64"}:
+                                schema[col] = pl.Float64()
+                            elif py_type in {"Int8"}:
+                                schema[col] = pl.Int8()
+                            elif py_type in {"Int16"}:
+                                schema[col] = pl.Int16()
+                            elif py_type in {"Int32"}:
+                                schema[col] = pl.Int32()
+                            elif py_type in {"Int64"}:
+                                schema[col] = pl.Int64()
+                            elif py_type in {"bool"}:
+                                schema[col] = pl.Boolean()
+                            elif py_type in {"geometry"}:
+                                schema[col] = pl.String()
+                        else:
+                            schema[col]=pl.String()                    
                 #print("Uso Polars")
                 if filter:
-                    df = pl.scan_csv(pathg.as_posix()).sql(f"select * from self {sql_filters}").collect().to_pandas()
+                    df = pl.scan_csv(pathg.as_posix(), schema=schema).sql(f"select * from self {sql_filters}").collect().to_pandas()
                 else:
-                    df = pl.scan_csv(pathg.as_posix()).collect().to_pandas()         
+                    df = pl.scan_csv(pathg.as_posix(), schema=schema).collect().to_pandas()         
             else:
-                #print("Uso DuckDB")
+                #print("Uso DuckDB")                
                 con = duckdb.connect()
-                query = f"SELECT * FROM '{pathg.as_posix()}' {sql_filters}"
+                sniff = "SELECT Columns FROM sniff_csv('" + pathg.as_posix() + "')"
+                schema = con.execute(sniff).df().iloc[0,0]
+                if dtype:
+                    # convert python types to duckdb types
+                    for col, duckdb_type in schema.items():
+                        if dtype and col in dtype.keys():
+                            py_type = dtype[col]
+                            if py_type in {"string"}:
+                                schema[col] = "TEXT"
+                            elif py_type in {"Float32"}:
+                                schema[col] = "FLOAT4"
+                            elif py_type in {"Float64"}:
+                                schema[col] = "FLOAT8"
+                            elif py_type in {"Int8"}:
+                                schema[col] = "INT1"
+                            elif py_type in {"Int16"}:
+                                schema[col] = "INT2"
+                            elif py_type in {"Int32"}:
+                                schema[col] = "INT4"
+                            elif py_type in {"Int64"}:
+                                schema[col] = "INT8"
+                            elif py_type in {"bool"}:
+                                schema[col] = "BOOLEAN"
+                            else:
+                                schema[col] = "TEXT"
+                        else:
+                            schema[col] = "TEXT"
+                query = f"SELECT * FROM read_csv('{pathg.as_posix()}',columns={schema}) {sql_filters}"
                 df = con.execute(query).df()            
         elif ext in (".parquet",):
             if sql_filters == '':
@@ -83,25 +135,91 @@ class FileDriver(BaseDriver):
                 df = pd.read_parquet(pathg)
             else:
                 #print("Uso DuckDB")
-                con = duckdb.connect()
-                query = f"SELECT * FROM '{pathg.as_posix()}' {sql_filters}"
+                schema_or = pl.read_parquet_schema(pathg.as_posix())
+                schema = schema_or.copy()
+                if dtype:
+                    for col in schema.names():
+                        if col in dtype.keys():
+                            py_type = dtype[col]
+                            if py_type in {"string"}:
+                                schema[col] = pl.String()
+                            elif py_type in {"Float32"}:
+                                schema[col] = pl.Float32()
+                            elif py_type in {"Float64"}:
+                                schema[col] = pl.Float64()
+                            elif py_type in {"Int8"}:
+                                schema[col] = pl.Int8()
+                            elif py_type in {"Int16"}:
+                                schema[col] = pl.Int16()
+                            elif py_type in {"Int32"}:
+                                schema[col] = pl.Int32()
+                            elif py_type in {"Int64"}:
+                                schema[col] = pl.Int64()
+                            elif py_type in {"bool"}:
+                                schema[col] = pl.Boolean()
+                            elif py_type in {"geometry"}:
+                                schema[col] = pl.Binary()
+                        else:
+                            schema[col]=pl.String()  
+                if filter:
+                    df = pl.scan_parquet(pathg.as_posix(), schema=schema_or).cast(schema).sql(f"select * from self {sql_filters}").collect().to_pandas()
+                else:
+                    df = pl.scan_parquet(pathg.as_posix(), schema=schema_or).cast(schema).collect().to_pandas()         
+                """
+                con = duckdb.connect()                            
+                query = f"SELECT * FROM read_parquet('{pathg.as_posix()}') {sql_filters}"
                 df = con.execute(query).df()            
+                """
         elif ext in (".geoparquet",):
             if sql_filters == '' and pathg.is_file():
                 #print("Uso GeoPandas")
                 df = gpd.read_parquet(pathg)
             else:
                 #print("Uso DuckDB")
+                """
                 con = duckdb.connect()
-                query = f"SELECT * FROM parquet_scan('{pathg.as_posix()}') {sql_filters}"
+                query = f"SELECT * FROM read_parquet('{pathg.as_posix()}') {sql_filters}"
                 #print(query)
                 df = con.execute(query).df() 
+                """
+                schema_or = pl.read_parquet_schema(pathg.as_posix())
+                schema = schema_or.copy()
+                if dtype:
+                    for col in schema.names():
+                        if col in dtype.keys():
+                            py_type = dtype[col]
+                            if py_type in {"string"}:
+                                schema[col] = pl.String()
+                            elif py_type in {"Float32"}:
+                                schema[col] = pl.Float32()
+                            elif py_type in {"Float64"}:
+                                schema[col] = pl.Float64()
+                            elif py_type in {"Int8"}:
+                                schema[col] = pl.Int8()
+                            elif py_type in {"Int16"}:
+                                schema[col] = pl.Int16()
+                            elif py_type in {"Int32"}:
+                                schema[col] = pl.Int32()
+                            elif py_type in {"Int64"}:
+                                schema[col] = pl.Int64()
+                            elif py_type in {"bool"}:
+                                schema[col] = pl.Boolean()
+                            elif py_type in {"geometry"}:
+                                schema[col] = pl.Binary()
+                        else:
+                            schema[col]=pl.String()  
+                if filter:
+                    df = pl.scan_parquet(pathg.as_posix(), schema=schema_or).cast(schema).sql(f"select * from self {sql_filters}").collect().to_pandas()
+                else:
+                    df = pl.scan_parquet(pathg.as_posix(), schema=schema_or).cast(schema).collect().to_pandas() 
                 geom = from_wkb(df.pop("geometry").apply(bytes))
-                df = gpd.GeoDataFrame(df,geoemtry=geom, crs=crs) if crs else gpd.GeoDataFrame(df,geometry=geom)
+                df = gpd.GeoDataFrame(df,geometry=geom, crs=crs) if crs else gpd.GeoDataFrame(df,geometry=geom)
         elif ext in (".shp",".gpkg"):
             if pathg.is_file():
                 layer = kwargs.pop("layer", None)
                 df = gpd.read_file(pathg.as_posix(), layer=layer)
+                if df is not None:
+                    df = BaseDriver.adapt_dtype(df, dtype)
             else:
                 files = pathg.glob(os.path.join("*","*"+pathg.suffix))
                 df = None
@@ -109,7 +227,9 @@ class FileDriver(BaseDriver):
                     tmp = gpd.read_file(f) 
                     if tmp is None:
                         warnings.warn(f"File {f} not valid")
-                    df = tmp if df is None else pd.concat([df,tmp])   
+                    df = tmp if df is None else pd.concat([df,tmp])  
+                if df is not None:
+                    df = BaseDriver.adapt_dtype(df, dtype)
             if df_filters and df is not None:
                 df = df.query(df_filters)
         else:

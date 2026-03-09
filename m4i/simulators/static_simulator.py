@@ -11,13 +11,13 @@ class StaticSimulator(BaseSimulator):
 
     log = Logger.getLogger("SIM")
     
-    def __init__(self,loader: Loader, links_vdf: str = "vdf") -> None:
-        self.loader: Loader = loader   
+    def __init__(self,loader: Loader, links_vdf: str = "vdf", **kwargs) -> None:
+        super().__init__(loader=loader, **kwargs)
         self.paths:KPathContainer = None     
         self.G: Graph = loader.G
         self.links_vdf: str = links_vdf
     
-    def update_performance(self, k, tstart, tend):        
+    def update_performance(self, tstart: int, tend: int):    
         modes = self.G["modes"]
 
         for link in self.G.get_all_links():
@@ -56,10 +56,10 @@ class StaticSimulator(BaseSimulator):
             link.set_value("time", time)            
 
         
-    def initialize_assignment(self,time_start,time_end):
+    def initialize_assignment(self, time_start: int,time_end: int):
         pass
     
-    def finalize_assignment(self,time_start,time_end):
+    def finalize_assignment(self, time_start: int,time_end: int):
         pass
     
     def set_paths(self,paths: KPathContainer):
@@ -74,24 +74,22 @@ class StaticSimulator(BaseSimulator):
             "time": [],
             "mode": [],
             "id_link": [],
-            "flow_in": [],
-            "flow_out": [],
+            "flow": [],
             "speed": [],
             "density": [],
             "travel_time": [],
-            "queue": [],
-            #"geometry": []
+            "saturation": [],
+            "geometry": []
         }
         list_time = ret["time"]
         list_mode = ret["mode"]
         list_id_link = ret["id_link"]
-        list_flow_in = ret["flow_in"]
-        list_flow_out = ret["flow_out"]
+        list_flow = ret["flow"]
         list_speed = ret["speed"]
         list_density = ret["density"]
         list_travel_time = ret["travel_time"]
-        list_queue = ret["queue"]
-        #list_geometry = ret["geometry"]
+        list_saturation = ret["saturation"]
+        list_geometry = ret["geometry"]
         modes = self.G["modes"]
 
         for time in times:
@@ -100,45 +98,49 @@ class StaticSimulator(BaseSimulator):
                 travel_time = link.get_value("time")
                 speed = link.get_value("length")/travel_time
                 density = flow/speed
-                queue = None
+                c = link.get_value("capacity")
+                saturation = flow/c if c!=0 else float('nan')
+                geometry = link.get_value("geometry")
                 
                 list_time.append(time)
                 list_mode.append("all")        
                 list_id_link.append(link["idx"])
-                list_flow_in.append(flow)
-                list_flow_out.append(flow)                                
+                list_flow.append(flow)
                 list_speed.append(speed)
                 list_density.append(density)
                 list_travel_time.append(travel_time)
-                list_queue.append(queue)
+                list_saturation.append(saturation)
+                list_geometry.append(geometry)
 
                 for mode in modes.keys():
                     flow = link.get_value("flow_"+mode)
                     travel_time = link.get_value("time")
                     speed = link.get_value("length")/travel_time
                     density = flow/speed
-                    queue = None # flow/link.get_value("capacity")
+                    c = link.get_value("capacity")
+                    saturation = flow/c if c!=0 else float('nan')
+                    geometry = link.get_value("geometry")
                     
                     list_time.append(time)
                     list_mode.append(mode)        
                     list_id_link.append(link["idx"])
-                    list_flow_in.append(flow)
-                    list_flow_out.append(flow)                                
+                    list_flow.append(flow)
                     list_speed.append(speed)
                     list_density.append(density)
                     list_travel_time.append(travel_time)
-                    list_queue.append(queue)
+                    list_saturation.append(saturation)
+                    list_geometry.append(geometry)
                     
                 
         return pd.DataFrame(ret).astype({
             "time":"datetime64[ns]", 
             "mode":str,
             "id_link":int,                                            
-            "flow_in":float, 
-            "flow_out":float, 
+            "flow":float, 
+            "flow":float, 
             "speed":float, 
             "density":float, 
             "travel_time":float, 
-            "queue":float
+            "saturation":float
             }, copy=False)
     

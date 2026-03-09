@@ -341,7 +341,7 @@ class DynamicGraph(AbstractGraph, dict):
         new_total_time: Optional[Number] = None,
         new_delta_t: Optional[Number] = None,
         offset = 0,
-    ) -> None:
+    ) -> DynamicGraph:
         """
         Resize all time-dependent attributes.
 
@@ -365,6 +365,7 @@ class DynamicGraph(AbstractGraph, dict):
         dict.__setitem__(self,"total_time",new_total_time)
         dict.__setitem__(self,"delta_t",new_delta_t)
         dict.__setitem__(self, "num_intervals", new_total_time // new_delta_t)
+        return self
 
     def get_all_links(self) -> Generator[DynamicLink]:
         for l in self["links"].values():

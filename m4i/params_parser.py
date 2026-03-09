@@ -24,6 +24,7 @@ class ParamsParser:
     """
     A class to parse parameters from a string.
     """
+    
     def __init__(self, params: Union[str,dict, list,tuple], settings: Optional[IniClass] = None, options: Optional[dict] = None):        
         self.params:dict | None = ParamsParser.params_to_dict(params)
         deep_update(self.params, options)
@@ -46,6 +47,7 @@ class ParamsParser:
                 self.set_value(f"datetime_{name}", now.strftime("%Y-%m-%d %H:%M:%S"))
             self.set_value(f"ts_{name}", int(round(now.timestamp() / 60)))
             self.set_value(f"t_{name}", now.hour * 60 + now.minute)
+            self.set_value(f"{name}", now.strftime("%Y-%m-%d %H:%M:%S"))
         else:
             if date:
                 self.set_default(f"date_{name}", now.strftime("%Y-%m-%d"))
@@ -57,11 +59,13 @@ class ParamsParser:
                 self.set_default(f"datetime_{name}", now.strftime("%Y-%m-%d %H:%M:%S"))
             self.set_default(f"ts_{name}", int(round(now.timestamp() / 60)))
             self.set_default(f"t_{name}", now.hour * 60 + now.minute)
+            self.set_default(f"{name}", now.strftime("%Y-%m-%d %H:%M:%S"))
     
     @staticmethod
     def day_type(dt: Union[str,datetime]) -> str:
         dt = to_datetime_auto(dt)
         wd = dt.isoweekday() % 7
+
         if wd == 0:
             return "sunday"
         elif wd == 1:
@@ -75,17 +79,14 @@ class ParamsParser:
         
     @staticmethod
     def params_to_dict(params: Union[str,dict, list,tuple]) -> dict | None:
+        from .utils.util import deep_update
         if isinstance(params, str):
-            params=params.strip()
-            if params.startswith("{") and params.endswith("}"):
-                params = json.loads(params)
-                return params
-            elif os.path.exists(params):
+            if os.path.exists(params):
                 with open(params, "r") as f:
                     params = json.load(f)
-                return params
             else:
-                raise FileNotFoundError(f"Parameters file not found: {params}")
+                params = {}
+                return params # raise FileNotFoundError(f"Parameters file not found: {params}")
         elif isinstance(params, (list,tuple)):
             ret: dict | None = None
             for p in params:
@@ -94,11 +95,22 @@ class ParamsParser:
                 else:
                     d: dict | None = ParamsParser.params_to_dict(p)
                     if d:
-                        d.update(ret)
+                        deep_update(d, ret)
                         ret = d
-            return ret
+            params = ret
         if not isinstance(params, dict):    
             raise ValueError("Invalid parameters: %s" % params)
+        
+        if "data_file" in params:            
+            data_file = params.pop("data_file")
+            if not isinstance(data_file, (list,tuple)):
+                data_file = [data_file]
+            for df in data_file:
+                df_path = get_parametric_name(df, **params)
+                d = ParamsParser.params_to_dict(df_path)
+                if d:
+                    deep_update(d, params)
+                    params = d
         return params
     
     def get_dict(self) -> dict:
@@ -133,18 +145,28 @@ class ParamsParser:
             date_simulation = to_datetime_auto(self.get("date_simulation"),tz_localize=self.ini.TZ_LOCAL)
         if "start" not in self.params:
             time_start = datetime.now(tz=pytz.timezone(self.ini.TZ_LOCAL))
+            # discretizza time_start al passo di delta_t
+            time_start = time_start.replace(second=0, microsecond=0)
+            time_start_min = (time_start.hour * 60 + time_start.minute) // self.ini.DELTA_T * self.ini.DELTA_T
+            time_start = time_start.replace(hour=time_start_min // 60, minute=time_start_min % 60)
         else:
-            time_start = to_datetime_auto(self.get("start"),tz_localize=self.ini.TZ_LOCAL)
+            time_start = to_datetime_auto(self.get("start"), date_default=date_simulation,tz_localize=self.ini.TZ_LOCAL)
         
         if "end" not in self.params:
-            time_end = datetime.now(tz=pytz.timezone(self.ini.TZ_LOCAL)) + timedelta(minutes=60)
+            time_end = date_simulation + timedelta(minutes=60)
+            time_end = time_end.replace(second=0, microsecond=0)
+            time_end_min = (time_end.hour * 60 + time_end.minute) // self.ini.DELTA_T * self.ini.DELTA_T
+            time_end = time_end.replace(hour=time_end_min // 60, minute=time_end_min % 60)
         else:
-            time_end = to_datetime_auto(self.get("end"),tz_localize=self.ini.TZ_LOCAL)
+            time_end = to_datetime_auto(self.get("end"), date_default=date_simulation,tz_localize=self.ini.TZ_LOCAL)
 
         dt = datetime.combine(date_simulation.date(), time_start.time(), tzinfo=pytz.timezone(self.ini.TZ_LOCAL))        
         self.update_date(dt=dt, name="simulation", override=True, time=True, date=True)            
         self.update_date(dt=time_start, name="start", override=True, time=True, date=True)
         self.update_date(dt=time_end, name="end", override=True, time=True, date=True)
+        self.set_default("total_time", int((time_end - time_start).total_seconds() / 60))
+        self.set_default("delta_t", self.ini.DELTA_T)
+        self.set_default("num_intervals", self.get("total_time") // self.get("delta_t"))
         """
         #if "start" in self.params:
             #self.set_value("start",util.min2hhmm(util.hhmm2min(self.get("start"))))
@@ -390,10 +412,13 @@ class ParamsParser:
             ],
             "nodes": [
                 {"name": "id", "type": is_int, "dtype": "Int64", "required": True},
+                {"name": "centroid", "type": is_int, "dtype": "Int8", "required": True},
                 {"name": "modes", "type": is_set, "dtype": "string", "required": True, "default": None, "parser": parse_set},
                 {"name": "geometry", "type": is_point, "dtype": "geometry", "required": False},
             ],
             "turns": [
+                {"name": "from_link", "type": is_int, "dtype": "Int64", "required": True},
+                {"name": "to_link", "type": is_int, "dtype": "Int64", "required": True},
                 {"name": "from_node", "type": is_int, "dtype": "Int64", "required": True},
                 {"name": "to_node", "type": is_int, "dtype": "Int64", "required": True},
                 {"name": "via_node", "type": is_int, "dtype": "Int64", "required": True},
@@ -530,12 +555,12 @@ class ParamsParser:
         else:
             raise ValueError(f"Unknown name: {name}")
         
-    def get_dtype(self, name: str) -> dict:
+    def get_dtype(self, name: str, default=None) -> dict:
         if name in self.fields:
             fields = self.fields[name]
             return {field["name"]: field["dtype"] for field in fields}
         else:
-            raise ValueError(f"Unknown name: {name}")
+            return default
         
     def get_output_parameters(self, name_or_params: str = None, index: int = None, df:pd.DataFrame=None, from_input=False) -> dict:
         if from_input:
@@ -543,6 +568,8 @@ class ParamsParser:
         else:
             base = "params.output"
         ret = self.get_parameters(name_or_params=name_or_params, index=index, df=df, base=base)
+        if ret is None:
+            return ret
         if connector := ret.get("connector", None):
             if connector.endswith("Loader"):
                 ret["connector"]= connector.replace("Loader", "Writer")
@@ -554,6 +581,8 @@ class ParamsParser:
         else:
             base = "params.input"
         ret = self.get_parameters(name_or_params=name_or_params, index=index, df=None, base=base)
+        if ret is None:
+            return ret
         if connector := ret.get("connector", None):
             if connector.endswith("Writer"):
                 ret["connector"]= connector.replace("Writer", "Loader")
@@ -643,7 +672,14 @@ class ParamsParser:
                     ret[k] = df[v]
                 assigned.add(v)
             else:
-                ret[k] = None
+                if isinstance(v, str) and v.startswith("expression:"):
+                    v = v.replace("expression:", "")
+                    ret[k] = df.eval(v)
+                elif isinstance(v, str) and v.startswith("lambda:"):
+                    v = v.replace("lambda:", "")
+                    ret[k] = df.apply(lambda x: eval(v), axis=1)
+                else:
+                    ret[k] = None
         return ret
     
     def apply_dtype(self, df, dtype, copy=False, tz_src = None, tz_dest = None):

@@ -1,0 +1,3 @@
+id,id_link_set,start,end,type,params,rain,fog,snow,wind,sim_1
+1,,14:52,14:59,weather,"{""rain"":1,""fog"":1,""snow"":1,""wind"":0}",1,1,1,0,1
+2,uno,14:43,14:55,weather,"{""rain"":2,""fog"":2,""snow"":0,""wind"":0}",2,2,0,0,1

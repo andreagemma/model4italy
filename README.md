@@ -36,7 +36,63 @@ Per avviare il programma in modalità server eseguire
 python model4italy.py server
 ```
 
+In alternativa è possibile importare la libreria e usare i seguenti comandi:
+
+```python
+import m4i
+
+m4i.init_db()
+```
+
+oppure
+
+```python
+import m4i
+
+m4i.run(params="params.json", params_data="params_data.json")
+```
+
+oppure passare i parametri come dictionary python
+
+```python
+import m4i
+
+params= { 
+        "simulation_id": 1,
+        "scenario": "eur2",
+        "start": "07:00",
+        "end": "07:30",  
+        "op": "assignment",
+        "settings": {
+            "MSA_MAX_ITE": 6,
+            "MSA_K": 2
+        },
+    }
+
+m4i.run(params=params, params_data="params_data.json")
+
+params = { 
+        "simulation_id": 1,
+        "scenario": "eur2",
+        "start": "07:00",
+        "end": "07:30",  
+        "op": "assignment"
+    }
+settings= { 
+        "settings": {
+            "MSA_MAX_ITE": 1,
+            "MSA_K": 2
+        }
+    }
+
+
+m4i.run(params=[params, settings], params_data="params_data.json")
+
+m4i.run(params=[params, settings, "params_data.json"])
+
+m4i.run(params=["params.json", params, settings], params_data="params_data.json")
 # Descrizione del file di configurazione unificato (params.json + params_data.json)
+
 
 Quando Model4Italy viene avviato, i file `params.json` e `params_data.json` vengono uniti in un unico oggetto di configurazione. Questo file risultante contiene sia i parametri generali della simulazione sia tutte le specifiche relative ai dati di input/output, domanda, rete, eventi, ecc.
 
@@ -45,7 +101,7 @@ Quando Model4Italy viene avviato, i file `params.json` e `params_data.json` veng
 ```json
 {
     "simulation_id": 25,
-    "description": "Demo",
+    "scenario": "Demo",
     "date": "2024-05-07",
     "start": "07:00",
     "end": "7:30",
@@ -65,7 +121,7 @@ Quando Model4Italy viene avviato, i file `params.json` e `params_data.json` veng
 ## Descrizione dei principali campi
 
 - **simulation_id**: Identificativo numerico della simulazione (del chiamante).
-- **description**: Descrizione testuale della simulazione (opzinale).
+- **description**: Descrizione testuale della simulazione (opzionale).
 - **date**: Data di riferimento della simulazione.
 - **start**: Ora di inizio della simulazione (formato HH:MM).
 - **end**: Ora di fine della simulazione (formato HH:MM).
@@ -74,6 +130,8 @@ Quando Model4Italy viene avviato, i file `params.json` e `params_data.json` veng
 - **settings**: Parametri avanzati per la simulazione (es. numero massimo di iterazioni, CPU, ecc.).
 - **params**: Oggetto che contiene tutte le informazioni dettagliate sui dati di input/output, domanda, rete, eventi, risultati, ecc.  
   La struttura interna di `params` dipende dal tipo di simulazione e dalla sorgente dati (file, database, ecc.).
+
+  I campi opzionali possono essere usati per comporre configurazioni parametriche come di seguito
 
 ### Esempio di struttura interna di `params`
 

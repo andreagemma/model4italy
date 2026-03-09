@@ -75,7 +75,9 @@ class Dispatcher(BaseM4IModel):
                 })
                 p = self.parser.get_output_parameters("params.params")
                 if "src" in p and p["src"].lower().endswith(".json"):
-                    with open(os.path.join(p["location"], p["src"]), 'w') as f:
+                    params_path = os.path.join(p["location"], p["src"])
+                    os.makedirs(os.path.dirname(params_path), exist_ok=True)
+                    with open(params_path, 'w') as f:
                         json.dump(self.parser.get_dict(), f, indent=4)
                 else:
                     self.writer.write(df, "params.params", mode="w")
@@ -122,6 +124,8 @@ class Dispatcher(BaseM4IModel):
                 self.run_rt_server_period()
             elif self.op == "fcd_server_paths_clustering":
                 self.run_rt_server_clustering()
+            elif self.op == "paths_calculation":
+                self.run_paths_caluclation()
             elif self.op == "ipc":
                 self.run_ipc_client()                
             elif self.op == "init":
@@ -179,6 +183,10 @@ class Dispatcher(BaseM4IModel):
     def run_rt_server_clustering(self):
         op: OP = PathsClustering(loader=self.loader, writer=self.writer, ipc=self.ipc)  
         op.run()   
+
+    def run_paths_caluclation(self):
+        op: OP = PathsCalculation(loader=self.loader, writer=self.writer, ipc=self.ipc)  
+        op.run()
 
     def run_ipc_client(self):
         if self.ipc is None:

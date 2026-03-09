@@ -104,7 +104,7 @@ components:
             - $ref: '#/components/schemas/DataInputConnector'
             - type: object
               properties:
-                src: { type: string, description: "Nome file, tabella o query di origine." }
+                src: { type: string, description: "Nome file, tabella o query di origine." }                
                 mapping:
                   type: object
                   additionalProperties: true

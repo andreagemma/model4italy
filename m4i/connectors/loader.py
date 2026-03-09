@@ -78,7 +78,7 @@ class Loader(BaseLoader):
         self.dparams: dict = None
         self.delta_t: int = self.ini.DELTA_T
         self.conv_tbl: pd.DataFrame = None
-        self.parser = parser
+        self.parser: ParamsParser = parser
         self.update_params(tstart = tstart, tend = tend)
 
         self.attr_to_share = ["_origins", "_destinations", "_zones", "_sign_nodes", "_OD", "_ODs",
@@ -164,8 +164,6 @@ class Loader(BaseLoader):
         if additional_fields := parameters.get("additional_fields", None):
             if isinstance(additional_fields, dict):                
                 for k, v in additional_fields.items():
-                    if k in df.columns:
-                        continue
                     if isinstance(v, str) and v.startswith("expression:"):
                         v = v.replace("expression:", "")
                         df[k] = df.eval(v)
@@ -177,14 +175,21 @@ class Loader(BaseLoader):
             elif isinstance(additional_fields, list):
                 for field in additional_fields:
                     if isinstance(field, str):
-                        if field in df.columns:
-                            continue
+                        #if field in df.columns:
+                        #    continue
                         df[field] = None
                     elif isinstance(field, dict):
                         for k, v in field.items():
-                            if k in df.columns:
-                                continue
-                            df[k] = v
+                            #if k in df.columns:
+                            #    continue
+                            if isinstance(v, str) and v.startswith("expression:"):
+                                v = v.replace("expression:", "")
+                                df[k] = df.eval(v)
+                            elif isinstance(v, str) and v.startswith("lambda:"):
+                                v = v.replace("lambda:", "")
+                                df[k] = df.apply(lambda x: eval(v), axis=1)
+                            else:
+                                df[k] = v
         if isinstance(df, gpd.GeoDataFrame): # se geodataframe trasforma o setta CRS e rinomina geometria
             crs = parameters.get("crs", None)
             if crs is not None:                
@@ -223,7 +228,7 @@ class Loader(BaseLoader):
         df=self.parser.apply_dtype(df=df, dtype=dtype, copy=False, 
                                    tz_src=parameters.get("tz_data", self.ini.TZ_LOCAL),
                                    tz_dest=self.ini.TZ_CALC)  
-                              
+        #self.log.debug(f"Loaded dataset with {len(df)} records for parameters: {parameters}")          
         return df
             
 
@@ -300,7 +305,7 @@ class Loader(BaseLoader):
                                      corrisponde a (col1 == 10 AND col2 > 5) OR (col3 < 20)
                                  es: filters = [[('col1', '==', 10), ('col2', '>', 5)], [('col3', '<', 20), ('col4', '!=', 30)]] 
                                      corrisponde a (col1 == 10 AND col2 > 5) OR (col3 < 20 AND col4 != 30)
-            dtype (opzionale): Il tipo di dato desiderato per il dataset caricato. Può essere utilizzato per specificare formati come pandas DataFrame o GeoDataFrame.
+            dtype (opzionale): Il tipo di dato desiderato pe+r il dataset caricato. Può essere utilizzato per specificare formati come pandas DataFrame o GeoDataFrame.
             **kwargs: Argomenti aggiuntivi per la personalizzazione o per casi d'uso specifici.
 
         Restituisce:
@@ -969,7 +974,7 @@ class Loader(BaseLoader):
             self.log.debug(f"Loading OD Matrix '{id_mat}'...")
             mode = od_param.get("mode", "c")            
             if mode not in self.modes:
-                raise KeyError("mode '{mode}' not defined in modes parameter")
+                raise KeyError(f"mode '{mode}' not defined in modes parameter")
             if "matrices" not in od_param:
                 raise KeyError("key 'matrices' required in demand element")
             modes.add(mode)
@@ -995,6 +1000,10 @@ class Loader(BaseLoader):
                     if tmp is None:
                         raise Exception(f"load_matrix({mat_params}) function return None value")
                     tmp = tmp[(tmp["o"].isin(self.origins)) & (tmp["d"].isin(self.destinations))]
+                    # aggrego per timestamps di simulazione
+                    s=pd.cut(tmp["timestamp"],timestamps+[1E100],right=False)
+                    tmp["timestamp"] = s.cat.categories[s.cat.codes].left
+                    tmp = tmp.groupby(["o","d","timestamp"]).agg(value=('value','sum')).reset_index()
                     tot_od_pairs += tmp.shape[0]
                     current_od = MatrixODT.read_df(rows=self.origins, cols=self.destinations, timestamps=timestamps, df=tmp)
                 if id_m==0:
@@ -1028,7 +1037,7 @@ class Loader(BaseLoader):
         self.log.info(f"OD Matrices identified {len(self.ODs)}. Read OD Pairs : {tot_od_pairs}")
             
             
-    def load_graph(self, df_links=None, df_nodes=None, df_turns=None):
+    def load_graph(self, df_links=None, df_nodes=None, df_turns=None) -> DynamicGraph:
         self.log.debug("Loading Graph...")
         if self.ini.LOAD_GRAPH and (df_links is None or df_nodes is None):
             self.log.debug("Loading State (Graph)...")
@@ -1115,8 +1124,14 @@ class Loader(BaseLoader):
                 else:
                     kwargs["modes"]=row["modes"]
             kwargs["idx"]=int(row["id"])
-            kwargs["is_centroid"]=int(row["id"]) in self.zones
-            kwargs["time"]=DynamicTimeArrayAttribute(0)
+            if "centroid" in row and not pd.isna(row["centroid"]):
+                kwargs["is_centroid"]=bool(row["centroid"])
+            else:
+                kwargs["is_centroid"]=int(row["id"]) in self.zones                
+            if "time" in row and not pd.isna(row["time"]):
+                kwargs["time"]=DynamicTimeArrayAttribute(float(row["time"]))
+            else:
+                kwargs["time"]=DynamicTimeArrayAttribute(0)
 
             #[kwargs.pop(k,None) for k in set(mapping_nodes.values())]
             G.add_node(**kwargs)
@@ -1167,7 +1182,12 @@ class Loader(BaseLoader):
                 else:
                     kwargs["modes"]=row["modes"]
             kwargs["t0"]=float(row["length"] / row["v0"] * 60)
-            kwargs["time"]=DynamicTimeArrayAttribute(float(row["length"] / row["v0"] * 60))
+            if "time" in row and not pd.isna(row["time"]):
+                kwargs["time"]=DynamicTimeArrayAttribute(float(row["time"]))
+            else:
+                kwargs["time"]=DynamicTimeArrayAttribute(float(row["length"] / row["v0"] * 60))
+
+            
             kwargs["flow"]=DynamicTimeArrayAttribute(0)
             #[kwargs.pop(k,None) for k in set(mapping_links.values())]
             G.add_link(**kwargs)            
@@ -1203,8 +1223,12 @@ class Loader(BaseLoader):
                     id_turn += 1
                     kwargs["idx"]=id_turn
                     kwargs["in_link"]=from_link
-                    kwargs["out_link"]=to_link                    
-                    kwargs["time"]=float("inf") if "penalty" not in row or pd.isna(row["penalty"]) else float(row["penalty"])
+                    kwargs["out_link"]=to_link          
+                    if "time" in row and not pd.isna(row["time"]):
+                        kwargs["time"]=float(row["time"])
+                        kwargs["time"]+=float("inf") if "penalty" not in row or pd.isna(row["penalty"]) else float(row["penalty"])
+                    else:
+                        kwargs["time"]=float("inf") if "penalty" not in row or pd.isna(row["penalty"]) else float(row["penalty"])
                     if "modes" in row:
                         if pd.isna(row["modes"]):
                             row["modes"] = modes.copy()
@@ -1226,10 +1250,14 @@ class Loader(BaseLoader):
                             kwargs["modes"]=row["modes"]
 
                     G.add_turn(**kwargs)
-
-        G["origins"] = list(self.origins)
-        G["destinations"] = list(self.destinations)
-        G["zones"] = list(self.zones) 
+        if self.parser.get_parameters("params.zones"):
+            G["origins"] = list(self.origins)
+            G["destinations"] = list(self.destinations)
+            G["zones"] = list(self.zones) 
+        else:
+            G["origins"] = []
+            G["destinations"] = []
+            G["zones"] = []
         if self.ini.CHECK_INPUT:
             self.check_graph(G)
         self._G = G

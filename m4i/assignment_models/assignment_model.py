@@ -61,9 +61,10 @@ class AssignmentModel(BaseM4IModel):
         self.loader.load_from_ipc(ipc=self.ipc)
         self.max_ite: int = max_ite
         self.max_rel_gap: float = max_rel_gap
-
-        self.global_t_start: int = max(0, self.loader.start if start is None else start)
-        self.global_t_end: int = min(1440, self.loader.end if end is None else end)
+        start = self.loader.start if start is None else start
+        self.global_t_start: int = max(0, 0 if start is None else start)
+        end = self.loader.end if end is None else end
+        self.global_t_end: int = min(1440, 1440 if end is None else end)
         self.global_time_slice: int = int(loader.ini.MSA_MAX_TIMESLICE if max_timeslice is None else max_timeslice)
         self.global_time_slice: int = int(min(self.global_t_end-self.global_t_start,self.global_time_slice))
 
@@ -84,8 +85,7 @@ class AssignmentModel(BaseM4IModel):
         self.save_agg_results = save_agg_results and self.writer.has_write_agg_results() and self.simulator is not None
         self.save_agg_results_stats = save_agg_results_stats and self.writer.has_write_agg_results_stats() and self.simulator is not None
         self.save_trace_results = save_trace_results and self.writer.has_write_trace_results() and self.simulator is not None
-        self.save_signal_results = save_signal_results and self.writer.has_write_signal_results() and self.simulator is not None
-        self.state_manager = StateManager(self.loader.parser)
+        self.save_signal_results = save_signal_results and self.writer.has_write_signal_results() and self.simulator is not None        
 
         self.save_state_ass_matrix = save_ass_matrix and self.state_manager.has_write_state() and self.calc_ass_matrix
         self.save_state_graph = save_state_graph and self.state_manager.has_write_state()
@@ -405,7 +405,7 @@ class AssignmentModel(BaseM4IModel):
                         df_paths.dropna(subset=["mode"], inplace=True)
                         df_paths = df_paths[df_paths["source"].isin(self.loader.origins) & df_paths["target"].isin(self.loader.destinations)]
 
-                        self.m_paths.add_from_dataframe(df_paths)
+                        self.m_paths.from_pandas(df_paths)
                     
             except Exception as e:
                 self.log.error("Failed to load off-line paths:", exc_info=e, stack_info=True)
@@ -697,17 +697,17 @@ class AssignmentModel(BaseM4IModel):
         self.log.info ("Assignment matrix calculated")
 
     def get_trace_results_dataframe(self):
-        if self.simulator is None:
+        if self.simulator is None or not hasattr(self.simulator,'get_trace_res'):
             return None
         return self.simulator.get_trace_res(self.global_t_start, self.global_t_end)
 
     def get_signal_results_dataframe(self):
-        if self.simulator is None:
+        if self.simulator is None or not hasattr(self.simulator,'get_signalized_res'):
             return None
         return self.simulator.get_signalized_res(self.global_t_start, self.global_t_end)
 
     def get_aggregated_results_stats_dataframe(self):
-        if self.simulator is None:
+        if self.simulator is None or not hasattr(self.simulator,'agg_stats'):
             return None
         return self.simulator.agg_stats(self.global_t_start, self.global_t_end)
 
@@ -749,6 +749,10 @@ class AssignmentModel(BaseM4IModel):
         l = next(G.get_all_links())
         for geom in ("geom","geometry"):
             if geom in l:
+                if results is None or results.empty:
+                    results[geom] = None
+                    results = gpd.GeoDataFrame(results, geometry=geom ,crs=self.loader.ini.CRS_CALC)
+                    break
                 results[geom]=[MultiLineString([multi_line_to_line(G.get_link(l_idx).get_value(geom)) for l_idx in links]) for links in results["links"]]
                 results = gpd.GeoDataFrame(results, geometry=geom ,crs=self.loader.ini.CRS_CALC)
                 break

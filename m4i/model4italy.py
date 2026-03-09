@@ -122,7 +122,7 @@ def main(**kwargs)->Optional[BaseM4IModel]:
             if args.command == 'run':
                 return run(ini_file=args.config,
                 params=args.params,
-                params_data=args.params_data,
+                params_data=args.params_data if args.params_data is not None else "params_data.json",
                 options=options)
                 
             elif args.command == 'server':
@@ -228,35 +228,16 @@ def open_db(ini_file="settings.ini", options: dict | None = None):
     Logger.setEngine(DB.get_engine())   
     return config
 
-def run(ini_file="settings.ini", params="params.json", params_data="params_data.json", options: dict=None):
+def run(ini_file="settings.ini", params="params.json", params_data=None, options: dict=None):
     import os
     from .dispatcher import Dispatcher
+    if not isinstance(params, (list,tuple)):
+        params = [params]
+    if not isinstance(params_data, (list,tuple)):
+        params_data = [params_data]
 
-    if params_data:
-        if isinstance(params_data, str) and os.path.exists(params_data):
-            params = [params_data, params]
-        elif isinstance(params_data, (tuple,list)):
-            if isinstance(params, (list,tuple)):
-                params = list(params_data) + list(params)
-            else:
-                params = list(params_data) + [params]
-        elif isinstance(params_data, dict):
-            if isinstance(params, (list,tuple)):
-                params = [params_data] + list(params)
-            else:
-                params = [params_data, params]
-    else:
-        if os.path.exists("params_data.json") and isinstance(params, str):
-            try:
-                data = json.load(open(params))
-                if "data_file" in data:
-                    from .utils import get_parametric_name
-                    data_file = get_parametric_name(data["data_file"], **data)
-                    params = [params, data_file]
-                else:
-                    params = [params,"params_data.json"]
-            except:
-                params = [params,"params_data.json"]
+    params = [ p for p in params + params_data if p is not None]
+
     config = open_db(ini_file=ini_file, options=options)
     return Dispatcher(params=params, options=options, ini=config).run()       
 

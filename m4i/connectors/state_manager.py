@@ -22,7 +22,7 @@ from .. import ParamsParser
 from .. import IniClass
 from ..log import Logger
 
-from ..utils import save_dict, load_dict
+from ..utils import save_dict, load_dict, Serializer
 
 
 class StateManager(object):
@@ -60,7 +60,7 @@ class StateManager(object):
         src = join(src, name+self.default_ext)
         if not os.path.exists(src):
             return None
-        return load_dict(src, compression=self.compression)
+        return Serializer.load(src, compression=self.compression)
         
 
     def write_state(self, object,  name, mode="w", partition=None,**kwargs) ->bool:
@@ -86,11 +86,11 @@ class StateManager(object):
                     shutil.rmtree(src, ignore_errors=True)
                 else:
                     os.remove(src)
-        kwargs.setdefault("index",False)
-        kwargs.setdefault("partition",partition)
+        #kwargs.setdefault("index",False)
+        #kwargs.setdefault("partition",partition)
         
         #location = self.parser.get_parametric_name(location, **kwargs)
 
         os.makedirs(src, exist_ok=True)
         src = join(src, name+self.default_ext)
-        save_dict(object, src, compression=self.compression, clevel=self.clevel)
+        Serializer.save(object, src, compression=self.compression, clevel=self.clevel)

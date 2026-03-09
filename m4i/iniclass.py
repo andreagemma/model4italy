@@ -2,6 +2,7 @@
 # Usare False in caso di Debug
 from .utils import ConfigReader, generate_sqlalchemy_url
 import logging, os
+import random
 
 class IniClass:
 
@@ -10,10 +11,14 @@ class IniClass:
     def get_dict(self):
         from copy import deepcopy
         tmp = deepcopy(self.__dict__)
+        tmp.pop('rnd', None)  # Rimuove l'oggetto random
         tmp.pop('config_reader', None)  # Rimuove il lettore di configurazione
         return tmp
     
+    
     def __init__(self, ini_file='settings.ini', db_url=None, use_db=False, reload=True, options: dict | None = None):
+        self.rnd = random.Random()
+
         # Inizializza il lettore di configurazione
         if options is not None:
             db_url = options.get("settings", {}).get("DB_SETTINGS_URL", db_url)
@@ -100,12 +105,15 @@ class IniClass:
         self.TZ_LOCAL = self.config_reader.get("TZ_LOCAL", 'GENERAL', "Europe/Rome")  # Timezone locale
         self.TZ_CALC = self.config_reader.get("TZ_CALC", 'GENERAL', "UTC")  # Timezone for calculations
         self.CHECK_INPUT = self.config_reader.getboolean("CHECK_INPUT", 'GENERAL', False)  # Controlla la validità dei dati in ingresso
-
+        self.RANDOM_SEED = self.config_reader.getint("RANDOM_SEED", 'GENERAL', 0)  # Seed per la generazione di numeri casuali
+        if self.RANDOM_SEED is not None:
+            self.rnd.seed(self.RANDOM_SEED)
+            
         # SIMULATOR
         self.SIMU_STEP = self.config_reader.getfloat("SIMU_STEP", 'SIMULATOR', 6)  # step di simulazione
         self.CAR_LENGTH = self.config_reader.getfloat("CAR_LENGTH", 'SIMULATOR', 5)  # lunghezza veicolo in metri
         self.MIN_SPEED = self.config_reader.getfloat("MIN_SPEED", 'SIMULATOR', 4)  # velocità minima per la coda
-        self.AGG_INT = self.config_reader.getint("AGG_INT", 'SIMULATOR', 5)  # intervallo di aggregazione in secondi
+        #self.AGG_INT = self.config_reader.getint("AGG_INT", 'SIMULATOR', 5)  # intervallo di aggregazione in secondi
         self.LT1 = self.config_reader.getfloat("LT1", 'SIMULATOR', 0)  # perditempo 1 alla partenza del veicolo
         self.LT2 = self.config_reader.getfloat("LT2", 'SIMULATOR', 0)  # perditempo 2 alla partenza del veicolo
 
@@ -156,6 +164,7 @@ class IniClass:
         self.FCD_SERVER_ROUTING = self.config_reader.getboolean("FCD_SERVER_ROUTING", 'FCD_SERVER', True) # abilita il routing
         self.FCD_SERVER_TRIPS = self.config_reader.getboolean("FCD_SERVER_TRIPS", 'FCD_SERVER', True) # abilita la generazione dei viaggi
         self.FCD_SERVER_UPDATE_SPEED = self.config_reader.getboolean("FCD_SERVER_UPDATE_SPEED", 'FCD_SERVER', True) # calcola velocità media dei veicoli
+        self.FCD_SERVER_WRITE_STATE = self.config_reader.getboolean("FCD_SERVER_WRITE_STATE", 'FCD_SERVER', True) # salva lo stato della simulazione ad ogni timeslice
 
         self.FCD_SPEED_AGGREGATION_INTERVAL = self.config_reader.getint("FCD_SPEED_AGGREGATION_INTERVAL", 'FCD_SERVER', 15) # intervallo di aggregazione della velocità in secondi
         self.FCD_MAP_MATCHING_CPUS = self.config_reader.getint("FCD_MAP_MATCHING_CPUS", 'FCD_MAP_MATCHING', 1) # numero di processi per il map matching
@@ -166,6 +175,8 @@ class IniClass:
         self.FCD_ROUTING_START_FROM_ZONE = self.config_reader.getboolean("FCD_ROUTING_START_FROM_ZONE", 'FCD_ROUTING', False) # se True il path inizia dalla zona di partenza
         self.FCD_ROUTING_END_TO_ZONE = self.config_reader.getboolean("FCD_ROUTING_END_TO_ZONE", 'FCD_ROUTING', False) # se True il path termina nella zona di arrivo
         self.FCD_ROUTING_AGGRATION_INTERVAL = self.config_reader.getint("FCD_ROUTING_AGGRATION_INTERVAL", 'FCD_ROUTING', 15) # intervallo di aggregazione in secondi
+        self.FCD_ROUTING_CLUSTERING = self.config_reader.getboolean("FCD_ROUTING_CLUSTERING", 'FCD_ROUTING', True) # se True viene eseguito il clustering dei percorsi FCD
+        self.FCD_ROUTING_CLUSTERING_EPS = self.config_reader.getfloat("FCD_ROUTING_CLUSTERING_EPS", 'FCD_ROUTING', 100) # eps per il clustering dei percorsi FCD in metri
          
         self.FCD_TRIPS_CPUS = self.config_reader.getint("FCD_TRIPS_CPUS", 'FCD_TRIPS', 1)  # numero di processi per la generazione dei viaggi
         self.FCD_TRIPS_SIGNAL_BREAK_MAX_DT = self.config_reader.getint("FCD_TRIPS_SIGNAL_BREAK_MAX_DT", 'FCD_TRIPS', 900)  # max time for signal break in seconds

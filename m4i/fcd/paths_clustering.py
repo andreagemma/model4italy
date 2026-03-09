@@ -22,7 +22,7 @@ def hausdorff_matrix(geoms):
             D[i, j] = D[j, i] = d
     return D
 
-def clustering(df,crs_data, crs_calc):
+def clustering(df,crs_data, crs_calc, eps=100):
     if not isinstance(df, gpd.GeoDataFrame):
         if df.geometry.dtype == 'object':
             # Convert WKB to shapely geometries
@@ -45,18 +45,19 @@ def clustering(df,crs_data, crs_calc):
     D = hausdorff_matrix(df.geometry.values)
     
     # Esegui il clustering
-    model = DBSCAN(min_samples=1, eps=100, metric='precomputed')
+    model = DBSCAN(min_samples=1, eps=eps, metric='precomputed')
 
     # Aggiungi le etichette al GeoDataFrame
-    df["k"] = model.fit_predict(D)
+    df["cluster"] = model.fit_predict(D)
     # per ogni gruppo prendo quello con tot_cost minimo
     agg = {c:(c,"first") for c in df.columns if c in {"source","target","mode", "links"}}
     if "tot_cost" in df.columns:
         agg["tot_cost"] = ("tot_cost","mean")
-    agg["n_paths"] = ("source", "count")
+    agg["n_paths"] = ("source", "count")    
     df = df.sort_values(by=['tot_cost'])
-    df = df.groupby('k').agg(**agg).reset_index(drop=False)    
+    df = df.groupby('cluster').agg(**agg).reset_index(drop=False)        
     df.drop(columns=['id_trip'], errors='ignore', inplace=True)
+    df["k"]=df.groupby(["source","target","mode", "links"]).cumcount()    
     return df
 
 class PathsClustering(BaseM4IModel):
@@ -64,7 +65,7 @@ class PathsClustering(BaseM4IModel):
     def __init__(self, loader: Loader, writer: Writer, ipc: IPC, **kwargs):
         super().__init__(loader=loader, writer=writer, ipc=ipc, **kwargs)
 
-    def run(self, df: Union[gpd.GeoDataFrame, dd.DataFrame]) -> gpd.GeoDataFrame:
+    def run(self, df: Union[gpd.GeoDataFrame, dd.DataFrame], eps=100) -> gpd.GeoDataFrame:
         if df is None:
             self
         """
@@ -85,10 +86,11 @@ class PathsClustering(BaseM4IModel):
         
         crs_calc = self.loader.parser.ini.CRS_CALC
         crs_data = self.loader.parser.ini.CRS
+        eps = eps if eps is not None else self.loader.parser.ini.FCD_ROUTING_CLUSTERING_EPS
         def fn(tasks):
             ret = None
             for name, df_group in tasks:
-                tmp= clustering(df_group, crs_calc=crs_calc, crs_data=crs_data)
+                tmp= clustering(df_group, crs_calc=crs_calc, crs_data=crs_data, eps=eps)
                 if ret is None and tmp is not None and not tmp.empty:
                     ret = tmp
                 else:

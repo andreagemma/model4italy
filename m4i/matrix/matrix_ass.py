@@ -32,6 +32,7 @@ class MatrixAss:
             i, j, l = key
             idx = i * self.nd + j
             self.mat[l, idx] = value
+            
 
     def __init__(self, loader=None, n_intervals=None, links_detected=None, G=None, pre_intervals=None):
         from ..connectors import Loader
@@ -39,6 +40,7 @@ class MatrixAss:
         self.G = loader.G if G is None else G
         self.origins = loader.origins
         self.destinations = loader.destinations
+        
         self.detectors = sorted(loader.detectors["id_link"].to_list() if links_detected is None else links_detected)
 
         self.delta_t = loader.delta_t

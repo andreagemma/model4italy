@@ -40,7 +40,8 @@ class car:
         self.same_link = False
         
         if self.ind_res:
-            self.monitored_veh = True if (self.ID%self.mon_veh) == 0 else False
+            # self.monitored_veh = True if (self.ID%self.mon_veh) == 0 else False # UPDATE: Gemma
+            self.monitored_veh = self.ini.rnd.random() < self.mon_veh/100
         self.trace = []
         
 

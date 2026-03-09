@@ -16,20 +16,6 @@ class KPathList(KPathContainer):
         self.setdefault("paths", {})
         self.setdefault("ull", {}) # Unique Link List
 
-    def add_from_dataframe(self, df, **kwargs) -> KPathList:
-        import pandas as pd
-        df: pd.DataFrame = df if isinstance(df, pd.DataFrame) else pd.DataFrame(df)
-
-        grps = df.groupby(["source", "target", "t_start", "mode"])
-        for key,index in grps.groups.items():
-            group = df.loc[index,:].copy()
-            group.sort_values(by="tot_cost", inplace=True)            
-            for k, (_,  row) in enumerate(group.iterrows()):
-                args =row.to_dict()
-                args["k"]=k
-                path = Path.load_from_dict(args)
-                self.add_path(path, **kwargs)
-
     def add_path(self, to_add: Path, k: Optional[int] = None, **kwargs):
         to_add["links"] = self["ull"].setdefault(to_add["links"], to_add["links"])
         key = to_add.key()

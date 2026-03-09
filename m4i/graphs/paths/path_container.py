@@ -19,6 +19,9 @@ class PathContainer(ABC, dict):
         self.update(**kwargs)
         self["type"] = self.__class__.__name__
 
+    def deepcopy(self) -> PathContainer:
+        return copy.deepcopy(self)
+    
     def get_paths_by_t_start(self, t_start) -> Generator[Path,None,None]:
         for path in self.all_paths():
             if path["t_start"] == t_start:
@@ -42,7 +45,11 @@ class PathContainer(ABC, dict):
         elif isinstance(to_add, PathContainer):
             for path in to_add.all_paths(**kwargs):
                 self.add_path(path)
-    	
+    
+    def apply(self, function: Callable[[Path], Any], **kwargs) -> None:
+        for path in self.all_paths():
+            function(path)
+            
     @abstractmethod
     def get_sources(self, target: Optional[Hashable]=None, t_start: Optional[Number] = None, mode:Optional[str]=None, **kwargs) -> Tuple[Hashable]:
         raise NotImplementedError()
@@ -94,6 +101,7 @@ class PathContainer(ABC, dict):
     def to_pandas(self, G, crs_link):        
         df_paths: pd.DataFrame = pd.DataFrame(self.all_paths())
         if df_paths.empty:
+            df_paths = gpd.GeoDataFrame(df_paths, geometry=[], crs=crs_link)
             return df_paths
         l = next(G.get_all_links())
         for geom in ("geom","geometry"):
@@ -102,5 +110,17 @@ class PathContainer(ABC, dict):
                 df_paths = gpd.GeoDataFrame(df_paths, geometry=geom ,crs=crs_link)
                 return df_paths            
         return None
+    
+    def from_pandas(self, df, **kwargs) -> KPathList:
+        import pandas as pd
+        from . import Path
+        df: pd.DataFrame = df if isinstance(df, pd.DataFrame) else pd.DataFrame(df)
+
+        for path in df.iterrows():
+            args =row.to_dict()
+            path = Path.load_from_dict(args)
+            self.add_path(path, **kwargs)
+
+ 
 
     

@@ -8,6 +8,7 @@ from .offline_save_state import OfflineSaveState
 from .online_rt_server import OnlineRTServer
 from .offline_rt_server import OfflineRTServer
 from .paths_clustering import PathsClustering
+from .paths_calculation import PathsCalculation
 
 __all__ = [
     "OP",
@@ -19,5 +20,6 @@ __all__ = [
     "OnlineRTServer",
     "OfflineRTServer",
     "PathsClustering",
-    "ODEstimation"
+    "ODEstimation",
+    "PathsCalculation"
 ]

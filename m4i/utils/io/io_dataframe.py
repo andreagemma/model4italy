@@ -71,7 +71,7 @@ class IO_DataFrame:
         kwargs_driver: Optional[dict] = None,
         force_geodataframe: Optional[bool] = None,
         **kwargs
-    ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
+    ) -> Union[pd.DataFrame, gpd.GeoDataFrame, object]:
 
         if not driver:
             driver = self._detect_driver(path)

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import dateutil
 import logging
 import __future__
 from numbers import Number
@@ -23,6 +24,8 @@ import pyproj
 import warnings
 from ..graphs import AbstractGraph, PathList, PathList, AbstractGraph, DynamicGraph, DynamicTimeArrayAttribute
 from .build_paths import BuildPaths
+from .paths_clustering import PathsClustering
+
 from ..params_parser import ParamsParser
 from ..connectors import Loader, Writer
 from ..utils import export_dataframe, TicToc, multi_line_to_line, to_datetime_auto, to_timedelta_auto, remove_path, pd_concat
@@ -30,6 +33,7 @@ from ..utils.ipc import IPC
 from ..log import Logger
 from .fcd_manager import FCDManager
 from ..base_m4i_model import BaseM4IModel
+from ..graphs import KPathList
 
 
 class RTServer(BaseM4IModel):
@@ -113,7 +117,7 @@ class RTServer(BaseM4IModel):
                 update_speed=self.parser.ini.FCD_SERVER_UPDATE_SPEED,
                 share_data=False,
                 )
-            write_data =self.parser.ini.FCD_SERVER_WRITE_OUTPUT
+            write_data =self.parser.ini.FCD_SERVER_WRITE_OUTPUT or self.parser.ini.FCD_SERVER_WRITE_STATE
             if write_data:
                 if self.save_paths(paths=self.paths, mode=self.mode_paths):
                     self.mode_paths = "a"
@@ -423,8 +427,6 @@ class RTServer(BaseM4IModel):
         else:
             self.tic.info("IPC is not initialized. Cannot share data.")
             return
-
-    
     
     def save_paths(self, paths: PathList, mode) -> None:
         # TODO: Verificare formato con DB
@@ -437,88 +439,126 @@ class RTServer(BaseM4IModel):
         if not self.writer.has("params.fcd_paths"):
             return False
         self.tic.info("Saving paths...").tic()
-        df_paths: gpd.GeoDataFrame = paths.to_pandas(self.graph, self.df_links.crs)
-        if df_paths is None or df_paths.shape[0] == 0:
-            self.tic.info("No paths to save")
-            return False
-        df_paths = df_paths.to_crs(self.build_paths.crs_data)
-        df_paths["dt_o"] = df_paths["dt_o"].dt.tz_convert(self.parser.ini.TZ_LOCAL)
-        df_paths["dt_d"] = df_paths["dt_d"].dt.tz_convert(self.parser.ini.TZ_LOCAL)
-        df_paths["t"] = (np.floor((df_paths["dt_o"].dt.hour * 60 + df_paths["dt_o"].dt.minute)/self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL) * self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL).astype("Int64")
-        df_paths["t_start"] = df_paths["t"].copy()
-        df_paths["t_base"] = 0
+        df_paths: Optional[gpd.GeoDataFrame] = None
+        if self.parser.ini.FCD_ROUTING_CLUSTERING:
+            df_paths: gpd.GeoDataFrame = paths.to_pandas(self.graph, self.df_links.crs)
+            if df_paths is None or df_paths.shape[0] == 0:
+                self.tic.info("No paths to save")
+                return False
+            PathsClustering(loader=self.loader,writer=self.writer,ipc=self.ipc).run(
+                df_paths,
+                eps = self.parser.ini.FCD_ROUTING_CLUSTERING_EPS
+            )
+            
+        if self.parser.ini.FCD_SERVER_WRITE_OUTPUT:  
+            if df_paths is None:
+                df_paths: gpd.GeoDataFrame = paths.to_pandas(self.graph, self.df_links.crs)          
+            if df_paths is None or df_paths.shape[0] == 0:
+                self.tic.info("No paths to save")
+                return False
+            df_paths = df_paths.to_crs(self.build_paths.crs_data)
+            if "dt_o" in df_paths.columns:
+                df_paths["dt_o"] = df_paths["dt_o"].dt.tz_convert(self.parser.ini.TZ_LOCAL)
+            if "dt_d" in df_paths.columns:
+                df_paths["dt_d"] = df_paths["dt_d"].dt.tz_convert(self.parser.ini.TZ_LOCAL)
+            df_paths["t"] = (np.floor((df_paths["dt_o"].dt.hour * 60 + df_paths["dt_o"].dt.minute)/self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL) * self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL).astype("Int64")
+            df_paths.drop(["dt_o","dt_d"], axis='columns', inplace=True, errors="ignore")
+            df_paths["t_start"] = df_paths["t"].copy()
+            df_paths["t_base"] = 0
+            
+            self.writer.write_paths(df_paths, params="params.fcd_paths", mode=mode)
+            self.tic.info("Saved paths in {et} seconds").tic()
+
+        if self.parser.ini.FCD_SERVER_WRITE_STATE:
+            if self.parser.ini.FCD_ROUTING_CLUSTERING:
+                paths = KPathList.from_pandas(df_paths)
+                self.state_manager.write_state(paths, "fcd_paths")
+            else:
+                def add_info(path):
+                    path["t"] = (np.floor((path["dt_o"].hour * 60 + path["dt_o"].minute)/self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL) * self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL).astype(np.int64)
+                    path["t_start"] = path["t"]
+                    path["t_base"] = 0
+                    #path.pop("dt_o", None)
+                    #path.pop("dt_d", None)
+                    return path
+                PathList.apply(paths, add_info) 
+                self.state_manager.write_state(paths, "fcd_paths",mode=mode)
+            self.tic.info("Saved state paths in {et} seconds").tic()
+
 
         
-        self.writer.write(df_paths,"params.fcd_paths", mode=mode)
-        self.tic.info("Saved paths in {et} seconds")
         return True
 
     def save_trips(self, df_trips: gpd.GeoDataFrame, mode) -> None:
         """
         Save the calculated paths to a file.
         """
-        if df_trips is None or df_trips.shape[0] == 0:
-            self.tic.info("No trips to save")
-            return False
-        if not self.writer.has("params.fcd_trips"):
-            return False
-        self.tic.info("Saving trips...").tic()
-        
-        df_trips = df_trips.copy()
-        df_trips["dt_o"] = df_trips["dt_o"].dt.tz_convert(self.parser.ini.TZ_LOCAL)
-        df_trips["dt_d"] = df_trips["dt_d"].dt.tz_convert(self.parser.ini.TZ_LOCAL)
-        df_trips["t"]=(np.floor((df_trips["dt_o"].dt.hour*60+df_trips["dt_o"].dt.minute)/self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL)*self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL).astype("Int64")
-        df_trips.drop(columns=["new"], inplace=True, errors="ignore")
-        if df_trips is None or df_trips.shape[0] == 0:
-            self.tic.info("No trips to save")
-            return False
-        else:
-            df_trips = df_trips.to_crs(self.build_paths.crs_data)
-        
-        self.writer.write(df_trips,"params.fcd_trips", mode=mode)
-        self.tic.info("Saved trips in {et} seconds")
+        if self.parser.ini.FCD_SERVER_WRITE_OUTPUT:
+            if df_trips is None or df_trips.shape[0] == 0:
+                self.tic.info("No trips to save")
+                return False
+            if not self.writer.has("params.fcd_trips"):
+                return False
+            self.tic.info("Saving trips...").tic()
+            
+            df_trips = df_trips.copy()
+            df_trips["dt_o"] = df_trips["dt_o"].dt.tz_convert(self.parser.ini.TZ_LOCAL)
+            df_trips["dt_d"] = df_trips["dt_d"].dt.tz_convert(self.parser.ini.TZ_LOCAL)
+            df_trips["t"]=(np.floor((df_trips["dt_o"].dt.hour*60+df_trips["dt_o"].dt.minute)/self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL)*self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL).astype("Int64")
+            df_trips.drop(columns=["new"], inplace=True, errors="ignore")
+            if df_trips is None or df_trips.shape[0] == 0:
+                self.tic.info("No trips to save")
+                return False
+            else:
+                df_trips = df_trips.to_crs(self.build_paths.crs_data)
+            
+            self.writer.write(df_trips,"params.fcd_trips", mode=mode)
+            self.tic.info("Saved trips in {et} seconds")
         return True
     
     def save_fcd(self, df_fcd: gpd.GeoDataFrame, mode) -> None:
         """
         Save the calculated paths to a file.
         """
-        if df_fcd is None or df_fcd.shape[0] == 0:
-            self.tic.info("No FCD to save")
-            return False        
-        if not self.writer.has("params.fcd_fcd"):
-            return False
-        self.tic.info("Saving FCD...").tic()
-        df_fcd = df_fcd.copy()
-        df_fcd["timestamp"] = df_fcd["timestamp"].dt.tz_convert(self.parser.ini.TZ_LOCAL)
-        df_fcd["t"]=(np.floor((df_fcd["timestamp"].dt.hour*60+df_fcd["timestamp"].dt.minute)/self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL)*self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL).astype("Int64")
-        df_fcd.drop(columns=["new","x","y"], inplace=True, errors="ignore")
-        df_fcd = df_fcd.to_crs(self.build_paths.crs_data)
-        
-        self.writer.write(df_fcd,"params.fcd_fcd", mode=mode)
-        self.tic.info("Saved FCD in {et} seconds")
+        if self.parser.ini.FCD_SERVER_WRITE_OUTPUT:
+            if df_fcd is None or df_fcd.shape[0] == 0:
+                self.tic.info("No FCD to save")
+                return False        
+            if not self.writer.has("params.fcd_fcd"):
+                return False
+            self.tic.info("Saving FCD...").tic()
+            df_fcd = df_fcd.copy()
+            df_fcd["timestamp"] = df_fcd["timestamp"].dt.tz_convert(self.parser.ini.TZ_LOCAL)
+            df_fcd["t"]=(np.floor((df_fcd["timestamp"].dt.hour*60+df_fcd["timestamp"].dt.minute)/self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL)*self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL).astype("Int64")
+            df_fcd.drop(columns=["new","x","y"], inplace=True, errors="ignore")
+            df_fcd = df_fcd.to_crs(self.build_paths.crs_data)
+            
+            self.writer.write(df_fcd,"params.fcd_fcd", mode=mode)
+            self.tic.info("Saved FCD in {et} seconds")
         return True
 
     def save_all_graph(self, graph: AbstractGraph, mode) -> None:
         """
         Save the calculated paths to a file.
         """
-        self.tic.info("Saving Graph...").tic()
-        if graph is None:
-            self.tic.info("No Graph to save")
-            return False
-        self.graph["t_start"] = to_datetime_auto(self.graph["t_start"], tz_localize=self.parser.ini.TZ_CALC, tz_convert=self.parser.ini.TZ_LOCAL)
-        t_base = self.graph["t_start"]
-        t_base = (np.floor((t_base.hour * 60 + t_base.minute)/self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL) * self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL).astype("Int64") 
-        self.graph["t_base"] = t_base
+        if self.parser.ini.FCD_SERVER_WRITE_OUTPUT:
+            self.tic.info("Saving Graph...").tic()
+            if graph is None:
+                self.tic.info("No Graph to save")
+                return False
+            self.graph["t_start"] = to_datetime_auto(self.graph["t_start"], tz_localize=self.parser.ini.TZ_CALC, tz_convert=self.parser.ini.TZ_LOCAL)
+            t_base = self.graph["t_start"]
+            t_base = (np.floor((t_base.hour * 60 + t_base.minute)/self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL) * self.parser.ini.FCD_ROUTING_AGGRATION_INTERVAL).astype("Int64") 
+            self.graph["t_base"] = t_base
 
-        #graph.apply_links(
-        #    lambda x: x.set_value("geometry", x.get_value("geometry", t=None).to_crs(self.parser.ini.CRS), t=None),
-        #)
-        if self.writer.has("params.fcd_graph"):
-            self.writer.write(graph,"params.fcd_graph", mode=mode)
-        self.tic.info("Saved Graph in {et} seconds")
-        return True
+            #graph.apply_links(
+            #    lambda x: x.set_value("geometry", x.get_value("geometry", t=None).to_crs(self.parser.ini.CRS), t=None),
+            #)
+        
+            if self.writer.has("params.fcd_graph"):
+                self.writer.write(graph,"params.fcd_graph", mode=mode)
+            self.tic.info("Saved Graph in {et} seconds").tic()
+            return True
         
     def save_graph(self, graph: AbstractGraph, mode) -> None:
         #TODO: salvare solo i dati modificati in json o altro
@@ -526,34 +566,35 @@ class RTServer(BaseM4IModel):
         """
         Save the calculated paths to a file.
         """
-        self.tic.info("Saving Graph...").tic()
-        if graph is None:
-            self.tic.info("No Graph to save")
-            return False
-        updated_links = []
-        self.graph["t_start"] = to_datetime_auto(self.graph["t_start"], tz_localize=self.parser.ini.TZ_CALC, tz_convert=self.parser.ini.TZ_LOCAL)
-        t_base = self.graph["t_start"]
-        t_base = int(round(t_base.hour * 60 + t_base.minute + t_base.second / 60))
-        self.graph["t_base"] = t_base
-        for l in graph.get_all_links():
-            if "fcd_n" not in l:
-                continue
-            fcd_n = l.get_values("fcd_n")
-            if sum(fcd_n)==0:
-                continue
-            updated_links.append({
-                "id": l["idx"],
-                "fcd_n": fcd_n,
-                "fcd_speed": l.get_values("fcd_speed"),
-                "t_base": t_base,
-            })
-        df = pd.DataFrame(updated_links)
-        if df.empty:
-            self.tic.info("No Graph to save")
-            return False
-        if self.writer.has("params.fcd_graph"):
-            self.writer.write(df,"params.fcd_graph", mode=mode)
-        self.tic.info("Saved Graph in {et} seconds")
+        if self.parser.ini.FCD_SERVER_WRITE_OUTPUT:
+            self.tic.info("Saving Graph...").tic()
+            if graph is None:
+                self.tic.info("No Graph to save")
+                return False
+            updated_links = []
+            self.graph["t_start"] = to_datetime_auto(self.graph["t_start"], tz_localize=self.parser.ini.TZ_CALC, tz_convert=self.parser.ini.TZ_LOCAL)
+            t_base = self.graph["t_start"]
+            t_base = int(round(t_base.hour * 60 + t_base.minute + t_base.second / 60))
+            self.graph["t_base"] = t_base
+            for l in graph.get_all_links():
+                if "fcd_n" not in l:
+                    continue
+                fcd_n = l.get_values("fcd_n")
+                if sum(fcd_n)==0:
+                    continue
+                updated_links.append({
+                    "id": l["idx"],
+                    "fcd_n": fcd_n,
+                    "fcd_speed": l.get_values("fcd_speed"),
+                    "t_base": t_base,
+                })
+            df = pd.DataFrame(updated_links)
+            if df.empty:
+                self.tic.info("No Graph to save")
+                return False
+            if self.writer.has("params.fcd_graph"):
+                self.writer.write(df,"params.fcd_graph", mode=mode)
+            self.tic.info("Saved Graph in {et} seconds")
         return True
     def run(self):
         """

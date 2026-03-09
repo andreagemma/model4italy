@@ -28,7 +28,16 @@ class BaseSimulator(BaseM4IModel):
     def set_paths(self,paths: KPathList):
         pass
     
-    @abstractmethod
+    
     def agg_results(self, tstart: int, tend: int, agg_int: int) -> pd.DataFrame:
         pass
+
     
+    def agg_stats(self, tstart: int, tend: int):
+        pass
+
+    def get_signalized_res(self, tstart: int, tend: int):
+        pass
+    
+    def get_trace_res(self, tstart: int, tend: int):
+        pass
