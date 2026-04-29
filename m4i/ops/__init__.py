@@ -9,6 +9,7 @@ from .online_rt_server import OnlineRTServer
 from .offline_rt_server import OfflineRTServer
 from .paths_clustering import PathsClustering
 from .paths_calculation import PathsCalculation
+from .online_rolling import OnlineRolling
 
 __all__ = [
     "OP",
@@ -21,5 +22,6 @@ __all__ = [
     "OfflineRTServer",
     "PathsClustering",
     "ODEstimation",
-    "PathsCalculation"
+    "PathsCalculation",
+    "OnlineRolling"
 ]

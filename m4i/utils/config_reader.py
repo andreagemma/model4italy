@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 import warnings
 from typing import Union
+import logging
 
 class ConfigReader:
     def __init__(self, settings:Union[str,dict,tuple,list]='settings.ini', db_url=None, use_db=False, db_query=None, table_name="settings"):
@@ -82,18 +83,35 @@ class ConfigReader:
         return self.config.get(section, name, fallback=None)
 
     def _get_from_env(self, name):
-        return os.getenv("M4I_" + name)
+        return os.getenv("M4I_" + name, None)
 
     def get(self, name, section='DEFAULT', default=None):
-        value_ini = self._get_from_ini(section, name)
-        value_db=None
-        value_env=None
-        if self.use_db:
-            value_db = self._get_from_db(section, name)
-        value_env = self._get_from_env(name)
-        
-        value = (value_env or value_db) or value_ini
-        return value.strip() if value is not None else default
+        value = self._get_from_env(name)
+        source = None
+        if value is not None and str(value).strip() != "":
+            source = "ENV"
+        #print(f"ConfigReader: got {name}={value} from environment variable M4I_{name}")
+        if self.use_db and (value is None or str(value).strip() == ""):
+            value = self._get_from_db(section, name)
+            if value is not None and str(value).strip() != "":
+                source = "DB"
+            #print(f"ConfigReader: got {name}={value} from database query")
+        elif value is None or str(value).strip() == "":
+            value = self._get_from_ini(section, name)
+            if value is not None and str(value).strip() != "":
+                source = "INI"
+            #print(f"ConfigReader: got {name}={value} from INI file")
+
+        if source=="ENV":
+            logging.debug(f"ConfigReader: got {name}={value} from environment variable M4I_{name}")
+        elif source=="DB":
+            logging.debug(f"ConfigReader: got {name}={value} from database query")
+        elif source=="INI":
+            logging.debug(f"ConfigReader: got {name}={value} from INI file")
+        if isinstance(value, str):
+            value = value.strip()
+            value = None if value.lower() == "none" else value
+        return value if value is not None else default
 
     def getint(self, name, section='DEFAULT', default=None):
         value = self.get(name, section, default)

@@ -86,6 +86,10 @@ class Loader(BaseLoader):
                               "_df_links", "_df_nodes", "_df_turns",
                               "dparams", "delta_t", "conv_tbl", "timestamps"]
         
+    def round_to(self, min: int, delta: int=None) -> int:
+        delta = self.delta_t if delta is None else delta
+        return min // delta * delta
+    
     def recreate(self, tstart:int=None, tend:int = None) -> Loader:
         """
         Create a clone of the current Loader instance.
@@ -159,37 +163,53 @@ class Loader(BaseLoader):
         df = loader.load_dataset(parameters=parameters, filters=filters, dtype=dtype_inverse,**kwargs)
         if df is None:
             return None
-        if mapping:            
-            df = self.parser.apply_mapping(df=df, mapping=mapping)
-        if additional_fields := parameters.get("additional_fields", None):
-            if isinstance(additional_fields, dict):                
-                for k, v in additional_fields.items():
-                    if isinstance(v, str) and v.startswith("expression:"):
-                        v = v.replace("expression:", "")
-                        df[k] = df.eval(v)
-                    elif isinstance(v, str) and v.startswith("lambda:"):
-                        v = v.replace("lambda:", "")
-                        df[k] = df.apply(lambda x: eval(v), axis=1)
-                    else:
-                        df[k] = v
-            elif isinstance(additional_fields, list):
+        if additional_fields := parameters.get("additional_fields", None):            
+            if isinstance(additional_fields, list):
+                tmp = {}
                 for field in additional_fields:
                     if isinstance(field, str):
-                        #if field in df.columns:
-                        #    continue
-                        df[field] = None
+                        tmp[field] = {"value": None}
                     elif isinstance(field, dict):
-                        for k, v in field.items():
-                            #if k in df.columns:
-                            #    continue
-                            if isinstance(v, str) and v.startswith("expression:"):
-                                v = v.replace("expression:", "")
-                                df[k] = df.eval(v)
-                            elif isinstance(v, str) and v.startswith("lambda:"):
-                                v = v.replace("lambda:", "")
-                                df[k] = df.apply(lambda x: eval(v), axis=1)
-                            else:
-                                df[k] = v
+                        if "name" not in field:
+                            raise ValueError(f"Missing 'name' key in additional field definition: {field}")
+                        tmp[field["name"]] = field
+                additional_fields = tmp
+            if isinstance(additional_fields, dict):
+                tmp = {}
+                for additional_field, p in additional_fields.items():
+                    if not isinstance(p, dict):
+                        d = {"value": p}
+                    else:
+                        d = p.copy()
+                    d.setdefault("dtype", None)
+                    d.setdefault("value", None)
+                    d.setdefault("name", additional_field)
+                    tmp[additional_field]=d
+                additional_fields = tmp
+            else:
+                raise ValueError(f"Invalid 'additional_fields' definition: {additional_fields}. Must be a list of field {{name: <name>[, value: <value>][, dtype: <dtype>]}} or a dict {{<name>: {{value: <value>, dtype: <dtype>}}}}.")
+
+        if mapping:            
+            df = self.parser.apply_mapping(df=df, mapping=mapping)
+        if additional_fields and isinstance(df, (pd.DataFrame, gpd.GeoDataFrame, dict)):                
+            for additional_field, p in additional_fields.items():
+                t = p.get("dtype", None)
+                v = p.get("value", None)    
+                                                    
+                if isinstance(v, str) and v.startswith("expression:"):
+                    s = df.eval(v.replace("expression:", ""))                        
+                elif isinstance(v, str) and v.startswith("lambda:"):
+                    v = v.replace("lambda:", "")
+                    s = df.apply(lambda x: eval(v), axis=1)
+                else:
+                    s=v
+                df[additional_field] = s
+                if t is not None:
+                    if isinstance(df, (pd.DataFrame, gpd.GeoDataFrame)):
+                        df[additional_field] = df[additional_field].astype(t)
+                    elif isinstance(df, dict):
+                        df[additional_field] = pd.Series([v]).astype(t).tolist()[0]
+            
         if isinstance(df, gpd.GeoDataFrame): # se geodataframe trasforma o setta CRS e rinomina geometria
             crs = parameters.get("crs", None)
             if crs is not None:                
@@ -335,10 +355,9 @@ class Loader(BaseLoader):
         start = kwargs.pop("start", self.start)
         end = self.end if end is None else end
         start = self.start if start is None else start
-        if end%1440<start%1440:
-            filters = [(("timestamp","<",end%1440),("timestamp",">=",start%1440))]
-        else:
-            filters = [("timestamp",">=",start%1440),("timestamp","<",end%1440)]
+        filters = [[["timestamp",">=",start],["timestamp","<",end]]]
+        if end >= 1440:
+            filters = [[["timestamp",">=",start],["timestamp","<",1440]], [["timestamp",">=",0],["timestamp","<",end-1440]]]
         dtype = self.parser.get_dtype("counts")
         df = self._load_dataset(parameters=parameters, filters = filters, dtype=dtype, **kwargs)
         if df is None:
@@ -350,10 +369,9 @@ class Loader(BaseLoader):
     def load_matrix(self, parameters: dict, **kwargs) -> pd.DataFrame:
         end = kwargs.pop("end", self.end)
         start = kwargs.pop("start", self.start)
-        if end%1440<start%1440:
-            filters = [(("timestamp","<",end%1440),("timestamp",">=",start%1440))]
-        else:
-            filters = [("timestamp",">=",start%1440),("timestamp","<",end%1440)]
+        filters = [[["timestamp",">=",start],["timestamp","<",end]]]
+        if end >= 1440:
+            filters = [[["timestamp",">=",start],["timestamp","<",1440]], [["timestamp",">=",0],["timestamp","<",end-1440]]]
         dtype = self.parser.get_dtype("matrices")
         df = self._load_dataset(parameters=parameters, filters = filters, dtype=dtype, **kwargs)
         if df is None:
@@ -697,6 +715,14 @@ class Loader(BaseLoader):
         df = self.load_zones(parameters)
         if df is None:
             raise Exception(f"load_zones({parameters}) function return None value")
+        
+        if self._zones is None:
+            self._zones = df["id"].values.tolist()
+        if self._origins is None:
+            self._origins = self.zones.copy()
+        if self._destinations is None:
+            self._destinations = self.zones.copy()
+
         ret=None
         if "geometry" in df.columns and df.geometry.iloc[0] is not None:
             df = gpd.GeoDataFrame(df)
@@ -1181,11 +1207,14 @@ class Loader(BaseLoader):
                     kwargs["modes"]=m
                 else:
                     kwargs["modes"]=row["modes"]
-            kwargs["t0"]=float(row["length"] / row["v0"] * 60)
+            if "t0" not in row or pd.isna(row["t0"]):
+                kwargs["t0"]=float(row["length"] / row["v0"] * 60)
+            else:
+                kwargs["t0"]=float(row["t0"])   
             if "time" in row and not pd.isna(row["time"]):
                 kwargs["time"]=DynamicTimeArrayAttribute(float(row["time"]))
             else:
-                kwargs["time"]=DynamicTimeArrayAttribute(float(row["length"] / row["v0"] * 60))
+                kwargs["time"]=DynamicTimeArrayAttribute(kwargs["t0"])
 
             
             kwargs["flow"]=DynamicTimeArrayAttribute(0)
@@ -1250,6 +1279,55 @@ class Loader(BaseLoader):
                             kwargs["modes"]=row["modes"]
 
                     G.add_turn(**kwargs)
+        # add penalty from turns
+        if self.ini.GRAPH_ADD_TURN_PENALTIES:
+            for n in G.get_all_nodes():
+                in_links = list(G.get_bws(n["idx"]))
+                out_links = list(G.get_bws(n["idx"]))
+                for in_link in in_links:
+                    #in_link = G.get_link(id_in_link)
+                    if in_link["connector"] == 1:
+                        continue
+                    idx_in_link = in_link["idx"]
+                    for out_link in out_links:
+                        #out_link = G.get_link(id_out_link)
+                        if out_link["connector"] == 1:
+                            continue
+                        idx_out_link = out_link["idx"]
+                        if idx_in_link == idx_out_link:
+                            continue                                                   
+                        if G.get_turn(idx_in_link, idx_out_link) is not None:
+                            continue
+                        if in_link and out_link:
+                            type_turn = G.classify_turn(in_link.get("geometry"), out_link.get("geometry"), self.ini.GRAPH_PENALTY_ANGLES)
+                            if type_turn is None or type_turn == "straight":
+                                continue
+                            elif type_turn == "slight_right":
+                                penalty = self.ini.GRAPH_PENALTY_RIGHT_SLIGHT / 60.0
+                            elif  type_turn == "right_elbow":
+                                penalty = self.ini.GRAPH_PENALTY_RIGHT_ELBOW / 60.0
+                            elif type_turn == "sharp_right":
+                                penalty = self.ini.GRAPH_PENALTY_RIGHT_SHARP / 60.0
+                            elif type_turn == "slight_left":
+                                penalty = self.ini.GRAPH_PENALTY_LEFT_SLIGHT / 60.0
+                            elif type_turn == "left_elbow":
+                                penalty = self.ini.GRAPH_PENALTY_LEFT_ELBOW / 60.0
+                            elif type_turn == "sharp_left":
+                                penalty = self.ini.GRAPH_PENALTY_LEFT_SHARP / 60.0
+                            elif type_turn == "u_turn":
+                                penalty = self.ini.GRAPH_PENALTY_U / 60.0                        
+                            if penalty == 0:
+                                continue
+                            id_turn += 1
+                            kwargs = {
+                                "idx": id_turn, 
+                                "in_link": idx_in_link, 
+                                "out_link": idx_out_link, 
+                                "time": penalty, 
+                                "type": "turn_penalty", 
+                                "direction": type_turn
+                                }                            
+                            G.add_turn(**kwargs)
         if self.parser.get_parameters("params.zones"):
             G["origins"] = list(self.origins)
             G["destinations"] = list(self.destinations)

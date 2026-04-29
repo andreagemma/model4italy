@@ -10,17 +10,18 @@ import logging
 from ..utils import Parallel
 
 class MapMatching:
-    def __init__(self, links_gdf, links_id_col="id",links_direction_col=None):
+    def __init__(self, links_gdf, links_id_col="id",links_direction_col=None, segments_gdf=None):
         self.links_gdf = links_gdf
         self.links_id_col = links_id_col
         self.link_direction_col = links_direction_col
-        self._segments_gdf = None
+        self._segments_gdf = segments_gdf
         
     @property
     def segments_gdf(self):
         if self._segments_gdf is None:
             self._segments_gdf = MapMatching.split_links_to_segments(self.links_gdf, link_id_col=self.links_id_col, link_direction_col=self.link_direction_col)
         return self._segments_gdf
+    
     
     @staticmethod
     def calculate_azimuth(p1, p2):

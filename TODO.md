@@ -10,6 +10,8 @@
 - [x] Salvataggio dati micro di simulazione
 - [x] Salvataggio dati stats
 - [x] Salvataggio dati intersezione
+- [ ] Calolare Speed dopo analisi OffLine o salvataggio offline
+- [ ] Aggiungere dt_o e dt_d ai paths del rt_server
 - [ ] Calcolo e salvataggio splitting rates di arco
 - [ ] Correggere formato cammini offline secondo specifiche DB
 - [ ] Stima OD Online con gestione day_type

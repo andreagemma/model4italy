@@ -98,7 +98,7 @@ class PathContainer(ABC, dict):
             d = dill.load(f)  
         return d
     
-    def to_pandas(self, G, crs_link):        
+    def to_pandas(self, G, crs_link) -> gpd.GeoDataFrame:        
         df_paths: pd.DataFrame = pd.DataFrame(self.all_paths())
         if df_paths.empty:
             df_paths = gpd.GeoDataFrame(df_paths, geometry=[], crs=crs_link)
@@ -111,7 +111,7 @@ class PathContainer(ABC, dict):
                 return df_paths            
         return None
     
-    def from_pandas(self, df, **kwargs) -> KPathList:
+    def from_pandas(self, df, **kwargs) -> "KPathList":
         import pandas as pd
         from . import Path
         df: pd.DataFrame = df if isinstance(df, pd.DataFrame) else pd.DataFrame(df)

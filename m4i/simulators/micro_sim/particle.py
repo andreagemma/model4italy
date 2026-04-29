@@ -235,7 +235,7 @@ class car:
         
         if self.monitored_veh:
             ss = self.s_t if self.s_t else 0
-            self.trace.append([t, ss, self.current_link["idx"], self.status])
+            self.trace.append((t, ss, self.current_link["idx"], self.status, self.ID))
  
 
         if self.status == 'mov':

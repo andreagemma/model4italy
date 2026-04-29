@@ -1,0 +1,25 @@
+{
+    "simulation_id": 1,
+    "description": "RT Server Offline Simulation",
+    "scenario": "eur2_db",
+    "start": "2024-05-01 00:00:00",
+    "end": "2024-06-01 05:00:00",   
+    "op": "fcd_server_offline",
+    "settings": {
+        "PARALLEL_NUMCPUS": 24,
+        "FCD_SERVER_SAVE_START": "2024-05-01 00:00:00",
+        "FCD_SERVER_RECOVERY_MODE": false,
+        "FCD_SERVER_FCD_TIMESLICE_OFFLINE": 240,
+        "FCD_SERVER_FCD_HORIZON": 300,
+        "FCD_SERVER_MAP_MATCHING": false,
+        "FCD_SERVER_TRIPS": true,
+        "FCD_SERVER_ROUTING": true,
+        "FCD_ROUTING_CLUSTERING": false,
+        "FCD_SERVER_UPDATE_SPEED": true,
+        "FCD_ROUTING_START_FROM_ZONE": 1,
+        "FCD_ROUTING_END_TO_ZONE": 1,
+        "GRAPH_ADD_TURN_PENALTIES": false,
+        "PARALLEL_ENGINE": "ray"
+    },
+    "data_file": "params_data_{scenario}.json"
+}

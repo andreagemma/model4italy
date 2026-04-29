@@ -5,7 +5,7 @@ from numbers import Number
 import dill
 from copy import deepcopy
 from types import MappingProxyType
-
+from math import degrees, atan2
 
 class AbstractGraphElement(ABC, dict):
     """
@@ -217,3 +217,47 @@ class AbstractGraph(ABC, dict):
 
     def copy(self) -> AbstractGraph:
         return deepcopy(self)
+    
+    def st_transform(self, crs_from, crs_to) -> AbstractGraph:
+        from pyproj import Transformer
+        t = Transformer.from_crs(crs_from, crs_to, always_xy=True)
+        def st_transform_geom(l):
+            return t.transform(l["geometry"])
+        self.apply_links(st_transform_geom)
+
+    @staticmethod
+    def classify_turn(in_edge_geometry, out_edge_geometry, angles=[30,60,120,150]):
+        if not in_edge_geometry or not out_edge_geometry:
+            return None
+        c1 = list(in_edge_geometry.coords)
+        c2 = list(out_edge_geometry.coords)
+
+        # vettore entrante
+        x1, y1 = c1[-2]
+        x2, y2 = c1[-1]
+
+        # vettore uscente
+        x3, y3 = c2[0]
+        x4, y4 = c2[1]
+
+        v1 = (x2-x1, y2-y1)
+        v2 = (x4-x3, y4-y3)
+
+        dot = v1[0]*v2[0] + v1[1]*v2[1]
+        cross = v1[0]*v2[1] - v1[1]*v2[0]
+
+        ang = degrees(atan2(cross, dot))
+
+        # classificazione
+        a = abs(ang)
+
+        if a < angles[0]:
+            return "straight"
+        elif a < angles[1]:
+            return "slight_left" if ang > 0 else "slight_right"
+        elif a < angles[2]:
+            return "left_elbow" if ang > 0 else "right_elbow"
+        elif a < angles[3]:
+            return "sharp_left" if ang > 0 else "sharp_right"
+        else:
+            return "u_turn"

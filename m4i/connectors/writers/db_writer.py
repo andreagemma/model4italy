@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from ...log import Logger
 import warnings
 import json
+import psycopg
 
 class DBWriter(BaseWriter):
 
@@ -60,29 +61,42 @@ class DBWriter(BaseWriter):
                 table = table_schema[0]
             else:
                 raise ValueError(f"Invalid src format: {src}")
+            mode = parameters.get("mode","a")
             pre_query = parameters.get("pre_query")   
-            if pre_query:
+            first_query = kwargs.get("first_query", False)
+            execute_pre_query = first_query and pre_query is not None and mode == "a"
+            if execute_pre_query:
                 if isinstance(pre_query, str):
                     pre_query = {
                         "query": pre_query
                     }
+                
                 if pre_query.get("query"):
                     errors = pre_query.get("errors", "raise")
                     try:
-                        conn.execute(f"SET LOCAL search_path TO {schema},public;")
-                        conn.execute(sa.text(pre_query.get("query")))
+                        conn.execute(sa.text(f"SET LOCAL search_path TO {schema},public;"))
+                        pre = conn.begin_nested()
+                        try:
+                            Logger.debug(f"Executing pre-query for {pre_query}...")
+                            conn.execute(sa.text(pre_query.get("query")))
+                            pre.commit()
+                        except Exception as e:
+                            pre.rollback()
+                            if isinstance(e, sa.exc.ProgrammingError) and  isinstance(e.orig, psycopg.errors.UndefinedTable):
+                                Logger.warning(f"Table not found in pre-query: {pre_query.get('query')}")    
+                            else:
+                                raise e                        
                     except Exception as e:
                         if errors=="raise":
                             raise e
                         elif errors == "ignore":
                             pass
                         elif errors == "warn":
-                            Logger.warning(e.message)
-                            warnings.warn(e)
+                            Logger.warning(e.args[0])
+                            warnings.warn(e.args[0])
             
             savepoint = conn.begin_nested()            
-            rollback = False
-            mode = parameters.get("mode","a")
+            rollback = False            
             if mode == "a":
                 if_exists = "append"
             elif mode == "w":
@@ -95,7 +109,7 @@ class DBWriter(BaseWriter):
                     rollback = True
                 if_exists = "append"
             if isinstance(df, gpd.GeoDataFrame):  
-                df.to_postgis(src, schema=schema, con=conn, if_exists=if_exists, chunksize=1000, index=False)
+                df.to_postgis(table, schema=schema, con=conn, if_exists=if_exists, chunksize=1000, index=False)
             else:
                 df.to_sql(table, schema=schema, con=conn, if_exists=if_exists,method="multi", chunksize=1000, index=False)
             if not rollback:

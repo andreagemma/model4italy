@@ -1,3 +1,4 @@
+from .serializer import Serializer
 from .parallel import Parallel
 from .decorators import run_in_thread, lru_cache, stat_calls, stat_results, stat_timing
 from .decorators import log_execution, add_dict_methods,print_constructor_params
@@ -21,4 +22,4 @@ from . import ipc
 from .ipc import *
 from . import io
 from .io import *
-from .serializer import Serializer
+

@@ -4,8 +4,9 @@ import multiprocessing
 import importlib
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import dill
+import dill as Serializer
 import os
+
 
 class Parallel:
     ENGINE_RAY = "ray"
@@ -13,6 +14,7 @@ class Parallel:
     ENGINE_DASK_MULTITHREADING = "dask_multithreading"
     ENGINE_NONE = "none"
     ENGINE_MULTITHREADING = "threading"
+    ENGINE_JOBLIB = "joblib"
 
     ray_initialized = False  # Class variable to trace Ray's initialization
     dask_initialized = False  # Class variable to trace Dask's initialization
@@ -79,7 +81,7 @@ class Parallel:
         if engine == Parallel.ENGINE_RAY:
             try:
                 import ray
-                ray.util.register_serializer(dict, serializer=dill.dumps, deserializer=dill.loads)
+                ray.util.register_serializer(dict, serializer=Serializer.dumps, deserializer=Serializer.loads)
                 os.environ["RAY_COLOR_PREFIX"] = "1"
             except ImportError:
                 pass
@@ -97,7 +99,14 @@ class Parallel:
                 Parallel.log.warning("Dask is not installed. Please install it using 'pip install dask'")
                 engine = Parallel.ENGINE_MULTITHREADING
                 Parallel.log.warning("Switching to multi-threaded mode.")
-        Parallel.parallel_engine = engine or "none"  # Parameter to select the parallel engine ('Ray' O 'dask', 'dask_treahding', 'none')
+        if engine == Parallel.ENGINE_JOBLIB:
+            try:
+                import joblib
+            except ImportError:
+                Parallel.log.warning("Joblib is not installed. Please install it using 'pip install joblib'")
+                engine = Parallel.ENGINE_MULTITHREADING
+                Parallel.log.warning("Switching to multi-threaded mode.")
+        Parallel.parallel_engine = engine or "none"  # Parameter to select the parallel engine ('Ray' O 'dask', 'dask_treahding', 'joblib', 'none')
         
         
         if Parallel.num_cpus==1:
@@ -109,7 +118,7 @@ class Parallel:
             if not Parallel.ray_initialized:
                 try:
                     import ray
-                    ray.util.register_serializer(dict, serializer=dill.dumps, deserializer=dill.loads)
+                    ray.util.register_serializer(dict, serializer=Serializer.dumps, deserializer=Serializer.loads)
                     kwargs["ignore_reinit_error"] = True
                     kwargs["include_dashboard"] = False
                     kwargs["include_dashboard"]={"log_to_driver": True}
@@ -181,6 +190,18 @@ class Parallel:
                 return len(Parallel.dask_client.nthreads())
         elif Parallel.parallel_engine == Parallel.ENGINE_MULTITHREADING and Parallel.num_cpus>1:
             return Parallel.num_cpus
+        elif Parallel.parallel_engine == Parallel.ENGINE_JOBLIB and Parallel.num_cpus>1:
+            try:
+                import joblib
+                Parallel.joblib_engine = joblib.Parallel(n_jobs=num_cpus, backend='loky')
+                Parallel.joblib_initialized = True
+                return Parallel.num_cpus
+            except ImportError:
+                Parallel.parallel_engine = Parallel.ENGINE_MULTITHREADING
+                Parallel.log.error("Joblib is not installed. Please install it using 'pip install joblib'")
+                Parallel.log.warning("Switching to multi-threaded mode.")
+                Parallel.joblib_initialized = False
+                return Parallel.num_cpus
         else:
             Parallel.num_cpus=1
             return 1
@@ -198,6 +219,7 @@ class Parallel:
                     ray.shutdown()
                 Parallel.ray_initialized = False
             except Exception as ex:
+                Parallel.ray_initialized = False                
                 pass#Parallel.log.error("Error during ray shutdown.")
 
         elif Parallel.parallel_engine in [Parallel.ENGINE_DASK, Parallel.ENGINE_DASK_MULTITHREADING] and Parallel.dask_initialized:
@@ -205,7 +227,18 @@ class Parallel:
                 Parallel.dask_client.close()
                 Parallel.dask_initialized = False
             except Exception as ex:
+                Parallel.dask_client = None
+                Parallel.dask_initialized = False
                 pass#Parallel.log.error("Error during dask shutdown.", exc_info=True)
+        elif Parallel.parallel_engine == Parallel.ENGINE_JOBLIB and Parallel.joblib_initialized:
+            try:                
+                Parallel.joblib_engine.close()
+                Parallel.joblib_engine = None
+                Parallel.joblib_initialized = False
+            except Exception as ex:
+                Parallel.joblib_engine = None
+                Parallel.joblib_initialized = False
+                pass#Parallel.log.error("Error during joblib shutdown.", exc_info=True)
 
     @staticmethod
     def execute(fn:Callable, tasks: Iterable[dict], engine: Optional[str] = None, n_workers: Optional[int]=None, chunk_size:Optional[int]=None, **kwargs) ->Generator:
@@ -235,7 +268,7 @@ class Parallel:
 
         if engine == Parallel.ENGINE_RAY and num_cpus>1 and Parallel.ray_initialized:    
             import ray
-            ray.util.register_serializer(dict, serializer=dill.dumps, deserializer=dill.loads)
+            ray.util.register_serializer(dict, serializer=Serializer.dumps, deserializer=Serializer.loads)
             pair_chunks_refs = [ray.put(chunk) for chunk in pair_chunks]
 
             @ray.remote
@@ -248,7 +281,7 @@ class Parallel:
                     ref_kwargs[k] = v
                 else:                
                     ref_kwargs[k] = ray.put(v)
-
+            Parallel.log.debug(f"Run task on engine Ray with {num_cpus} workers.")
             result_ids = [calculate.remote(tasks=chunk_ref, **ref_kwargs) for chunk_ref in pair_chunks_refs]
 
             while result_ids:
@@ -264,6 +297,7 @@ class Parallel:
             def calculate(*args, **kwargs):
                 return fn(*args, **kwargs)
 
+            Parallel.log.debug(f"Run task on engine Dask with {num_cpus} workers.")
             delayed_results = [calculate(tasks=chunk,  **kwargs) for chunk in pair_chunks]
             results = dask.compute(*delayed_results, scheduler='processes')
             for paths in results:
@@ -274,13 +308,21 @@ class Parallel:
             def calculate(*args, **kwargs):
                 return fn(*args, **kwargs)
             
+            Parallel.log.debug(f"Run task on engine Multithreading with {num_cpus} workers.")
             with ThreadPoolExecutor(max_workers=num_cpus) as executor:
                 futures = {executor.submit(calculate, tasks=chunk, **kwargs): chunk for chunk in pair_chunks}
 
                 # Attend results
                 for future in as_completed(futures):
                     yield future.result()
-        
+        elif engine == Parallel.ENGINE_JOBLIB and num_cpus>1:
+            import joblib
+            def calculate(*args, **kwargs):
+                return fn(*args, **kwargs)
+            Parallel.log.debug(f"Run task on engine Joblib with {num_cpus} workers.")
+            results = Parallel.joblib_engine(joblib.delayed(calculate)(tasks=chunk, **kwargs) for chunk in pair_chunks)
+            for paths in results:
+                yield paths
         else:
             ret = fn(tasks=tasks, **kwargs)
             yield ret

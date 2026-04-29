@@ -4,11 +4,8 @@ import numpy as np
 import shapely
 from shapely.geometry import LineString
 from sklearn.cluster import AgglomerativeClustering, DBSCAN
-from dask.dataframe.utils import make_meta
 from ..utils.parallel import Parallel
 from ..base_m4i_model import BaseM4IModel
-import dask.dataframe
-import dask.dataframe as dd
 from ..connectors import Loader, Writer
 from ..utils.ipc import IPC
 from typing import Union
@@ -49,23 +46,30 @@ def clustering(df,crs_data, crs_calc, eps=100):
 
     # Aggiungi le etichette al GeoDataFrame
     df["cluster"] = model.fit_predict(D)
+    df["_geometry"] = df.geometry.to_crs(crs_data)
     # per ogni gruppo prendo quello con tot_cost minimo
-    agg = {c:(c,"first") for c in df.columns if c in {"source","target","mode", "links"}}
+    agg = {c:(c,"first") for c in df.columns if c in {"source","target","mode", "links", "_geometry"}}
     if "tot_cost" in df.columns:
         agg["tot_cost"] = ("tot_cost","mean")
     agg["n_paths"] = ("source", "count")    
     df = df.sort_values(by=['tot_cost'])
     df = df.groupby('cluster').agg(**agg).reset_index(drop=False)        
+    df = df.rename(columns={"_geometry": "geometry"})
     df.drop(columns=['id_trip'], errors='ignore', inplace=True)
     df["k"]=df.groupby(["source","target","mode", "links"]).cumcount()    
     return df
 
 class PathsClustering(BaseM4IModel):
 
-    def __init__(self, loader: Loader, writer: Writer, ipc: IPC, **kwargs):
+    def __init__(self, loader: Loader, writer: Writer, ipc: IPC, n_workers=-1, **kwargs):
         super().__init__(loader=loader, writer=writer, ipc=ipc, **kwargs)
+        self.n_workers = Parallel.get_num_min_cpus(n_workers)
+        self.log.info(f"Initializing Parallel...")
+        Parallel.initialize_parallel(engine=self.parser.ini.PARALLEL_ENGINE, num_cpus=self.n_workers, address=self.parser.ini.PARALLEL_CLUSTER_ADDRESS)
+        self.log.info(f"Parallel initialized with {Parallel.num_cpus} workers")
 
-    def run(self, df: Union[gpd.GeoDataFrame, dd.DataFrame], eps=100) -> gpd.GeoDataFrame:
+
+    def run(self, df: Union[gpd.GeoDataFrame], eps=100, mode=None, **kwargs) -> gpd.GeoDataFrame:
         if df is None:
             self
         """
@@ -96,19 +100,27 @@ class PathsClustering(BaseM4IModel):
                 else:
                     ret = pd.concat([ret,tmp], ignore_index=True)
             if ret is not None and not ret.empty:
-                if isinstance(ret, dd.DataFrame):
-                    ret = ret.compute()
+                try:
+                    import dask.dataframe as dd
+                    if isinstance(ret, dd.DataFrame):
+                        ret = ret.compute()
+                except ImportError:
+                    raise ImportError("Dask is not installed. Please install dask to use this feature.")
                 if isinstance(ret, pd.DataFrame):
                     ret = gpd.GeoDataFrame(ret, crs=crs_calc, geometry=ret.geometry)
             if ret is not None and ret.crs is None:
                 ret.set_crs(crs_calc, inplace=True)
             ret.to_crs(crs_data, inplace=True)
             return ret
+        if mode == "a":
+            df_prev = self.loader.load("params.fcd_paths_clustered", from_output=True)
+            df_prev["links"] = df_prev["links"].map(np.ndarray.tolist).map(tuple)
+            df = pd.concat([df_prev, df], ignore_index=True)
         grp = df.groupby(["source", "target"])
         ret = None
         total_tasks = list(grp)
         counts = 0
-        for i, tmp in enumerate(Parallel.execute(fn, total_tasks)):    
+        for i, tmp in enumerate(Parallel.execute(fn, total_tasks, n_workers=self.n_workers)):    
             if ret is None and tmp is not None and not tmp.empty:
                 ret = tmp
             else:
@@ -117,12 +129,13 @@ class PathsClustering(BaseM4IModel):
                 counts += tmp[['source','target']].drop_duplicates().shape[0]
             if ret is not None and not ret.empty:
                 self.log.debug(f"Processed {counts}/{len(total_tasks)} tasks")
+                pass
         ret.reset_index(drop=True, inplace=True)
         if ret is not None:
-            ret = gpd.GeoDataFrame(ret, crs=crs_data, geometry=ret.geometry)
+            ret = gpd.GeoDataFrame(ret, crs=crs_calc, geometry=ret["geometry"])
         if ret.crs is None:
-            ret.set_crs(crs_data, inplace=True)
+            ret.set_crs(crs_calc, inplace=True)
         ret.to_crs(crs_data, inplace=True)
-        self.writer.write(ret, "params.fcd_paths_clustered", mode="w")    
+        self.writer.write(ret, "params.fcd_paths_clustered", mode="w", first_query=True)    
         return ret
 

@@ -17,6 +17,7 @@ from .utils import util, deep_update
 from .iniclass import IniClass
 from datetime import datetime, timedelta
 from .utils import to_datetime_auto
+from .functions.day_type import day_type
 import pytz
 
 
@@ -64,18 +65,7 @@ class ParamsParser:
     @staticmethod
     def day_type(dt: Union[str,datetime]) -> str:
         dt = to_datetime_auto(dt)
-        wd = dt.isoweekday() % 7
-
-        if wd == 0:
-            return "sunday"
-        elif wd == 1:
-            return "monday"
-        elif wd == 5:
-            return "friday"
-        elif wd == 6:
-            return "saturday"
-        else:
-            return "weekday"
+        return day_type(dt)
         
     @staticmethod
     def params_to_dict(params: Union[str,dict, list,tuple]) -> dict | None:
@@ -153,7 +143,7 @@ class ParamsParser:
             time_start = to_datetime_auto(self.get("start"), date_default=date_simulation,tz_localize=self.ini.TZ_LOCAL)
         
         if "end" not in self.params:
-            time_end = date_simulation + timedelta(minutes=60)
+            time_end = time_start + timedelta(minutes=60)
             time_end = time_end.replace(second=0, microsecond=0)
             time_end_min = (time_end.hour * 60 + time_end.minute) // self.ini.DELTA_T * self.ini.DELTA_T
             time_end = time_end.replace(hour=time_end_min // 60, minute=time_end_min % 60)
@@ -486,6 +476,18 @@ class ParamsParser:
                 {"name": "lat", "type": is_float, "dtype": "Float64", "required": False, "default": lambda row: row["geometry"].coords[1] if pd.notna(row["geometry"]) else None},
                 {"name": "geometry", "type": is_point, "dtype": "geometry", "required": False, "default": lambda row: Point(row["lon"], row["lat"]) if pd.notna(row["lon"]) and pd.notna(row["lat"]) else None},
             ],
+            "fcd_paths": [
+                {"name": "source", "type": is_int, "dtype": "Int64", "required": True},
+                {"name": "target", "type": is_int, "dtype": "Int64", "required": True},
+                {"name": "t_start", "type": is_int, "dtype": "Int16", "required": True},
+                {"name": "t_base", "type": is_int, "dtype": "Int16", "required": True},
+                {"name": "t", "type": is_int, "dtype": "Int64", "required": True},
+                {"name": "mode", "type": is_int, "dtype": "string", "required": True},
+                {"name": "tot_cost", "type": is_number, "dtype": "Float32", "required": True},
+                {"name": "links", "type": is_list, "dtype": "string", "required": True},
+                {"name": "id_trip", "type": is_int, "dtype": "string", "required": True},
+                {"name": "geometry", "type": is_line, "dtype": "geometry", "required": True},
+            ],
         }
         return fields
     
@@ -612,19 +614,29 @@ class ParamsParser:
             mapping = base_param.get("mapping", {})
             for c in df.columns:
                 if c not in mapping:
-                    additional_fields[c]=c
-                else:
-                    additional_fields[c] = mapping[c]
+                    pass
+                elif c == "geometry" and isinstance(df, gpd.GeoDataFrame):
+                    pass
             for k,v in mapping.items():
-                if k not in df.columns:
+                if k == "geometry" and isinstance(df, gpd.GeoDataFrame):
+                    pass
+                elif k not in df.columns:
                     additional_fields[k] = v
-        base_param.setdefault("additional_fields", additional_fields)
+        #base_param["additional_fields"] = additional_fields
         name_category = name_or_params.split(".")[-1]
         if name_category in self.fields:
             mapping = self.get_mapping(name_category, base_param["mapping"])
-            additional_fields = self.get_additional_field(name_category, mapping)
+            #additional_fields = self.get_additional_field(name_category, mapping)
             base_param["mapping"] = mapping
-            base_param["additional_fields"].update(additional_fields)
+            for k in mapping.keys():
+                if k in additional_fields:
+                    additional_fields.pop(k)
+            #base_param["additional_fields"].update(additional_fields)
+        base_param["additional_fields"] = additional_fields
+        for k, v in additional_fields.items():
+            if k not in base_param["mapping"]:
+                base_param["mapping"][k] = k
+            
         return base_param
 
     def get(self, path: str, *args, copy=True, default=None) -> Any:
@@ -651,7 +663,6 @@ class ParamsParser:
             return self.get_parametric_name(default)
         return self.get_parametric_name(value)
 
-
     def get_parametric_name(self, name, **kwargs):
         from .utils import ravel_dict, get_parametric_name
         kwargs = kwargs or self.params
@@ -659,10 +670,18 @@ class ParamsParser:
         return name
 
     @staticmethod
-    def apply_mapping(df, mapping, reverse=False):
-        if reverse:
+    def apply_mapping(df, mapping, writing=False):
+        or_mapping = mapping.copy()
+        if writing:
             mapping = {v: k for k, v in mapping.items()}
-        ret = pd.DataFrame()
+            ret = df.rename(columns=mapping)
+            if isinstance(df, gpd.GeoDataFrame):
+                geom_col = or_mapping.get("geometry", "geometry")
+                if geom_col != ret.geometry.name:
+                    ret.rename_geometry(geom_col, inplace=True)
+            return ret
+                
+        ret = pd.DataFrame(index=df.index)
         assigned = set()
         for k, v in mapping.items():    
             if v in df.columns:
@@ -672,6 +691,12 @@ class ParamsParser:
                     ret[k] = df[v]
                 assigned.add(v)
             else:
+                if not isinstance(v, dict):
+                    d = {"value": v}
+                else:
+                    d = v      
+                v = d.get("value", None)
+                t = d.get("type", None)
                 if isinstance(v, str) and v.startswith("expression:"):
                     v = v.replace("expression:", "")
                     ret[k] = df.eval(v)
@@ -680,6 +705,13 @@ class ParamsParser:
                     ret[k] = df.apply(lambda x: eval(v), axis=1)
                 else:
                     ret[k] = None
+                if t is not None:
+                    ret[k] = ret[k].astype(t)
+        if isinstance(df, gpd.GeoDataFrame):
+            geom_col = or_mapping.get("geometry", "geometry")
+            ret = gpd.GeoDataFrame(ret.drop(columns=geom_col, errors="ignore"), geometry=ret[geom_col], crs=df.crs)
+            if geom_col != ret.geometry.name:
+                ret.rename_geometry(geom_col, inplace=True)
         return ret
     
     def apply_dtype(self, df, dtype, copy=False, tz_src = None, tz_dest = None):

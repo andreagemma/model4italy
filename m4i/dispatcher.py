@@ -80,7 +80,7 @@ class Dispatcher(BaseM4IModel):
                     with open(params_path, 'w') as f:
                         json.dump(self.parser.get_dict(), f, indent=4)
                 else:
-                    self.writer.write(df, "params.params", mode="w")
+                    self.writer.write(df, "params.params", mode="a", first_query=True)
             except Exception as ex:
                 self.log.error(f"Error writing params.json: {ex}")
     @property
@@ -126,6 +126,8 @@ class Dispatcher(BaseM4IModel):
                 self.run_rt_server_clustering()
             elif self.op == "paths_calculation":
                 self.run_paths_caluclation()
+            elif self.op == "online_rolling":
+                self.run_online_rolling()
             elif self.op == "ipc":
                 self.run_ipc_client()                
             elif self.op == "init":
@@ -188,6 +190,9 @@ class Dispatcher(BaseM4IModel):
         op: OP = PathsCalculation(loader=self.loader, writer=self.writer, ipc=self.ipc)  
         op.run()
 
+    def run_online_rolling(self):
+        op: OP = OnlineRolling(loader=self.loader, writer=self.writer, ipc=self.ipc)  
+        op.run()
     def run_ipc_client(self):
         if self.ipc is None:
             raise ValueError("IPC not initialized")

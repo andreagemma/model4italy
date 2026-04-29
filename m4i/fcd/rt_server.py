@@ -34,7 +34,7 @@ from ..log import Logger
 from .fcd_manager import FCDManager
 from ..base_m4i_model import BaseM4IModel
 from ..graphs import KPathList
-
+import tempfile
 
 class RTServer(BaseM4IModel):
     """
@@ -50,8 +50,8 @@ class RTServer(BaseM4IModel):
                                       n_workers_pm=parser.ini.FCD_ROUTING_CPUS,
                                       max_distance=parser.ini.FCD_MAP_MATCHING_MAX_DISTANCE,
                                       max_angle=parser.ini.FCD_MAP_MATCHING_MAX_ANGLE,
-                                      crs_calc=parser.ini.CRS,
-                                      crs_data=parser.ini.CRS_CALC,
+                                      crs_calc=parser.ini.CRS_CALC,
+                                      crs_data=parser.ini.CRS,                                      
                                       logger=logger,
                                       )
         self.fcd_manager = FCDManager(
@@ -60,6 +60,13 @@ class RTServer(BaseM4IModel):
             ipc=self.ipc
         )
 
+        self.reload_graph=False
+        if not self.reload_graph:
+            self.tmp_graph = tempfile.NamedTemporaryFile(delete=False)
+            self.tmp_links = tempfile.NamedTemporaryFile(delete=False)
+            self.tmp_nodes = tempfile.NamedTemporaryFile(delete=False)
+            self.tmp_turns = tempfile.NamedTemporaryFile(delete=False)
+            self.tmp_zones = tempfile.NamedTemporaryFile(delete=False)
         self.df_links: gpd.GeoDataFrame = None
         self.df_nodes: gpd.GeoDataFrame = None
         self.df_turns: gpd.GeoDataFrame = None
@@ -83,6 +90,7 @@ class RTServer(BaseM4IModel):
         self.mode_fcd="w"
         self.mode_paths="w"
         self.mode_graphs="w"
+        self.reload_map_matching_data = False
 
                           
     def elaborate_offline(self, 
@@ -96,11 +104,26 @@ class RTServer(BaseM4IModel):
         self.t_end = to_datetime_auto(t_end,unit="minutes", tz_localize=self.parser.ini.TZ_LOCAL, tz_convert=self.parser.ini.TZ_CALC)
         self.horizon = to_timedelta_auto(self.parser.ini.FCD_SERVER_FCD_HORIZON, unit="minutes")
         self.timeslice = to_timedelta_auto(self.parser.ini.FCD_SERVER_FCD_TIMESLICE_OFFLINE, unit="minutes") 
-        self.mode_trips="w"
-        self.mode_fcd="w"
-        self.mode_paths="w"
-        self.mode_graphs="w"
+        if self.parser.ini.FCD_SERVER_SAVE_DELAY:
+            self.start_save = self.t_start +timedelta(minutes=self.parser.ini.FCD_SERVER_SAVE_DELAY)
+        else:
+            self.start_save = self.t_start
 
+        if self.parser.ini.FCD_SERVER_SAVE_START:
+            self.start_save = to_datetime_auto(self.parser.ini.FCD_SERVER_SAVE_START, tz_localize=self.parser.ini.TZ_LOCAL, tz_convert=self.parser.ini.TZ_CALC)
+
+        self.recover_mode = self.parser.ini.FCD_SERVER_RECOVERY_MODE
+
+        if not self.recover_mode or self.start_save == self.t_start:
+            self.mode_trips="w"
+            self.mode_fcd="w"
+            self.mode_paths="w"
+            self.mode_graphs="w"
+        else:
+            self.mode_trips="a"
+            self.mode_fcd="a"
+            self.mode_paths="a"
+            self.mode_graphs="a"
 
         ts = self.t_start
         te = self.t_start + self.timeslice
@@ -111,14 +134,15 @@ class RTServer(BaseM4IModel):
             self.step(
                 t_start=ts, 
                 t_end=te, 
-                match=self.parser.ini.FCD_SERVER_MAP_MATCHING,
+                match=self.parser.ini.FCD_SERVER_MAP_MATCHING and ts >= self.start_save,
                 trips =self.parser.ini.FCD_SERVER_TRIPS,
                 paths=self.parser.ini.FCD_SERVER_ROUTING,
-                update_speed=self.parser.ini.FCD_SERVER_UPDATE_SPEED,
+                update_speed=self.parser.ini.FCD_SERVER_UPDATE_SPEED and ts >= self.start_save,
                 share_data=False,
                 )
             write_data =self.parser.ini.FCD_SERVER_WRITE_OUTPUT or self.parser.ini.FCD_SERVER_WRITE_STATE
-            if write_data:
+            
+            if write_data and ts >= self.start_save: # in recovery mode, skip saving data for the initial periods     
                 if self.save_paths(paths=self.paths, mode=self.mode_paths):
                     self.mode_paths = "a"
                 if self.save_trips(df_trips=self.df_trips, mode=self.mode_trips):
@@ -130,10 +154,8 @@ class RTServer(BaseM4IModel):
                 self.paths.clear() 
                 self.df_trips = None
                 self.df_fcd_to_save = None
-
-
-                
-
+            elif write_data:
+                self.tic.info("Skipping saving data for period from {ts} to {te} due to recovery delay", ts=ts, te=te)
             ts = te
             te = ts + self.timeslice
 
@@ -173,13 +195,12 @@ class RTServer(BaseM4IModel):
              paths: bool = True,
              update_speed: bool = True,
              clean: bool = True,
-             share_data: bool = True,
+             share_data: bool = True
              ) -> None:
         """
         Perform a step in the FCD processing pipeline.
         """
         t_step=self.tic.get().info("Performing step...")
-
         self.tic.info("Step from {t_start} to {t_end}", t_start=t_start, t_end=t_end)
         self.t = t_start
         self.load_graph()
@@ -188,15 +209,19 @@ class RTServer(BaseM4IModel):
             self.df_fcd["id_trip"] = None
         if clean:
             self.clean(t_start=t_start)
-
+            t_step.info("Remaining {n_fcd} (old: {n_fcd_old}) FCDs, {n_trips} trips, {n_paths} paths",
+                    n_fcd=self.df_fcd.shape[0] if self.df_fcd is not None else 0,
+                    n_fcd_old=self.old_df_fcd.shape[0] if self.old_df_fcd is not None else 0,
+                    n_trips=self.df_trips.shape[0] if self.df_trips is not None else 0,
+                    n_paths=self.paths.n_paths())
     
-        if match or paths:
+        if match or update_speed or (paths and (self.ini.FCD_ROUTING_END_TO_ZONE==0 or self.ini.FCD_ROUTING_START_FROM_ZONE==0)):
             if self.df_fcd is not None and not self.df_fcd.empty:        
                 self.df_fcd = self.map_matching_fcd(df_fcd=self.df_fcd)
                 if update_speed:                
                     self.update_speed(df_fcd=self.df_fcd)
 
-        #self.df_fcd_to_save = self.df_fcd.copy() if self.df_fcd is not None else None
+        self.df_fcd_to_save = self.df_fcd.copy() if self.df_fcd is not None else None
 
         if self.old_df_fcd is not None and not self.old_df_fcd.empty:
             if self.df_fcd is not None and not self.df_fcd.empty:
@@ -214,7 +239,7 @@ class RTServer(BaseM4IModel):
         if share_data:
             self.share_data()
 
-        t_step.info("Step completed in {et} seconds. {n_fcd}/{n_fcd_old} FCDs, {n_trips} trips, {n_paths} paths",
+        t_step.info("Step completed in {et} seconds. {n_fcd} (old: {n_fcd_old}) FCDs, {n_trips} trips, {n_paths} paths",
                     n_fcd=self.df_fcd.shape[0] if self.df_fcd is not None else 0,
                     n_fcd_old=self.old_df_fcd.shape[0] if self.old_df_fcd is not None else 0,
                     n_trips=self.df_trips.shape[0] if self.df_trips is not None else 0,
@@ -223,15 +248,32 @@ class RTServer(BaseM4IModel):
 
     def load_graph(self) -> None:
         self.tic.info("Loading graph data...").tic()
+        to_reload = self.reload_graph or self.df_links is None or self.df_nodes is None or self.df_turns is None or self.zones is None
         if self.zones is None:
             self.zones = self.loader.zonization
 
         if self.df_links is None or self.df_nodes is None or self.df_turns is None:
             self.df_links, self.df_nodes, self.df_turns = self.loader.load_df_graph()
-        self.graph:DynamicGraph = self.loader.load_graph(
-            df_links=self.df_links.fillna({"connector":0}), 
-            df_nodes=self.df_nodes.fillna({"centroid":0}), 
-            df_turns=self.df_turns)
+
+        if not to_reload:
+            self.graph = DynamicGraph.load(self.tmp_graph.name) if os.path.exists(self.tmp_graph.name) else self.graph
+            self.df_links = pd.read_pickle(self.tmp_links.name) if os.path.exists(self.tmp_links.name) else self.df_links
+            self.df_nodes = pd.read_pickle(self.tmp_nodes.name) if os.path.exists(self.tmp_nodes.name) else self.df_nodes
+            self.df_turns = pd.read_pickle(self.tmp_turns.name) if os.path.exists(self.tmp_turns.name) else self.df_turns
+            self.zones = pd.read_pickle(self.tmp_zones.name) if os.path.exists(self.tmp_zones.name) else self.zones
+            self.tic.info("Reloaded graph data in {et} seconds")
+        else:
+            self.graph:DynamicGraph = self.loader.load_graph(
+                df_links=self.df_links.fillna({"connector":0}), 
+                df_nodes=self.df_nodes.fillna({"centroid":0}), 
+                df_turns=self.df_turns)
+            if not self.reload_graph:
+                self.graph.save(self.tmp_graph.name)
+                self.df_links.to_pickle(self.tmp_links.name)
+                self.df_nodes.to_pickle(self.tmp_nodes.name)
+                self.df_turns.to_pickle(self.tmp_turns.name)
+                self.zones.to_pickle(self.tmp_zones.name)
+                self.tic.info("Reloaded graph data in {et} seconds")
         
         
         self.graph["t_start"] = self.t
@@ -245,8 +287,8 @@ class RTServer(BaseM4IModel):
         id_nodes = set(self.df_links["from_node"].unique()).union(set(self.df_links["to_node"].unique()))
         self.df_nodes = self.df_nodes[self.df_nodes["id"].isin(id_nodes)]   
         for l in self.graph.get_all_links():
-            l["fcd_speed"] = DynamicTimeArrayAttribute([0])
-            l["fcd_n"] = DynamicTimeArrayAttribute([0])            
+            l["fcd_speed"] = DynamicTimeArrayAttribute([0.0])
+            l["fcd_n"] = DynamicTimeArrayAttribute([0.0])            
 
         self.graph.resize_attributes(new_total_time=self.timeslice.total_seconds() // 60, new_delta_t=self.ini.FCD_SPEED_AGGREGATION_INTERVAL)        
         self.tic.info("Loaded graph data in {et} seconds")
@@ -273,7 +315,11 @@ class RTServer(BaseM4IModel):
         Load FCD data from the database based on the given time range.
         """
         self.tic.info("Map Matching FCD data...").tic()
-        df_fcd = self.fcd_manager.map_matching_fcd(df_fcd=df_fcd, df_links=self.df_links, links_id_col="id",links_direction_col=None)
+        if not self.reload_map_matching_data and self.fcd_manager.mm is not None:
+            segments_gdf = self.fcd_manager.mm.segments_gdf
+        else:
+            segments_gdf = None
+        df_fcd = self.fcd_manager.map_matching_fcd(df_fcd=df_fcd, df_links=self.df_links, links_id_col="id",links_direction_col=None, segments_gdf=segments_gdf)
         self.tic.info("Matched {fcd} FCDs in {et} seconds", fcd=df_fcd.shape[0])
         return df_fcd
     
@@ -331,20 +377,20 @@ class RTServer(BaseM4IModel):
         self.tic.info(f"Calculating {new_trips.shape[0]} paths...").tic()
         if self.parser.ini.FCD_ROUTING_START_FROM_ZONE:
             gdf_start_points = gpd.GeoDataFrame(new_trips.drop(columns='geometry'), 
-                                     geometry=new_trips.geometry.apply(lambda geom: Point(geom.xy[0][0], geom.xy[1][0]))
-                                     )
-            tmp = self.zones[['id', 'geometry']].rename(columns={"id":"id_zone_o"})
+                                     geometry=new_trips.geometry.apply(lambda geom: Point(geom.xy[0][0], geom.xy[1][0])),
+                                     crs=new_trips.crs)
+            tmp = self.zones[['id', 'geometry']].rename(columns={"id":"id_zone_o"}).copy()
             #tmp["geometry_o"] = tmp["geometry"]
-            #tmp.crs = new_trips.crs
+            tmp.set_crs(new_trips.crs, inplace=True)
             joined = gpd.sjoin(gdf_start_points, tmp, how='left', predicate='within')
             new_trips = new_trips.merge(joined[["id_trip","id_zone_o"]].drop_duplicates(subset="id_trip"), on="id_trip", how="left")
         if self.parser.ini.FCD_ROUTING_END_TO_ZONE:
             gdf_start_points = gpd.GeoDataFrame(new_trips.drop(columns='geometry'), 
-                                     geometry=new_trips.geometry.apply(lambda geom: Point(geom.xy[0][-1], geom.xy[1][-1]))
-                                     )
+                                     geometry=new_trips.geometry.apply(lambda geom: Point(geom.xy[0][-1], geom.xy[1][-1])),
+                                     crs=df_trips.crs)
             tmp = self.zones[['id', 'geometry']].rename(columns={"id":"id_zone_d"})
             #tmp["geometry_d"] = tmp["geometry"]
-            #tmp.crs = new_trips.crs
+            tmp.set_crs(new_trips.crs, inplace=True)
             joined = gpd.sjoin(gdf_start_points, tmp, how='left', predicate='within')
             new_trips = new_trips.merge(joined[["id_trip","id_zone_d"]].drop_duplicates(subset="id_trip"), on="id_trip", how="left")
 
@@ -373,13 +419,13 @@ class RTServer(BaseM4IModel):
             fcd_speed = l.get_value("fcd_speed", t=row["t"])
             fcd_n = l.get_value("fcd_n", t=row["t"])
             if fcd_speed is None or fcd_n is None or fcd_n == 0:
-                l.set_value("fcd_speed", row["speed"], t=row["t"])
-                l.set_value("fcd_n", row["n"], t=row["t"])
+                l.set_value("fcd_speed", float(row["speed"]), t=row["t"])
+                l.set_value("fcd_n", float(row["n"]), t=row["t"])
             else:
                 fcd_speed = (fcd_speed * fcd_n + row["speed"] * row["n"]) / (fcd_n + row["n"])
                 fcd_n += row["n"]
-                l.set_value("fcd_speed", fcd_speed, t=row["t"])
-                l.set_value("fcd_n", fcd_n, t=row["t"])            
+                l.set_value("fcd_speed", float(fcd_speed), t=row["t"])
+                l.set_value("fcd_n", float(fcd_n), t=row["t"])            
         self.tic.info("Updated speed in {et} seconds")
 
     def clean(self, t_start: datetime) -> None:
@@ -447,7 +493,8 @@ class RTServer(BaseM4IModel):
                 return False
             PathsClustering(loader=self.loader,writer=self.writer,ipc=self.ipc).run(
                 df_paths,
-                eps = self.parser.ini.FCD_ROUTING_CLUSTERING_EPS
+                eps = self.parser.ini.FCD_ROUTING_CLUSTERING_EPS,
+                mode=self.mode_paths
             )
             
         if self.parser.ini.FCD_SERVER_WRITE_OUTPUT:  
@@ -466,12 +513,12 @@ class RTServer(BaseM4IModel):
             df_paths["t_start"] = df_paths["t"].copy()
             df_paths["t_base"] = 0
             
-            self.writer.write_paths(df_paths, params="params.fcd_paths", mode=mode)
+            self.writer.write_paths(df_paths, params="params.fcd_paths", mode=mode, first_query=mode=="w")
             self.tic.info("Saved paths in {et} seconds").tic()
 
         if self.parser.ini.FCD_SERVER_WRITE_STATE:
             if self.parser.ini.FCD_ROUTING_CLUSTERING:
-                paths = KPathList.from_pandas(df_paths)
+                paths = KPathList().from_pandas(df_paths)
                 self.state_manager.write_state(paths, "fcd_paths")
             else:
                 def add_info(path):
@@ -482,7 +529,7 @@ class RTServer(BaseM4IModel):
                     #path.pop("dt_d", None)
                     return path
                 PathList.apply(paths, add_info) 
-                self.state_manager.write_state(paths, "fcd_paths",mode=mode)
+                self.state_manager.write_state(paths, "fcd_paths",mode=mode, first_query=mode=="w")
             self.tic.info("Saved state paths in {et} seconds").tic()
 
 
@@ -512,7 +559,7 @@ class RTServer(BaseM4IModel):
             else:
                 df_trips = df_trips.to_crs(self.build_paths.crs_data)
             
-            self.writer.write(df_trips,"params.fcd_trips", mode=mode)
+            self.writer.write(df_trips,"params.fcd_trips", mode=mode, first_query=mode=="w")
             self.tic.info("Saved trips in {et} seconds")
         return True
     
@@ -533,7 +580,7 @@ class RTServer(BaseM4IModel):
             df_fcd.drop(columns=["new","x","y"], inplace=True, errors="ignore")
             df_fcd = df_fcd.to_crs(self.build_paths.crs_data)
             
-            self.writer.write(df_fcd,"params.fcd_fcd", mode=mode)
+            self.writer.write(df_fcd,"params.fcd_fcd", mode=mode, first_query=mode=="w")
             self.tic.info("Saved FCD in {et} seconds")
         return True
 
@@ -556,7 +603,7 @@ class RTServer(BaseM4IModel):
             #)
         
             if self.writer.has("params.fcd_graph"):
-                self.writer.write(graph,"params.fcd_graph", mode=mode)
+                self.writer.write(graph,"params.fcd_graph", mode=mode, first_query=mode=="w")
             self.tic.info("Saved Graph in {et} seconds").tic()
             return True
         

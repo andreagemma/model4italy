@@ -4,7 +4,6 @@ from .base_m4i_model import BaseM4IModel
 from .utils.util import get_parametric_name, nested_dict_from_key_value_list
 from typing import Optional
 import sys
-import json
 def main(**kwargs)->Optional[BaseM4IModel]:    
     import argparse
     import os
@@ -241,6 +240,19 @@ def run(ini_file="settings.ini", params="params.json", params_data=None, options
     config = open_db(ini_file=ini_file, options=options)
     return Dispatcher(params=params, options=options, ini=config).run()       
 
+def load_config(ini_file="settings.ini", params="params.json", params_data=None, options: dict=None):
+    import os
+    from .dispatcher import Dispatcher
+    if not isinstance(params, (list,tuple)):
+        params = [params]
+    if not isinstance(params_data, (list,tuple)):
+        params_data = [params_data]
+
+    params = [ p for p in params + params_data if p is not None]
+
+    config = open_db(ini_file=ini_file, options=options)
+    return Dispatcher(params=params, options=options, ini=config)
+
 def run_server(ini_file="settings.ini", host=None, port=None, debug=None):
     """
     Start the web server.
@@ -249,9 +261,9 @@ def run_server(ini_file="settings.ini", host=None, port=None, debug=None):
     from .server.server import start_server
     
     config = open_db(ini_file=ini_file)
-    host = host if host is None else config.WEB_SERVER_HOST
-    port = port if port is None  else config.WEB_SERVER_PORT
-    debug = debug if debug is None  else config.WEB_SERVER_DEBUG
+    host = host if host is not None else config.WEB_SERVER_HOST
+    port = port if port is not None else config.WEB_SERVER_PORT
+    debug = debug if debug is not None else config.WEB_SERVER_DEBUG
     start_server(host=host, port=port, debug=debug, config=config)    
     
 if __name__ == "__main__":

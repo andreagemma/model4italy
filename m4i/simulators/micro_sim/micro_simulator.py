@@ -21,6 +21,7 @@ import logging
 import time
 import geopandas as gpd
 from shapely import LineString
+from shapely.ops import substring
 
 
 unroll_results = False
@@ -564,8 +565,8 @@ class MicroSimulator(BaseSimulator):
                     _ = f_stat(result_stats[mask])
                     _["segment_id"] = seg
                     stat.append(_)
-
-            stats = pd.concat(stat, axis=1).T
+            if stat:
+                stats = pd.concat(stat, axis=1).T
 
             return stats
         except Exception as e:
@@ -602,14 +603,17 @@ class MicroSimulator(BaseSimulator):
             shape = shape.to_crs(epsg=int(self.ini.CRS_CALC.split(":")[-1]))
 
             agg_trace = int(self.simustep)
-            trace_res = pd.DataFrame(columns = ["t", "p", "id_link", "status", "id"])
-            trace_res = trace_res.astype({"t": int, "p":float, "id_link": int, "status": str, 'id': int})
+            tot_data = []
             for veh in self.vehs:
                 if veh.monitored_veh:
-                    df = pd.DataFrame(data = veh.trace, columns = ["t", "p", "id_link", "status"])
-                    df["id"] = veh.ID
-                    #df = df[df.t.isin(range(tstart, tend, 1))]
-                    trace_res = pd.concat([trace_res, df])
+                    tot_data.extend(veh.trace)
+
+            if len(tot_data) > 0:
+                trace_res = pd.DataFrame(tot_data, columns = ["t", "p", "id_link", "status", "id"])
+            else:
+                trace_res = pd.DataFrame(columns = ["t", "p", "id_link", "status", "id"])
+
+            trace_res = trace_res.astype({"t": float, "p":float, "id_link": int, "status": str, 'id': int})
             # UPDATE: GEMMA - Corretto il time che ora usa date_simulation
             times = pd.date_range(start=self.loader.parser.get("start", default=min2hhmm(tstart)), end=self.loader.parser.get("end", default=min2hhmm(tend)), freq=str(agg_trace)+'s')
             #times = pd.date_range(start=min2hhmm(tstart), end=min2hhmm(tend), freq=str(agg_trace)+'s')
@@ -622,25 +626,42 @@ class MicroSimulator(BaseSimulator):
             trace_res = trace_res.join(shape, on="id_link")
 
 
-            def point(geo, p, dire,id_link):
-                if dire == -1 or (dire == 0 and id_link < 0):
-                    geo = LineString(list(geo.coords)[::-1])
-                    
+            def point(geo, p):                    
                 return geo.line_interpolate_point(p, normalized = True)
 
-            def angle(geo, p, dire, id_link):
-                p2 = geo.line_interpolate_point(p, normalized = True).bounds
-                p1 = geo.line_interpolate_point(p+0.1, normalized = True).bounds
-                if dire == -1 or (dire == 0 and id_link < 0):
-                    p2, p1 = p1, p2
-                        
-                return -math.degrees(math.atan2(p2[1]-p1[1], p2[0]-p1[0]))
-                
+            def angle(geom, p, eps=1e-4):
+                if p <= 0:
+                    p1 = geom.interpolate(0, normalized=True)
+                    p2 = geom.interpolate(eps, normalized=True)
+                elif p >= 1:
+                    p1 = geom.interpolate(1-eps, normalized=True)
+                    p2 = geom.interpolate(1, normalized=True)
+                else:
+                    p1 = geom.interpolate(p, normalized=True)
+                    p2 = geom.interpolate(min(p + eps, 1), normalized=True)
+                dx = p2.x - p1.x
+                dy = p2.y - p1.y
+
+                return math.degrees(math.atan2(dy, dx))
+            
+            def azimuth_tangent_robust(geom, p, delta=0.01):
+                start = max(p - delta, 0)
+                end   = min(p + delta, 1)
+
+                seg = substring(geom, start, end, normalized=True)
+                coords = list(seg.coords)
+
+                x1, y1 = coords[0]
+                x2, y2 = coords[-1]
+
+                az = math.degrees(math.atan2(x2 - x1, y2 - y1))                
+                return (az + 360) % 360
+            
             if trace_res.empty:
                 trace_res = trace_res.assign(point=None, rotation=None)
             else:
-                trace_res["point"] = trace_res.apply(lambda row : point(row.geometry, row.p, 1, row.id_link), axis=1)
-                trace_res["rotation"] = trace_res.apply(lambda row : angle(row.geometry, row.p, 1, row.id_link), axis=1)
+                trace_res["point"] = trace_res.apply(lambda row : point(row.geometry, row.p), axis=1)
+                trace_res["rotation"] = trace_res.apply(lambda row : azimuth_tangent_robust(row.geometry, row.p), axis=1)
             geo_trace = gpd.GeoDataFrame(data = trace_res[["id", "id_link", "time", "status", "p", "rotation"]], 
                                                 geometry=trace_res["point"],
                                                 crs=self.ini.CRS_CALC)

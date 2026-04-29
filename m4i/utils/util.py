@@ -884,9 +884,9 @@ def inner_filter_to_query_expression(filters, rename=None, quoting='"',  op_bool
     else:
         raise ValueError("Invalid filter format. The inner filter must be a tuple with 3 elements (column,operator,value).")
     if op_boolean_symbols:
-        return " | ".join(expressions)
+        return " & ".join(expressions)
     else:
-        return " OR ".join(expressions)
+        return " AND ".join(expressions)
     
 def filters_to_query_expression(filters, quoting='"',  op_boolean_symbols=False):
     if isinstance(filters, str):
@@ -899,9 +899,9 @@ def filters_to_query_expression(filters, quoting='"',  op_boolean_symbols=False)
 
     # Unisci i gruppi con 'or'
     if op_boolean_symbols:
-        return ' & '.join(group_expressions)
+        return ' | '.join(group_expressions)
     else:
-        return ' AND '.join(group_expressions)
+        return ' OR '.join(group_expressions)
 
 def rename_filters(filters, rename):
     for i, group in enumerate(filters):

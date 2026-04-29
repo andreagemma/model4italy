@@ -71,7 +71,7 @@ class ODEstimation(OP):
                     start=tstart - self.ini.OD_ESTIMATION_WHISKERS,
                     end = tend + self.ini.OD_ESTIMATION_WHISKERS,
                     time_slice=tend - tstart + 2 * self.ini.OD_ESTIMATION_WHISKERS,
-                    od_estimation=True,
+                    calc_ass_matrix=True,
                     simulator=self.simulator,
                     save_state_graph=False,
                     load_state_graph=False,

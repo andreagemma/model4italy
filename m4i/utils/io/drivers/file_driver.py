@@ -135,7 +135,7 @@ class FileDriver(BaseDriver):
                 df = pd.read_parquet(pathg)
             else:
                 #print("Uso DuckDB")
-                schema_or = pl.read_parquet_schema(pathg.as_posix())
+                schema_or = pl.scan_parquet(pathg.as_posix()).collect_schema()
                 schema = schema_or.copy()
                 if dtype:
                     for col in schema.names():

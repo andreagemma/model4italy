@@ -61,21 +61,41 @@ class Writer(ABC):
             writer: BaseWriter  = ClassWriter()
 
             parameters = copy.deepcopy(parameters)
-            if isinstance(df, (pd.DataFrame, gpd.GeoDataFrame, dict)):
-                additional_fields = parameters.get("additional_fields", {})
-                if additional_fields:
-                    for additional_field, p in additional_fields.items():
-                        if additional_field not in df.columns:
-                            if isinstance(p, str):
-                                p = {"value" : p}
-                            v = p.get("value", None)
+            if isinstance(df, (pd.DataFrame, gpd.GeoDataFrame, dict)):                
+                if additional_fields := parameters.get("additional_fields", None):
+                    tmp = {}
+                    if isinstance(additional_fields, list):
+                        for field in additional_fields:
+                            if isinstance(field, str):
+                                tmp[field] = {"value": None}
+                            elif isinstance(field, dict):
+                                if "name" not in field:
+                                    raise ValueError(f"Missing 'name' key in additional field definition: {field}")
+                                tmp[field["name"]] = field
+                        additional_fields = tmp
+
+                    if isinstance(additional_fields, dict):
+                        for additional_field, p in additional_fields.items():
+                            if not isinstance(p, dict):
+                                p = {"value": p}
                             t = p.get("dtype", None)
-                            df[additional_field] = v
-                            if t:
+                            v = p.get("value", None)                                        
+                            if v.startswith("expression:"):
+                                s = df.eval(v.replace("expression:", ""))                        
+                            elif isinstance(p, str) and p.startswith("lambda:"):
+                                v = p.replace("lambda:", "")
+                                s = df.apply(lambda x: eval(v), axis=1)
+                            else:
+                                s=v
+                            df[additional_field] = s
+                            if t is not None:
                                 if isinstance(df, (pd.DataFrame, gpd.GeoDataFrame)):
                                     df[additional_field] = df[additional_field].astype(t)
                                 elif isinstance(df, dict):
                                     df[additional_field] = pd.Series([v]).astype(t).tolist()[0]
+                    else:
+                        raise ValueError(f"Invalid 'additional_fields' definition: {additional_fields}. Must be a list of field {{name: <name>[, value: <value>][, dtype: <dtype>]}} or a dict {{<name>: {{value: <value>, dtype: <dtype>}}}}.")
+
                             
                 """
                 for k, v in parameters.items():
@@ -92,7 +112,7 @@ class Writer(ABC):
                 mapping = parameters.get("mapping")
                 
                 if mapping is not None and isinstance(df, (pd.DataFrame, gpd.GeoDataFrame)):
-                    self.parser.apply_mapping(df=df, mapping=mapping, reverse=True)
+                    df = self.parser.apply_mapping(df=df, mapping=mapping, writing=True)
                     
                 if isinstance(df, gpd.GeoDataFrame):
                     crs = parameters.get("crs", self.ini.CRS)

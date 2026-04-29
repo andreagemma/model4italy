@@ -165,8 +165,11 @@ class IniClass:
         self.FCD_SERVER_TRIPS = self.config_reader.getboolean("FCD_SERVER_TRIPS", 'FCD_SERVER', True) # abilita la generazione dei viaggi
         self.FCD_SERVER_UPDATE_SPEED = self.config_reader.getboolean("FCD_SERVER_UPDATE_SPEED", 'FCD_SERVER', True) # calcola velocità media dei veicoli
         self.FCD_SERVER_WRITE_STATE = self.config_reader.getboolean("FCD_SERVER_WRITE_STATE", 'FCD_SERVER', True) # salva lo stato della simulazione ad ogni timeslice
-
+        self.FCD_SERVER_SAVE_DELAY = self.config_reader.getint("FCD_SERVER_SAVE_DELAY", 'FCD_SERVER', 0) # ritardo del server FCD in minuti per avviare il salvataggio dei dati (utile per recovery da crash)
+        self.FCD_SERVER_SAVE_START = self.config_reader.get("FCD_SERVER_SAVE_START", 'FCD_SERVER', None) # istante di inizio salvataggio dati (None per salvare dall'inizio) - sovrascrive FCD_SERVER_SAVE_DELAY se presente
         self.FCD_SPEED_AGGREGATION_INTERVAL = self.config_reader.getint("FCD_SPEED_AGGREGATION_INTERVAL", 'FCD_SERVER', 15) # intervallo di aggregazione della velocità in secondi
+        self.FCD_SERVER_RECOVERY_MODE = self.config_reader.getboolean("FCD_SERVER_RECOVERY_MODE", 'FCD_SERVER', False) # è o meno in modalità recovery (True per modalità recovery, False per modalità normale)
+
         self.FCD_MAP_MATCHING_CPUS = self.config_reader.getint("FCD_MAP_MATCHING_CPUS", 'FCD_MAP_MATCHING', 1) # numero di processi per il map matching
         self.FCD_MAP_MATCHING_MAX_DISTANCE = self.config_reader.getfloat("FCD_MAP_MATCHING_MAX_DISTANCE", 'FCD_MAP_MATCHING', 50) # distanza massima per il map matching in metri
         self.FCD_MAP_MATCHING_MAX_ANGLE = self.config_reader.getfloat("FCD_MAP_MATCHING_MAX_ANGLE", 'FCD_MAP_MATCHING', 45) # angolo massimo per il map matching in gradi
@@ -227,6 +230,18 @@ class IniClass:
         self.PARALLEL_NUMCPUS = self.config_reader.getint("PARALLEL_NUMCPUS", 'PARALLEL', 1)
         self.PARALLEL_ENGINE = self.config_reader.get("PARALLEL_ENGINE", 'PARALLEL', "ray")
         self.PARALLEL_CLUSTER_ADDRESS = self.config_reader.get("PARALLEL_CLUSTER_ADDRESS", 'PARALLEL', None)
+
+        self.GRAPH_ADD_TURN_PENALTIES = self.config_reader.getboolean("GRAPH_ADD_TURN_PENALTIES", 'GRAPH', True)         
+        self.GRAPH_PENALTY_ANGLES = self.config_reader.getlist("GRAPH_PENALTY_ANGLES", 'GRAPH', [30,60,120,150])
+        self.GRAPH_PENALTY_RIGHT_SLIGHT = self.config_reader.getint("GRAPH_PENALTY_RIGHT_SLIGHT", 'GRAPH', 1) # in seconds
+        self.GRAPH_PENALTY_RIGHT_ELBOW = self.config_reader.getint("GRAPH_PENALTY_RIGHT_ELBOW", 'GRAPH', 1) # in seconds
+        self.GRAPH_PENALTY_RIGHT_SHARP = self.config_reader.getint("GRAPH_PENALTY_RIGHT_SHARP", 'GRAPH', 1) # in seconds
+        self.GRAPH_PENALTY_LEFT_SLIGHT = self.config_reader.getint("GRAPH_PENALTY_LEFT_SLIGHT", 'GRAPH', 4) # in seconds
+        self.GRAPH_PENALTY_LEFT_ELBOW = self.config_reader.getint("GRAPH_PENALTY_LEFT_ELBOW", 'GRAPH', 5) # in seconds
+        self.GRAPH_PENALTY_LEFT_SHARP = self.config_reader.getint("GRAPH_PENALTY_LEFT_SHARP", 'GRAPH', 6) # in seconds
+        self.GRAPH_PENALTY_U = self.config_reader.getint("GRAPH_PENALTY_U", 'GRAPH', 7) # in seconds
+
+        
 
         for section, name, value in self.config_reader.items():
             if not hasattr(self, name.upper()):

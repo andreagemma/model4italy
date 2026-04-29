@@ -83,6 +83,7 @@ class KPathContainer(PathContainer):
                 args["k"]=k
                 path = Path.load_from_dict(args)
                 self.add_path(path, **kwargs)
+        return self
                 
     def to_pandas(self, G, crs_link):        
         df_paths: pd.DataFrame = pd.DataFrame(self.all_paths())

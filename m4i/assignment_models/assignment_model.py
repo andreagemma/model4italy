@@ -36,7 +36,7 @@ class AssignmentModel(BaseM4IModel):
         links_cost: str = "time",
         turns_cost: str = "time",
         nodes_cost: str = "time",
-        od_estimation : bool = False,
+        calc_ass_matrix : bool = False,
         save_paths: bool = True,
         save_agg_results: bool = True,
         save_agg_results_stats: bool = True,
@@ -55,6 +55,7 @@ class AssignmentModel(BaseM4IModel):
         start: int = None,
         end: int = None,
         max_timeslice:int = None,
+        save_results=True,
         **kwargs
         ):
         super().__init__(loader=loader, writer=writer, ipc=ipc)
@@ -79,13 +80,14 @@ class AssignmentModel(BaseM4IModel):
         self.turns_cost = turns_cost
         self.nodes_cost = nodes_cost
         
-        self.calc_ass_matrix = od_estimation
+        self.calc_ass_matrix = calc_ass_matrix
         
-        self.save_paths = save_paths and self.writer.has_write_paths()
-        self.save_agg_results = save_agg_results and self.writer.has_write_agg_results() and self.simulator is not None
-        self.save_agg_results_stats = save_agg_results_stats and self.writer.has_write_agg_results_stats() and self.simulator is not None
-        self.save_trace_results = save_trace_results and self.writer.has_write_trace_results() and self.simulator is not None
-        self.save_signal_results = save_signal_results and self.writer.has_write_signal_results() and self.simulator is not None        
+        self.save_results = save_results
+        self.save_paths = save_paths and self.writer.has_write_paths() and self.save_results
+        self.save_agg_results = save_agg_results and self.writer.has_write_agg_results() and self.simulator is not None and self.save_results
+        self.save_agg_results_stats = save_agg_results_stats and self.writer.has_write_agg_results_stats() and self.simulator is not None and self.save_results
+        self.save_trace_results = save_trace_results and self.writer.has_write_trace_results() and self.simulator is not None and self.save_results
+        self.save_signal_results = save_signal_results and self.writer.has_write_signal_results() and self.simulator is not None and self.save_results
 
         self.save_state_ass_matrix = save_ass_matrix and self.state_manager.has_write_state() and self.calc_ass_matrix
         self.save_state_graph = save_state_graph and self.state_manager.has_write_state()
@@ -238,8 +240,12 @@ class AssignmentModel(BaseM4IModel):
             if self.writer.has("params.statistics"):
                 self.log.info("Saving stats...")
                 df = pd.DataFrame.from_dict(self.infos)
+                if df is None or df.empty:
+                    self.log.warning("No statistics to save")
+                    return
+
                 mode = None if self.interval==0 else "a"
-                self.writer.write(df,"params.statistics", mode=mode)
+                self.writer.write(df,"params.statistics", mode=mode, first_query=self.interval==0)
                 self.log.info("Saved stats")
         except Exception as e:
             self.log.error("Failed to save statistics:", exc_info=e, stack_info=True)     
@@ -250,8 +256,11 @@ class AssignmentModel(BaseM4IModel):
                 self.log.info("Saving paths...")
                 saved = True
                 paths = self.get_paths_dataframe()
+                if paths is None or paths.empty:
+                    self.log.warning("No paths to save")
+                    return
                 mode = None if self.interval==0 else "a"
-                saved = self.writer.write_paths(paths, mode=mode, crs=self.loader.ini.CRS)
+                saved = self.writer.write_paths(paths, mode=mode, crs=self.loader.ini.CRS, first_query=self.interval==0)
                 paths = None   
                 if saved:
                     self.log.info("Saved paths")
@@ -266,7 +275,7 @@ class AssignmentModel(BaseM4IModel):
                 self.log.info("Saving state (Paths)...")
                 for t in range(self.real_time_start,self.real_time_end,self.delta_t):
                     paths = list(self.m_paths.get_paths_by_t(t))
-                    self.state_manager.write_state(paths, "paths", partition=f"t={t}")
+                    self.state_manager.write_state(paths, "paths", partition=f"day_type={self.parser.get('day_type_simulation')}/t={t}")
                 paths = None                                                        
                 self.log.info("Saved state")
         except Exception as e:
@@ -278,17 +287,20 @@ class AssignmentModel(BaseM4IModel):
                 self.log.info("Saving aggregated results...")
                 saved = True
                 df=self.get_aggregated_results_dataframe()
-                ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400 ) / 60
-                if df["time"].dt.tz is None:
-                    df=df.assign(time = df["time"].dt.tz_localize(self.parser.ini.TZ_LOCAL).copy())
-                mode = None if self.interval==0 else "a"
-                df["t"] = ds_t.astype("Int64")
-                saved = self.writer.write_agg_results(df, crs=self.loader.ini.CRS, mode=mode)
-                                
-                if saved:                    
-                    self.log.info("Saved aggregated results")
+                if df is not None and not df.empty:
+                    ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400 ) / 60
+                    if df["time"].dt.tz is None:
+                        df=df.assign(time = df["time"].dt.tz_localize(self.parser.ini.TZ_LOCAL).copy())
+                    mode = None if self.interval==0 else "a"
+                    df["t"] = ds_t.astype("Int64")
+                    saved = self.writer.write_agg_results(df, crs=self.loader.ini.CRS, mode=mode, first_query=self.interval==0)
+                                    
+                    if saved:                    
+                        self.log.info("Saved aggregated results")
+                    else:
+                        self.log.warning("Failed to save aggregated results")
                 else:
-                    self.log.warning("Failed to save aggregated results")
+                    self.log.warning("No aggregated results to save")
         except Exception as e:
             self.log.error("Failed to save aggregated results:", exc_info=e, stack_info=True)
 
@@ -298,13 +310,15 @@ class AssignmentModel(BaseM4IModel):
                 self.log.info("Saving aggregated stats...")
                 saved = True
                 df=self.get_aggregated_results_stats_dataframe()
-                mode = None if self.interval==0 else "a"
-                saved = self.writer.write_agg_results_stats(df, mode=mode, crs=self.loader.ini.CRS)
-                                
-                if saved:                    
-                    self.log.info("Saved aggregated stats")
+                if df is not None and not df.empty:
+                    mode = None if self.interval==0 else "a"
+                    saved = self.writer.write_agg_results_stats(df, mode=mode, crs=self.loader.ini.CRS, first_query=self.interval==0)
+                    if saved:                    
+                        self.log.info("Saved aggregated stats")
+                    else:
+                        self.log.warning("Failed to save aggregated stats")
                 else:
-                    self.log.warning("Failed to save aggregated stats")
+                    self.log.warning("No aggregated stats to save")
         except Exception as e:
             self.log.error("Failed to save aggregated stats:", exc_info=e, stack_info=True)
 
@@ -314,17 +328,20 @@ class AssignmentModel(BaseM4IModel):
                 self.log.info("Saving trace results...")
                 saved = True
                 df=self.get_trace_results_dataframe()
-                ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400 ) / 60
-                if df["time"].dt.tz is None:
-                    df["time"] = df["time"].dt.tz_localize(self.parser.ini.TZ_LOCAL)  
-                mode = None if self.interval==0 else "a"
-                df["t"] = ds_t.astype("Float32")
-                saved = self.writer.write_trace_results(df, mode=mode, crs=self.loader.ini.CRS)
-                                
-                if saved:                    
-                    self.log.info("Saved trace results")
+                if df is not None and not df.empty:
+                    ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400 ) / 60
+                    if df["time"].dt.tz is None:
+                        df["time"] = df["time"].dt.tz_localize(self.parser.ini.TZ_LOCAL)  
+                    mode = None if self.interval==0 else "a"
+                    df["t"] = ds_t.astype("Float32")
+                    saved = self.writer.write_trace_results(df, mode=mode, crs=self.loader.ini.CRS, first_query=self.interval==0)
+                                    
+                    if saved:                    
+                        self.log.info("Saved trace results")
+                    else:
+                        self.log.warning("Failed to save trace results")
                 else:
-                    self.log.warning("Failed to save trace results")
+                    self.log.warning("No trace results to save")
         except Exception as e:
             self.log.error("Failed to save trace results:", exc_info=e, stack_info=True)
 
@@ -334,17 +351,20 @@ class AssignmentModel(BaseM4IModel):
                 self.log.info("Saving signal results...")
                 saved = True
                 df=self.get_signal_results_dataframe()
-                ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400 ) / 60
-                if df["time"].dt.tz is None:
-                    df["time"] = df["time"].dt.tz_localize(self.parser.ini.TZ_LOCAL)  
-                mode = None if self.interval==0 else "a"
-                df["t"] = ds_t.astype("Float32")
-                saved = self.writer.write_signal_results(df, mode=mode, crs=self.loader.ini.CRS)
-                                
-                if saved:                    
-                    self.log.info("Saved signal results")
+                if df is not None and not df.empty:
+                    ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400 ) / 60
+                    if df["time"].dt.tz is None:
+                        df["time"] = df["time"].dt.tz_localize(self.parser.ini.TZ_LOCAL)  
+                    mode = None if self.interval==0 else "a"
+                    df["t"] = ds_t.astype("Float32")
+                    saved = self.writer.write_signal_results(df, mode=mode, crs=self.loader.ini.CRS, first_query=self.interval==0)
+                                    
+                    if saved:                    
+                        self.log.info("Saved signal results")
+                    else:
+                        self.log.warning("Failed to save signal results")
                 else:
-                    self.log.warning("Failed to save signal results")
+                    self.log.warning("No signal results to save")
         except Exception as e:
             self.log.error("Failed to save signal results:", exc_info=e, stack_info=True)
 
@@ -354,7 +374,7 @@ class AssignmentModel(BaseM4IModel):
                 self.log.info("Saving state (Assignment Matrix)...")
 
                 for t_enter, mat in self.ass_matrix.get_all_matrix_by_tenter():
-                    self.state_manager.write_state(mat, "ass_matrix", mode="w", partition=f"t_enter={t_enter}")
+                    self.state_manager.write_state(mat, "ass_matrix", mode="w", partition=f"day_type={self.parser.get('day_type_simulation')}/t_enter={t_enter}")
                 mat = None                                                        
                 self.log.info("Saved state")
         except Exception as e:

@@ -38,7 +38,7 @@ class MSA(AssignmentModel):
         links_cost: str = "time",
         turns_cost: str = "time",
         nodes_cost: str = "time",
-        od_estimation : bool = False,
+        calc_ass_matrix : bool = False,
         save_paths: bool = True,
         save_agg_results: bool = True,
         save_state_graph: bool = False,
@@ -50,6 +50,7 @@ class MSA(AssignmentModel):
         max_rel_gap: float = None,
         max_ite: int = None,
         max_k: int = None,
+        save_results=True,
         **kwargs
         ):
         super().__init__(
@@ -59,7 +60,7 @@ class MSA(AssignmentModel):
             links_cost=links_cost,
             turns_cost=turns_cost,
             nodes_cost=nodes_cost,
-            od_estimation=od_estimation,
+            calc_ass_matrix=calc_ass_matrix,
             save_paths=save_paths,
             save_agg_results=save_agg_results,
             save_state_graph=save_state_graph,
@@ -70,6 +71,7 @@ class MSA(AssignmentModel):
             ipc=ipc,
             max_ite=max_ite,
             max_rel_gap=max_rel_gap,
+            save_results=save_results,
             **kwargs
         )
         self.max_k = max_k

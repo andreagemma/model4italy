@@ -28,12 +28,14 @@ class OfflineSaveState(OP):
             max_ite=self.ini.MSA_MAX_ITE,
             max_rel_gap=self.ini.MSA_RGAP,
             simulator=self.simulator,
-            load_off_line_paths=self.ini.OD_ESTIMATION_USE_OBSERVED_PATHS,
+            calc_ass_matrix=True,
+            load_off_line_paths=self.ini.USE_OBSERVED_PATHS,
             save_ass_matrix=True,
             save_state_graph=True,
             load_state_graph=False,
             save_state_paths=True,
-            load_state_paths=False)
+            load_state_paths=False,
+            save_results=False)
         n_steps = self.msa.calc_task_steps()
         if n_steps:
             self.msa.task_set_steps(n_steps)

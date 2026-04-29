@@ -34,5 +34,5 @@ from . import ops
 
 from .dispatcher import Dispatcher
 
-from .model4italy import main, run, run_server, init_db, launch_monitor
+from .model4italy import main, run, run_server, init_db, launch_monitor, load_config
 
