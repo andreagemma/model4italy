@@ -4,7 +4,7 @@ import multiprocessing
 import importlib
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import dill as Serializer
+from .serializer import Serializer
 import os
 
 

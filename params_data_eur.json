@@ -2,11 +2,11 @@
     "params": {
         "input": {
             "connector": "FileLoader",
-            "location": "./dati/{scenario}/files"
+            "location": "./data/{scenario}"
         },
         "output": {
             "connector": "FileWriter",
-            "location": "./dati/output/{scenario}/{simulation_id}"
+            "location": "./data/{scenario}/output/{simulation_id}"
         },
         "modes": "modes.csv",
         "demand": [
@@ -14,8 +14,7 @@
                 "mode": "c",
                 "matrices": [
                     {
-                        "src": "mat.parquet",
-                        "filters": " day_type = '{day_type_simulation}' and mode = 'c' "
+                        "src": "mat_weekday_c.csv"
                     }
                 ]
             }
@@ -44,26 +43,6 @@
                     "start": "start",
                     "end": "end",
                     "params": "params"
-                }
-            }
-        ],
-        "detectors": [
-            {
-                "src": "detectors.shp",
-                "mapping": {
-                    "id": "id",
-                    "id_link": "id_link"
-                }
-            }
-        ],
-        "counts": [
-            {
-                "src": "counts.csv",
-                "mapping": {
-                    "id": "id",
-                    "timestamp": "timestamp",
-                    "mode": "mode",
-                    "counts": "counts"
                 }
             }
         ],

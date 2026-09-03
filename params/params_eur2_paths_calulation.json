@@ -1,0 +1,23 @@
+{
+    "simulation_id": 7,
+    "scenario": "eur2",
+    "op": "paths_calculation",
+    "data_file": "params_data_{scenario}_x_paths.json",
+    "params": {
+        "paths": "calculated_paths.gpkg",
+        "origin_nodes": {
+            "src": "nodes.shp",
+            "mapping": {
+                "id": "id"                    
+            },
+            "filters": " id in (1001202, 1001203, 1001204)"
+        },
+        "destination_nodes": {
+            "src": "nodes.shp",
+            "mapping": {
+                "id": "id"                    
+            },
+            "filters": " id in (40193, 40194)"
+        }        
+    }
+}

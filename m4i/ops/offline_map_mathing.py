@@ -1,4 +1,4 @@
-from model4italy_client import params
+from trycode.model4italy_client import params
 import time
 from .op import OP
 from ..graphs.abstract_graph import AbstractGraph
