@@ -10,8 +10,8 @@ files have been collected under:
 licenses/third_party/packages/<package>/
 
 Notes
-- GDAL version is configured via environment variable in requirements.txt:
-  GDAL==${GDAL_VERSION}
+- GDAL is pinned in requirements.txt as:
+  GDAL==3.13.3
 - For GDAL, a license text was collected from the official OSGeo source.
 - Some packages bundle multiple upstream licenses; therefore, the package
   folder may contain multiple LICENSE/COPYING/NOTICE files.
@@ -21,7 +21,7 @@ Dependency Notice Table
 | Package | Requirement | License metadata (from PyPI) | License files location |
 |---|---|---|---|
 | joblib | joblib==1.5.3 | N/A | licenses/third_party/packages/joblib/ |
-| GDAL | GDAL==${GDAL_VERSION} | N/A | licenses/third_party/packages/GDAL/ |
+| GDAL | GDAL==3.13.3 | N/A | licenses/third_party/packages/GDAL/ |
 | shapely | shapely==2.1.2 | License :: OSI Approved :: BSD License | licenses/third_party/packages/shapely/ |
 | fiona | fiona==1.10.1 | License :: OSI Approved :: BSD License | licenses/third_party/packages/fiona/ |
 | pyproj | pyproj==3.7.2 | N/A | licenses/third_party/packages/pyproj/ |
