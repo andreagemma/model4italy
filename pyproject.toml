@@ -1,18 +1,44 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=61.0", "wheel", "build"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "m4i"
-version = "0.1.0"
+dynamic = ["version", "dependencies"]
 authors = [
     { name = "Andrea Gemma", email = "andrea.geoma@uniroma3.it" }
 ]
-description = "Modello di simulazione mesoscopico per l'analisi di sistemi di trasporto - Model4Italy"
+description = "Mesoscopic assignment and simulation model for the analysis of transportation systems"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
-dynamic = ["dependencies"]
-
+keywords = []
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Database :: Front-Ends",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed"
+]
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }
+version = {attr = "configreader.__version__"}
+
+[tool.setuptools]
+license-files = [
+    "LICENSE",
+    "AUTHORS",
+    "COPYING",
+    "THIRD_PARTY_NOTICES.md",
+    "licenses/third_party/packages/**/LICENSE*",
+    "licenses/third_party/packages/**/LICENCE*",
+    "licenses/third_party/packages/**/COPYING*",
+    "licenses/third_party/packages/**/NOTICE*",
+    "licenses/third_party/packages/**/AUTHORS*"
+]

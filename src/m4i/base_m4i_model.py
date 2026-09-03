@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import warnings
 
-from .connectors.state_manager import StateManager
-from .connectors import Writer
-from .connectors import Loader
 from . import ParamsParser
-from .utils import IPC
-from .log import Logger
+from .connectors import Loader, Writer
+from .connectors.state_manager import StateManager
 from .database import Execution
-from .taskbase import TaskBase
-from .utils.tictoc import TicToc
 from .iniclass import IniClass
+from .log import Logger
+from .taskbase import TaskBase
+from .utils import IPC
+from .utils.tictoc import TicToc
 
 
 class BaseM4IModel(TaskBase):
@@ -82,8 +81,7 @@ class BaseM4IModel(TaskBase):
                 )
             else:
                 self._ipc = None
-        elif self.parser is not None and self._ipc is None:
-            if self.parser.ini.IPC_USE:
+        elif self.parser is not None and self._ipc is None and self.parser.ini.IPC_USE:
                 warnings.warn(
                     "IPC is not initialized. Please provide a valid settings parameters file.",
                     UserWarning,
@@ -95,7 +93,7 @@ class BaseM4IModel(TaskBase):
 
     @staticmethod
     def update_progress(
-        self: BaseM4IModel, message: str = None, progress: float = None
+        self: BaseM4IModel, message: str | None = None, progress: float | None= None  # noqa: PLW0211
     ):
         tp = self.task_total_progress
         if message is None:
