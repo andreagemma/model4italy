@@ -1,6 +1,6 @@
 package	requirement	version_hint	license_classifier_or_field	download_url	files_copied
 joblib	joblib==1.5.3	1.5.3	N/A	https://files.pythonhosted.org/packages/41/f2/d34e8b3a08a9cc79a50b2208a93dce981fe615b64d5a4d4abee421d898df/joblib-1.5.3.tar.gz	1
-GDAL	GDAL==${GDAL_VERSION}	latest	N/A	https://raw.githubusercontent.com/OSGeo/gdal/master/LICENSE.TXT	1
+GDAL	GDAL==3.13.3	3.13.3	N/A	https://raw.githubusercontent.com/OSGeo/gdal/master/LICENSE.TXT	1
 shapely	shapely==2.1.2	2.1.2	License :: OSI Approved :: BSD License	https://files.pythonhosted.org/packages/4d/bc/0989043118a27cccb4e906a46b7565ce36ca7b57f5a18b78f4f1b0f72d9d/shapely-2.1.2.tar.gz	1
 fiona	fiona==1.10.1	1.10.1	License :: OSI Approved :: BSD License	https://files.pythonhosted.org/packages/51/e0/71b63839cc609e1d62cea2fc9774aa605ece7ea78af823ff7a8f1c560e72/fiona-1.10.1.tar.gz	2
 pyproj	pyproj==3.7.2	3.7.2	N/A	https://files.pythonhosted.org/packages/04/90/67bd7260b4ea9b8b20b4f58afef6c223ecb3abf368eb4ec5bc2cdef81b49/pyproj-3.7.2.tar.gz	2
