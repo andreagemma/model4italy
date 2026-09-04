@@ -4,10 +4,9 @@ Model4Italy è uno strumento avanzato per la meso-simulazione e l'analisi del tr
 
 ## Compatibilita piattaforme
 
-- Supportato: Windows, Linux
-- Non supportato ufficialmente: macOS
+- Supportato: Windows, Linux, macOS
 
-Le pipeline CI del progetto validano le installazioni su Windows e Linux.
+Le pipeline CI del progetto validano le installazioni su Windows, Linux e macOS.
 
 ## Installazione
 Installare la versione di python 3.12.
@@ -19,19 +18,43 @@ Model4Italy dipende da GDAL. GDAL deve essere installato separatamente:
 
 - come libreria di sistema (libgdal)
 - come pacchetto Python (`gdal`)
+- insieme a Fiona (`fiona`) in modo compatibile con la versione Python/OS
 
 Le due versioni devono essere compatibili tra loro (stessa major/minor, e in generale la stessa versione).
 
-Esempio Linux (Debian/Ubuntu):
+Installazione su Linux (Debian/Ubuntu):
 
 ```sh
 sudo apt-get update
 sudo apt-get install -y gdal-bin libgdal-dev
 gdal-config --version
 python -m pip install "GDAL==$(gdal-config --version)"
+python -m pip install "fiona==1.10.1"
 ```
 
 Se `gdal-config` non e presente, installare prima i pacchetti di sistema GDAL.
+
+Installazione su Windows (PowerShell):
+
+```powershell
+choco install gdal --yes
+$gdalVersion = ([regex]::Match((gdalinfo --version), '(\d+\.\d+\.\d+)')).Groups[1].Value
+python -m pip install "GDAL==$gdalVersion"
+python -m pip install "fiona==1.10.1"
+```
+
+Nota Windows + Python 3.14: se la wheel standard di Fiona non fosse disponibile,
+usare la wheel precompilata specifica per cp314.
+
+Installazione su macOS:
+
+```sh
+brew update
+brew install gdal
+gdal-config --version
+python -m pip install "GDAL==$(gdal-config --version)"
+python -m pip install "fiona==1.10.1"
+```
 
 Se è la prima volta che viene eseguito il sistema sulla macchina e non è presente il file ```model4italy.db``` necessario come database interno della piattaforma eseguire il comando:
 ```sh
