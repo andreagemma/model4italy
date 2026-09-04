@@ -2,6 +2,13 @@
 
 Model4Italy è uno strumento avanzato per la meso-simulazione e l'analisi del traffico veicolare su scala urbana e regionale. Grazie ai file di configurazione di tipo JSON e INI, è possibile personalizzare parametri come la rete stradale, la domanda di traffico, le regole di circolazione e le strategie di controllo. Model4Italy supporta l'integrazione con dati reali e offre strumenti per la visualizzazione e l'analisi dei risultati, facilitando il processo decisionale per enti pubblici, ricercatori e professionisti del settore.
 
+## Compatibilita piattaforme
+
+- Supportato: Windows, Linux
+- Non supportato ufficialmente: macOS
+
+Le pipeline CI del progetto validano le installazioni su Windows e Linux.
+
 ## Installazione
 Installare la versione di python 3.12.
 Installare le librerie presenti in ```requirements.txt```
