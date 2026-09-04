@@ -25,26 +25,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - name: Install GDAL and Fiona (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gdal-bin libgdal-dev
-          python -m pip install --upgrade pip
-          python -m pip install "GDAL==$(gdal-config --version)" "fiona==1.10.1"
-      - name: Install GDAL and Fiona (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          choco install gdal --yes
-          $gdalVersion = [regex]::Match((gdalinfo --version), '(\d+\.\d+\.\d+)').Groups[1].Value
-          python -m pip install --upgrade pip
-          python -m pip install "GDAL==$gdalVersion"
-          if ("${{ matrix.python-version }}" -eq "3.14") {
-            python -m pip install "fiona @ https://github.com/cgohlke/geospatial-wheels/releases/download/v2026.8.20/fiona-1.10.1-cp314-cp314-win_amd64.whl"
-          } else {
-            python -m pip install "fiona==1.10.1"
-          }
       - name: Install GDAL and Fiona (macOS)
         if: matrix.os == 'macos-latest'
         run: |
