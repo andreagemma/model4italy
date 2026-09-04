@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Versione release/tag (opzionale). Se vuota usa m4i.__version__."
+        description: "Release/tag (optional). If empty use the package version"
         required: false
         default: ""
       overwrite_existing:
-        description: "Sovrascrivi release/tag se esistono gia"
+        description: "Overwrite existing release/tag"
         required: true
         type: boolean
         default: false
