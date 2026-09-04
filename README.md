@@ -14,51 +14,22 @@ Installare le librerie presenti in ```requirements.txt```
 
 ### Dipendenza GDAL (obbligatoria)
 
-Model4Italy dipende da GDAL. GDAL deve essere installato separatamente:
+Model4Italy dipende da GDAL. Installare GDAL separatamente seguendo la documentazione ufficiale:
+
+- https://gdal.org/en/stable/download.html
 
 - come libreria di sistema (libgdal)
 - come pacchetto Python (`gdal`)
-- insieme a Fiona (`fiona`) in modo compatibile con la versione Python/OS
+
+Su macOS installare anche Fiona, seguendo la documentazione ufficiale:
+
+- https://fiona.readthedocs.io/
 
 Le due versioni devono essere compatibili tra loro (stessa major/minor, e in generale la stessa versione).
 
-Installazione su Linux (Debian/Ubuntu):
-
-```sh
-sudo apt-get update
-sudo apt-get install -y gdal-bin libgdal-dev
-gdal-config --version
-python -m pip install "GDAL==$(gdal-config --version)"
-python -m pip install "fiona==1.10.1"
-```
-
-Se `gdal-config` non e presente, installare prima i pacchetti di sistema GDAL.
-
-Installazione su Windows (PowerShell):
-
-```powershell
-choco install gdal --yes
-$gdalVersion = ([regex]::Match((gdalinfo --version), '(\d+\.\d+\.\d+)')).Groups[1].Value
-python -m pip install "GDAL==$gdalVersion"
-python -m pip install "fiona==1.10.1"
-```
-
-Nota Windows + Python 3.14: se la wheel standard di Fiona non fosse disponibile,
-usare la wheel precompilata specifica per cp314.
-
-Installazione su macOS:
-
-```sh
-brew update
-brew install gdal
-gdal-config --version
-python -m pip install "GDAL==$(gdal-config --version)"
-python -m pip install "fiona==1.10.1"
-```
-
 Se è la prima volta che viene eseguito il sistema sulla macchina e non è presente il file ```model4italy.db``` necessario come database interno della piattaforma eseguire il comando:
 ```sh
-python model4italy.py init_db
+python -m m4i init_db
 ```
 
 ## Avvio del programma
@@ -66,7 +37,7 @@ python model4italy.py init_db
 Per eseguire il programma principale:
 
 ```sh
-python model4italy.py
+python -m m4i
 ```
 il programma in automatico:
  * leggerà il file ```settings.ini``` per la configurazione dei parametri del software.
@@ -78,12 +49,12 @@ i file ```params.json``` e ```params_data.json``` sono complementari e vengono f
 
 Più in generale il programma può essere eseguito con i seguenti parametri:
 ```sh
-python model4italy.py run -p nome_file_params.json -d nome_file_params_data.json -c nome_file_settings.ini
+python -m m4i run -p nome_file_params.json -d nome_file_params_data.json -c nome_file_settings.ini
 ```
 
 Per avviare il programma in modalità server eseguire
 ```sh
-python model4italy.py server
+python -m m4i server
 ```
 
 In alternativa è possibile importare la libreria e usare i seguenti comandi:
