@@ -57,9 +57,7 @@ class IO_DaskDataFrame:
             )
             df = BaseDriver.apply_filters(df, filters)
         else:
-            raise ValueError(
-                f"Driver per '{path}' non supportato per l'importazione di DataFrame."
-            )
+            raise ValueError(f"Driver per '{path}' non supportato per l'importazione di DataFrame.")
 
         df = BaseDriver.adapt_dtype(df, dtype)
         return df

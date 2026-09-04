@@ -58,9 +58,7 @@ def safe_makevalid(geom):
         return None
 
 
-def safe_hausdorff(
-    a: LineString, b: LineString, densify: Optional[float] = None
-) -> float:
+def safe_hausdorff(a: LineString, b: LineString, densify: Optional[float] = None) -> float:
     if a is None or b is None or a.is_empty or b.is_empty:
         return float("inf")
     try:
@@ -82,9 +80,7 @@ def point_on_trip_distance(trip: LineString, p: Point) -> float:
         return 0.0
 
 
-def line_from_list(
-    line: Optional[LineString], link_geom: LineString
-) -> Optional[LineString]:
+def line_from_list(line: Optional[LineString], link_geom: LineString) -> Optional[LineString]:
     link_geom = safe_makevalid(link_geom)
     if link_geom is None:
         return line
@@ -109,9 +105,7 @@ def line_from_list(
         return line
 
 
-def cut_trip_between_distances(
-    trip: LineString, d0: float, d1: float
-) -> Optional[LineString]:
+def cut_trip_between_distances(trip: LineString, d0: float, d1: float) -> Optional[LineString]:
     if trip is None or trip.is_empty:
         return None
 
@@ -174,9 +168,7 @@ def nearest_forward_gps_index(
     return best_idx
 
 
-def local_trip_segment_from_indices(
-    trip: LineString, trip_proj: list[float], k0: int, k1: int
-) -> Optional[LineString]:
+def local_trip_segment_from_indices(trip: LineString, trip_proj: list[float], k0: int, k1: int) -> Optional[LineString]:
     if not trip_proj:
         return None
 
@@ -340,32 +332,24 @@ def trip_dijkstra(
     if use_gps_progress:
         trip = safe_makevalid(trip)
         if trip is None or trip.is_empty:
-            warnings.warn(
-                "Trip geometry is invalid or empty but required by current weights/heuristic."
-            )
+            warnings.warn("Trip geometry is invalid or empty but required by current weights/heuristic.")
             return PathList()
 
         try:
             trip_coords = list(trip.coords)
         except Exception:
-            warnings.warn(
-                "Unable to extract trip coordinates but required by current weights/heuristic."
-            )
+            warnings.warn("Unable to extract trip coordinates but required by current weights/heuristic.")
             return PathList()
 
         if len(trip_coords) < 2:
-            warnings.warn(
-                "Trip geometry has less than 2 points but required by current weights/heuristic."
-            )
+            warnings.warn("Trip geometry has less than 2 points but required by current weights/heuristic.")
             return PathList()
 
         trip_points = [Point(x, y) for x, y in trip_coords]
         trip_proj = [point_on_trip_distance(trip, p) for p in trip_points]
 
         if any("geometry" not in l for l in graph.get_all_links()):
-            warnings.warn(
-                "Graph links are missing geometry but required by current weights/heuristic."
-            )
+            warnings.warn("Graph links are missing geometry but required by current weights/heuristic.")
             return PathList()
 
     pl = PathList()
@@ -456,9 +440,7 @@ def trip_dijkstra(
 
     # ricerca
     while pq:
-        f_curr, curr_g, curr_time, state, current_l_i, current_l_j, current_l = heappop(
-            pq
-        )
+        f_curr, curr_g, curr_time, state, current_l_i, current_l_j, current_l = heappop(pq)
 
         # stale entry
         if curr_g > g_cost.get(state, float("inf")):
@@ -508,11 +490,7 @@ def trip_dijkstra(
                         continue
 
                 if use_pts_cost:
-                    local_pts = (
-                        trip_points[current_k : next_k + 1]
-                        if next_k >= current_k
-                        else []
-                    )
+                    local_pts = trip_points[current_k : next_k + 1] if next_k >= current_k else []
                     c_pts = calc_local_point_penalty(
                         next_geom,
                         local_pts,
@@ -523,9 +501,7 @@ def trip_dijkstra(
                 next_k = 0
 
             # tempo reale separato
-            edge_time = (
-                float(next_l.get_value(cost_field, 0.0)) if use_time_acc else 0.0
-            )
+            edge_time = float(next_l.get_value(cost_field, 0.0)) if use_time_acc else 0.0
             new_time = curr_time + edge_time if use_time_acc else curr_time
 
             c_turn = 0.0
@@ -611,9 +587,7 @@ def trip_dijkstra(
     return pl
 
 
-def nearest_point_row(
-    df_links: gpd.GeoDataFrame, fcd: gpd.GeoDataFrame, pt: Point
-) -> tuple:
+def nearest_point_row(df_links: gpd.GeoDataFrame, fcd: gpd.GeoDataFrame, pt: Point) -> tuple:
     neareset_node = None
 
     df_l = None
@@ -713,25 +687,17 @@ class BuildPaths:
                     else:
                         pto = Point(trip.geometry.coords[0])
                         if df_fcd is None:
-                            source = nearest_point_row(
-                                df_links=df_links, fcd=None, pt=pto
-                            )
+                            source = nearest_point_row(df_links=df_links, fcd=None, pt=pto)
                         else:
-                            source = nearest_point_row(
-                                df_links=df_links, fcd=df_fcd.iloc[0], pt=pto
-                            )
+                            source = nearest_point_row(df_links=df_links, fcd=df_fcd.iloc[0], pt=pto)
                     if hasattr(trip, "id_zone_d") and pd.notna(trip.id_zone_d):
                         target = int(trip.id_zone_d)
                     else:
                         ptd = Point(trip.geometry.coords[-1])
                         if df_fcd is None:
-                            target = nearest_point_row(
-                                df_links=df_links, fcd=None, pt=ptd
-                            )
+                            target = nearest_point_row(df_links=df_links, fcd=None, pt=ptd)
                         else:
-                            target = nearest_point_row(
-                                df_links=df_links, fcd=df_fcd.iloc[-1], pt=ptd
-                            )
+                            target = nearest_point_row(df_links=df_links, fcd=df_fcd.iloc[-1], pt=ptd)
 
                     # print(f"Calculating path for trip {trip.id_trip} from {source} to {target}")
                     paths: PathContainer = trip_dijkstra(
@@ -748,9 +714,7 @@ class BuildPaths:
                         path["t"] = int(
                             (
                                 trip.dt_o.timestamp()
-                                - trip.dt_o.replace(
-                                    hour=0, minute=0, second=0, microsecond=0
-                                ).timestamp()
+                                - trip.dt_o.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
                             )
                             / 60
                         )
@@ -765,9 +729,7 @@ class BuildPaths:
 
         old_crs = df_trips.crs
         if df_links.crs != self.crs_calc:
-            self.log.info(
-                f"Reprojecting links and graph from {df_links.crs} to {self.crs_calc}"
-            )
+            self.log.info(f"Reprojecting links and graph from {df_links.crs} to {self.crs_calc}")
             G = G.st_transform(df_links.crs, self.crs_calc)
             df_links = df_links.to_crs(self.crs_calc)
 
@@ -780,9 +742,7 @@ class BuildPaths:
         tot_paths = PathList()
         if df_fcd is not None:
             grp = df_fcd.groupby("id_trip")
-            tasks = [
-                (trip, grp.get_group(trip.id_trip).iloc[[0, -1], :]) for trip in tasks
-            ]
+            tasks = [(trip, grp.get_group(trip.id_trip).iloc[[0, -1], :]) for trip in tasks]
         else:
             tasks = [(trip, None) for trip in tasks]
         for paths in Parallel.execute(

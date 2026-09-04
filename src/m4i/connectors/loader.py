@@ -70,9 +70,7 @@ class Loader(BaseLoader):
         if self.execution_id is None:
             self.log = logger or Logger.getLogger(logger_name)
         else:
-            self.log = logger or Logger.getLogger(
-                logger_name, execution_id=self.execution_id
-            )
+            self.log = logger or Logger.getLogger(logger_name, execution_id=self.execution_id)
 
         self._origins: list[int] = None
         self._destinations: list[int] = None
@@ -139,9 +137,7 @@ class Loader(BaseLoader):
         Create a clone of the current Loader instance.
         :return: A new Loader instance with the same parameters and state.
         """
-        new_loader = Loader(
-            parser=self.parser.clone(), logger=self.log, tstart=tstart, tend=tend
-        )
+        new_loader = Loader(parser=self.parser.clone(), logger=self.log, tstart=tstart, tend=tend)
         return new_loader
 
     def reset(self, tstart: int = None, tend: int = None):
@@ -158,9 +154,7 @@ class Loader(BaseLoader):
         :param delta_t: Time step in minutes.
         """
         self.parser.params = copy.deepcopy(self.parser.params)
-        self.parser.params["start"] = (
-            min2hhmm(start) if start is not None else self.start
-        )
+        self.parser.params["start"] = min2hhmm(start) if start is not None else self.start
         self.parser.params["end"] = min2hhmm(end) if end is not None else self.end
         self.reset()
 
@@ -190,9 +184,7 @@ class Loader(BaseLoader):
             if isinstance(filters, str):
                 pass
             else:
-                filters = filters_to_query_expression(
-                    filters, quoting="", op_boolean_symbols=True
-                )
+                filters = filters_to_query_expression(filters, quoting="", op_boolean_symbols=True)
         if parameters.get("filters"):
             if filters:
                 filters = f"({filters}) & {parameters.get('filters')}"
@@ -211,9 +203,7 @@ class Loader(BaseLoader):
         kwargs.pop("src", None)
         kwargs.pop("location", None)
         kwargs.pop("source", None)
-        df = loader.load_dataset(
-            parameters=parameters, filters=filters, dtype=dtype_inverse, **kwargs
-        )
+        df = loader.load_dataset(parameters=parameters, filters=filters, dtype=dtype_inverse, **kwargs)
         if df is None:
             return None
         if additional_fields := parameters.get("additional_fields", None):
@@ -224,9 +214,7 @@ class Loader(BaseLoader):
                         tmp[field] = {"value": None}
                     elif isinstance(field, dict):
                         if "name" not in field:
-                            raise ValueError(
-                                f"Missing 'name' key in additional field definition: {field}"
-                            )
+                            raise ValueError(f"Missing 'name' key in additional field definition: {field}")
                         tmp[field["name"]] = field
                 additional_fields = tmp
             if isinstance(additional_fields, dict):
@@ -267,9 +255,7 @@ class Loader(BaseLoader):
                     elif isinstance(df, dict):
                         df[additional_field] = pd.Series([v]).astype(t).tolist()[0]
 
-        if isinstance(
-            df, gpd.GeoDataFrame
-        ):  # se geodataframe trasforma o setta CRS e rinomina geometria
+        if isinstance(df, gpd.GeoDataFrame):  # se geodataframe trasforma o setta CRS e rinomina geometria
             crs = parameters.get("crs", None)
             if crs is not None:
                 if df.crs is None:
@@ -279,9 +265,7 @@ class Loader(BaseLoader):
                         f"CRS of dataframe {df.crs} does not match expected CRS {crs}. Converting CRS for {parameters}."
                     )
             if df.crs is None:
-                warnings.warn(
-                    f"CRS of dataframe is None. Setting CRS to {self.ini.CRS} for {parameters}."
-                )
+                warnings.warn(f"CRS of dataframe is None. Setting CRS to {self.ini.CRS} for {parameters}.")
                 df.set_crs(self.ini.CRS, inplace=True)
             df.to_crs(self.ini.CRS_CALC, inplace=True)
             if geometry:
@@ -339,9 +323,7 @@ class Loader(BaseLoader):
         try:
             self.params = json.loads(
                 json.dumps(self.dparams),
-                object_hook=lambda d: (
-                    namedtuple("X", d.keys())(*d.values()) if isinstance(d, dict) else d
-                ),
+                object_hook=lambda d: namedtuple("X", d.keys())(*d.values()) if isinstance(d, dict) else d,
             )
         except Exception as e:
             raise Exception(f"Error parsing params definition: {e}")
@@ -390,9 +372,7 @@ class Loader(BaseLoader):
     def has(self, name):
         return self.parser.get(name) is not None
 
-    def load_dataset(
-        self, parameters: dict, filters=None, dtype=None
-    ) -> Union[pd.DataFrame, gpd.GeoDataFrame, dict]:
+    def load_dataset(self, parameters: dict, filters=None, dtype=None) -> Union[pd.DataFrame, gpd.GeoDataFrame, dict]:
         pass
 
     def load(
@@ -430,9 +410,7 @@ class Loader(BaseLoader):
         if parameters is None:
             parameters = self.parser.get_input_parameters(path, from_output=from_output)
 
-        df = self._load_dataset(
-            parameters=parameters, filters=filters, dtype=dtype, **kwargs
-        )
+        df = self._load_dataset(parameters=parameters, filters=filters, dtype=dtype, **kwargs)
         if df is None:
             raise Exception(f"load({parameters}) function return None value")
         else:
@@ -460,9 +438,7 @@ class Loader(BaseLoader):
                 [["timestamp", ">=", 0], ["timestamp", "<", end - 1440]],
             ]
         dtype = self.parser.get_dtype("counts")
-        df = self._load_dataset(
-            parameters=parameters, filters=filters, dtype=dtype, **kwargs
-        )
+        df = self._load_dataset(parameters=parameters, filters=filters, dtype=dtype, **kwargs)
         if df is None:
             raise Exception(f"load_counts({parameters}) function return None value")
         self.parser.check_fields("counts", df)
@@ -479,9 +455,7 @@ class Loader(BaseLoader):
                 [["timestamp", ">=", 0], ["timestamp", "<", end - 1440]],
             ]
         dtype = self.parser.get_dtype("matrices")
-        df = self._load_dataset(
-            parameters=parameters, filters=filters, dtype=dtype, **kwargs
-        )
+        df = self._load_dataset(parameters=parameters, filters=filters, dtype=dtype, **kwargs)
         if df is None:
             raise Exception(f"load_matrix({parameters}) function return None value")
         self.parser.check_fields("matrices", df)
@@ -490,9 +464,7 @@ class Loader(BaseLoader):
 
     def load_nodes(self, parameters: dict, **kwargs) -> pd.DataFrame:
         dtype = self.parser.get_dtype("nodes")
-        df = self._load_dataset(
-            parameters=parameters, dtype=dtype, geometry="geometry", **kwargs
-        )
+        df = self._load_dataset(parameters=parameters, dtype=dtype, geometry="geometry", **kwargs)
         if df is None:
             raise Exception(f"load_nodes({parameters}) function return None value")
         self.parser.check_fields("nodes", df)
@@ -501,9 +473,7 @@ class Loader(BaseLoader):
 
     def load_links(self, parameters: dict, **kwargs) -> pd.DataFrame:
         dtype = self.parser.get_dtype("links")
-        df = self._load_dataset(
-            parameters=parameters, dtype=dtype, geometry="geometry", **kwargs
-        )
+        df = self._load_dataset(parameters=parameters, dtype=dtype, geometry="geometry", **kwargs)
         if df is None:
             raise Exception(f"load_links({parameters}) function return None value")
         self.parser.check_fields("links", df)
@@ -521,9 +491,7 @@ class Loader(BaseLoader):
 
     def load_zones(self, parameters: dict, **kwargs) -> pd.DataFrame:
         dtype = self.parser.get_dtype("zones")
-        df = self._load_dataset(
-            parameters=parameters, dtype=dtype, geometry="geometry", **kwargs
-        )
+        df = self._load_dataset(parameters=parameters, dtype=dtype, geometry="geometry", **kwargs)
         if df is None:
             raise Exception(f"load_zones({parameters}) function return None value")
         self.parser.check_fields("zones", df)
@@ -534,9 +502,7 @@ class Loader(BaseLoader):
         dtype = self.parser.get_dtype("modes")
         if isinstance(parameters, list):
             return pd.DataFrame(parameters)
-        df = self._load_dataset(
-            parameters=parameters, dtype=dtype, geometry=None, **kwargs
-        )
+        df = self._load_dataset(parameters=parameters, dtype=dtype, geometry=None, **kwargs)
         if df is None:
             raise Exception(f"load_modes({parameters}) function return None value")
         self.parser.check_fields("modes", df)
@@ -546,9 +512,7 @@ class Loader(BaseLoader):
     def load_paths(self, parameters: dict, **kwargs) -> pd.DataFrame:
         if isinstance(parameters, dict):
             dtype = self.parser.get_dtype("paths")
-            df = self._load_dataset(
-                parameters=parameters, dtype=dtype, geometry=None, **kwargs
-            )
+            df = self._load_dataset(parameters=parameters, dtype=dtype, geometry=None, **kwargs)
             if df is None:
                 raise Exception(f"load_paths({parameters}) function return None value")
             self.parser.check_fields("paths", df)
@@ -579,9 +543,7 @@ class Loader(BaseLoader):
         dtype = self.parser.get_dtype("traffic_lights")
         df = self._load_dataset(parameters=parameters, dtype=dtype, **kwargs)
         if df is None:
-            raise Exception(
-                f"load_traffic_lights({parameters}) function return None value"
-            )
+            raise Exception(f"load_traffic_lights({parameters}) function return None value")
         self.parser.check_fields("traffic_lights", df)
         df = pd.DataFrame(df)
         return df
@@ -590,9 +552,7 @@ class Loader(BaseLoader):
         if cls in self.ODs:
             return self.ODs[cls]
         else:
-            od = MatrixODT(
-                rows=self.origins, cols=self.destinations, timestamps=self.timestamps
-            )
+            od = MatrixODT(rows=self.origins, cols=self.destinations, timestamps=self.timestamps)
             self.ODs[cls] = od
             return od
 
@@ -600,9 +560,7 @@ class Loader(BaseLoader):
         if cls in self.perc:
             return self.perc[cls]
         else:
-            od = MatrixODT(
-                rows=self.origins, cols=self.destinations, timestamps=self.timestamps
-            )
+            od = MatrixODT(rows=self.origins, cols=self.destinations, timestamps=self.timestamps)
             self.perc[cls] = od
             return od
 
@@ -770,45 +728,33 @@ class Loader(BaseLoader):
         for id_net, net_param in enumerate(parameters):
             self.log.debug(f"Loading Net {id_net}")
             if "links" in net_param:
-                links_parameters = self.parser.get_input_parameters(
-                    f"params.supply.{id_net}.links"
-                )
+                links_parameters = self.parser.get_input_parameters(f"params.supply.{id_net}.links")
                 tmp = self.load_links(links_parameters)
                 if tmp is None:
-                    raise Exception(
-                        f"load_links({links_parameters}) function return None value"
-                    )
+                    raise Exception(f"load_links({links_parameters}) function return None value")
                 tmp.set_index("id")
                 if df_links is None:
                     df_links = tmp
                 else:
                     df_links = df_links.combine_first(tmp)
             if "nodes" in net_param:
-                nodes_parameters = self.parser.get_input_parameters(
-                    f"params.supply.{id_net}.nodes"
-                )
+                nodes_parameters = self.parser.get_input_parameters(f"params.supply.{id_net}.nodes")
                 tmp = self.load_nodes(nodes_parameters)
                 if tmp is None:
-                    raise Exception(
-                        f"load_nodes({nodes_parameters}) function return None value"
-                    )
+                    raise Exception(f"load_nodes({nodes_parameters}) function return None value")
                 tmp.set_index("id")
                 if df_nodes is None:
                     df_nodes = tmp
                 else:
                     df_nodes = df_nodes.combine_first(tmp)
             if "turns" in net_param:
-                turns_parameters = self.parser.get_input_parameters(
-                    f"params.supply.{id_net}.turns"
-                )
+                turns_parameters = self.parser.get_input_parameters(f"params.supply.{id_net}.turns")
                 tmp = self.load_turns(turns_parameters)
                 if tmp is None:
-                    raise Exception(
-                        f"load_turns({turns_parameters}) function return None value"
-                    )
-                tmp.drop_duplicates(
-                    subset=["from_node", "via_node", "to_node"], keep="last"
-                ).set_index(["from_node", "via_node", "to_node"])
+                    raise Exception(f"load_turns({turns_parameters}) function return None value")
+                tmp.drop_duplicates(subset=["from_node", "via_node", "to_node"], keep="last").set_index(
+                    ["from_node", "via_node", "to_node"]
+                )
                 if df_turns is None:
                     df_turns = tmp
                 else:
@@ -876,9 +822,7 @@ class Loader(BaseLoader):
                     how="left",
                     suffixes=("", "_y"),
                 )
-                df = df.drop(columns=["geometry"]).rename(
-                    columns={"geometry_y": "geometry"}
-                )
+                df = df.drop(columns=["geometry"]).rename(columns={"geometry_y": "geometry"})
                 df = gpd.GeoDataFrame(df)
                 df.geometry = df.geometry.voronoi_polygons(extend_to=self.bounds)
                 ret = df
@@ -895,25 +839,21 @@ class Loader(BaseLoader):
                         .rename(columns={"to_node": "id"})
                         .drop_duplicates(subset=["id"], keep="last")
                     )
-                    nodes = pd.concat(
-                        [from_node, to_node], ignore_index=True
-                    ).drop_duplicates(subset=["id"], keep="last")
+                    nodes = pd.concat([from_node, to_node], ignore_index=True).drop_duplicates(
+                        subset=["id"], keep="last"
+                    )
                     df = df.merge(
                         nodes[["id", "geometry"]],
                         on="id",
                         how="left",
                         suffixes=("", "_y"),
                     )
-                    df = df.drop(columns=["geometry"]).rename(
-                        columns={"geometry_y": "geometry"}
-                    )
+                    df = df.drop(columns=["geometry"]).rename(columns={"geometry_y": "geometry"})
                     df = gpd.GeoDataFrame(df)
                     df.geometry = df.geometry.voronoi_polygons(extend_to=self.bounds)
                     ret = df
         if ret is None:
-            raise KeyError(
-                "geometry column not found in zones dataset, nodes dataset and links dataset"
-            )
+            raise KeyError("geometry column not found in zones dataset, nodes dataset and links dataset")
         return ret
 
     def _load_paths(self) -> KPathList:
@@ -924,17 +864,13 @@ class Loader(BaseLoader):
         pl: KPathList = KPathList()
         for id_paths, paths_params in enumerate(parameters):
             self.log.info(f"Loading Paths Set {id_paths}...")
-            paths_params = self.parser.get_input_parameters(
-                parameters, id_paths, from_output=True
-            )
+            paths_params = self.parser.get_input_parameters(parameters, id_paths, from_output=True)
             if "src" not in paths_params:
                 raise KeyError("key 'src' required in paths parameters")
 
             df = self.load_paths(paths_params)
             if df is None:
-                raise Exception(
-                    f"load_paths({paths_params}) function return None value"
-                )
+                raise Exception(f"load_paths({paths_params}) function return None value")
             for path_record in df.to_dict(orient="records"):
                 path = Path(
                     source=path_record["source"],
@@ -955,18 +891,14 @@ class Loader(BaseLoader):
         else:
             parameters = self.parser.get_input_parameters("params.modes")
             if parameters is None:
-                raise KeyError(
-                    "key 'modes' not found in execution parameters['params']"
-                )
+                raise KeyError("key 'modes' not found in execution parameters['params']")
             df = self.load_modes(parameters)
             if df is None:
                 raise Exception(f"load_modes({parameters}) function return None value")
             parameters = df.to_dict(orient="records")
         for mode in parameters:
             if not isinstance(mode, dict):
-                raise KeyError(
-                    "a single mode must to be a dictionary in parameters['params']['modes']"
-                )
+                raise KeyError("a single mode must to be a dictionary in parameters['params']['modes']")
             if "code" not in mode:
                 raise KeyError("a single mode must to contains 'id' key")
             key = str(mode.pop("code").lower())
@@ -985,23 +917,17 @@ class Loader(BaseLoader):
 
         if parameters is None:
             self._sign_nodes = []
-            self.log.warning(
-                "key 'traffic_lights' not found in execution parameters['params']"
-            )
+            self.log.warning("key 'traffic_lights' not found in execution parameters['params']")
         else:
             self._sign_nodes = []
             for id_tl, tl_params in enumerate(self.dparams["params"]["traffic_lights"]):
                 self.log.debug(f"Loading Traffic Light {id_tl}...")
-                tl_params = self.parser.get_input_parameters(
-                    "params.traffic_lights", id_tl
-                )
+                tl_params = self.parser.get_input_parameters("params.traffic_lights", id_tl)
                 if "src" not in tl_params:
                     raise KeyError("key 'src' required in traffic_lights parameters")
                 tmp = self.load_traffic_lights(tl_params)
                 if tmp is None:
-                    raise Exception(
-                        f"load_traffic_lights({tl_params}) function return None value"
-                    )
+                    raise Exception(f"load_traffic_lights({tl_params}) function return None value")
                 for new_tl in tmp.to_dict(orient="records"):
                     if isinstance(new_tl["phases"], str):
                         new_tl["phases"] = json.loads(new_tl["phases"])
@@ -1031,9 +957,7 @@ class Loader(BaseLoader):
                     raise KeyError("key 'src' required in events parameters")
                 tmp = self.load_events(event_params)
                 if tmp is None:
-                    raise Exception(
-                        f"load_events({event_params['src']}) function return None value"
-                    )
+                    raise Exception(f"load_events({event_params['src']}) function return None value")
                 df_events = df_events.combine_first(tmp)
 
             self._events = defaultdict(list)
@@ -1093,54 +1017,40 @@ class Loader(BaseLoader):
         parameters = self.parser.get("params.links_sets")
         if parameters is None:
             self._links_sets = {}
-            self.log.warning(
-                "key 'links_sets' not found in execution parameters['params']"
-            )
+            self.log.warning("key 'links_sets' not found in execution parameters['params']")
         else:
             df_links_sets = pd.DataFrame()
             for id_set, set_params in enumerate(parameters):
                 self.log.debug(f"Loading Links Set {id_set}...")
-                set_params = self.parser.get_input_parameters(
-                    "params.links_sets", id_set
-                )
+                set_params = self.parser.get_input_parameters("params.links_sets", id_set)
                 if "src" not in set_params:
                     raise KeyError("key 'src' required in links_sets parameters")
                 tmp = self.load_links_sets(set_params)
                 if tmp is None:
-                    raise Exception(
-                        f"load_links_sets({set_params}) function return None value"
-                    )
+                    raise Exception(f"load_links_sets({set_params}) function return None value")
                 df_links_sets = df_links_sets.combine_first(tmp)
             if df_links_sets.shape[0] == 0:
                 self._links_sets = {}
             else:
-                self._links_sets = (
-                    df_links_sets.groupby("id_set").agg(list).to_dict()["id_link"]
-                )
+                self._links_sets = df_links_sets.groupby("id_set").agg(list).to_dict()["id_link"]
             self.log.info(f"Links Sets identified {len(self.links_sets)}")
 
     def _load_detectors(self):
         self.log.debug("Loading Detectors...")
         parameters = self.parser.get("params.detectors")
         if parameters is None:
-            self.log.warning(
-                "key 'detectors' not found in execution parameters['params']"
-            )
+            self.log.warning("key 'detectors' not found in execution parameters['params']")
             self._detectors = []
         else:
             detectors = pd.DataFrame()
             for id_det, set_detect in enumerate(parameters):
                 self.log.debug(f"Loading Detectors {id_det}...")
-                set_detect = self.parser.get_input_parameters(
-                    "params.detectors", id_det
-                )
+                set_detect = self.parser.get_input_parameters("params.detectors", id_det)
                 if "src" not in set_detect:
                     raise KeyError("key 'src' required in links_sets parameters")
                 tmp = self.load_detectors(set_detect)
                 if tmp is None:
-                    raise Exception(
-                        f"load_detectors({set_detect}) function return None value"
-                    )
+                    raise Exception(f"load_detectors({set_detect}) function return None value")
                 detectors = detectors.combine_first(tmp)
         self._detectors = detectors
         if self._detectors is None:
@@ -1158,9 +1068,7 @@ class Loader(BaseLoader):
         counts = pd.DataFrame()
         for id_count, set_counts in enumerate(parameters):
             self.log.debug(f"Loading Counts {id_count}...")
-            set_counts = self.parser.get_input_parameters(
-                "params.counts", id_count
-            ).copy()
+            set_counts = self.parser.get_input_parameters("params.counts", id_count).copy()
             if "src" not in set_counts:
                 raise KeyError("key 'src' required in counts parameters")
             tmp = self.load_counts_df(set_counts, start=tstart, end=tend)
@@ -1183,21 +1091,15 @@ class Loader(BaseLoader):
                 df_mode["mode"] = "all"
                 counts.loc[b, ["eq_counts", "mode"]] = df_mode[["eq_counts", "mode"]]
             else:
-                self.log.warning(
-                    f"Mode '{mode}' not defined in modes parameter, counts will not be aggregated by mode"
-                )
+                self.log.warning(f"Mode '{mode}' not defined in modes parameter, counts will not be aggregated by mode")
                 df_mode["eq_counts"] = df_mode["counts"]
                 df_mode["mode"] = "all"
                 counts.loc[b, ["eq_counts", "mode"]] = df_mode[["eq_counts", "mode"]]
         # TODO: Group by class of timestamps
         self._counts["all"] = (
-            counts.groupby(["id", "timestamp"])
-            .agg(counts=("eq_counts", "sum"))["counts"]
-            .reset_index()
+            counts.groupby(["id", "timestamp"]).agg(counts=("eq_counts", "sum"))["counts"].reset_index()
         )
-        self.log.info(
-            f"Counts identified {len(self._counts)}. Read Counts : {counts.shape[0]}"
-        )
+        self.log.info(f"Counts identified {len(self._counts)}. Read Counts : {counts.shape[0]}")
 
     def load_demand(self, timestamps: list[int] = None):
         self.log.debug("Loading OD Matrices...")
@@ -1250,9 +1152,7 @@ class Loader(BaseLoader):
                         mode=mode,
                     )
                 else:
-                    mat_params = self.parser.get_input_parameters(
-                        f"params.demand.{id_mat}.matrices", id_m
-                    )
+                    mat_params = self.parser.get_input_parameters(f"params.demand.{id_mat}.matrices", id_m)
                     if "src" not in mat_params:
                         raise KeyError("key 'src' required in matrices element")
                     tmp = self.load_matrix(
@@ -1261,21 +1161,12 @@ class Loader(BaseLoader):
                         end=max(timestamps) + self.delta_t,
                     )
                     if tmp is None:
-                        raise Exception(
-                            f"load_matrix({mat_params}) function return None value"
-                        )
-                    tmp = tmp[
-                        (tmp["o"].isin(self.origins))
-                        & (tmp["d"].isin(self.destinations))
-                    ]
+                        raise Exception(f"load_matrix({mat_params}) function return None value")
+                    tmp = tmp[(tmp["o"].isin(self.origins)) & (tmp["d"].isin(self.destinations))]
                     # aggrego per timestamps di simulazione
                     s = pd.cut(tmp["timestamp"], timestamps + [1e100], right=False)
                     tmp["timestamp"] = s.cat.categories[s.cat.codes].left
-                    tmp = (
-                        tmp.groupby(["o", "d", "timestamp"])
-                        .agg(value=("value", "sum"))
-                        .reset_index()
-                    )
+                    tmp = tmp.groupby(["o", "d", "timestamp"]).agg(value=("value", "sum")).reset_index()
                     tot_od_pairs += tmp.shape[0]
                     current_od = MatrixODT.read_df(
                         rows=self.origins,
@@ -1317,9 +1208,7 @@ class Loader(BaseLoader):
             tmp = OD / self._OD
             tmp.nan_to_num(copy=False)
             self._perc[id_mat] = tmp
-        self.log.info(
-            f"OD Matrices identified {len(self.ODs)}. Read OD Pairs : {tot_od_pairs}"
-        )
+        self.log.info(f"OD Matrices identified {len(self.ODs)}. Read OD Pairs : {tot_od_pairs}")
 
     def load_graph(self, df_links=None, df_nodes=None, df_turns=None) -> DynamicGraph:
         self.log.debug("Loading Graph...")
@@ -1376,18 +1265,14 @@ class Loader(BaseLoader):
                 )
                 df_links = tmp[tmp["_merge"] == "both"].drop(columns=["_merge"])
 
-            nodes = (
-                set(df_links["from_node"].unique()) | set(df_links["to_node"].unique())
-            ) - set(df_nodes["id"])
+            nodes = (set(df_links["from_node"].unique()) | set(df_links["to_node"].unique())) - set(df_nodes["id"])
             if len(nodes) > 0:
                 self.log.warning(f"Nodes not connected with any link {nodes}")
                 df_nodes = df_nodes[~df_nodes["id"].isin(nodes)]
 
             cond = df_links["length"] > 0
             if not cond.all():
-                self.log.warning(
-                    f"Links with length <=0 {df_links[~cond][['id', 'from_node', 'to_node', 'length']]}"
-                )
+                self.log.warning(f"Links with length <=0 {df_links[~cond][['id', 'from_node', 'to_node', 'length']]}")
                 df_links = df_links[cond]
 
             if df_turns is not None:
@@ -1402,13 +1287,9 @@ class Loader(BaseLoader):
                     )
                     df_turns = df_turns[cond]
 
-                cond = (df_turns["from_node"] != df_turns["via_node"]) & (
-                    df_turns["to_node"] != df_turns["via_node"]
-                )
+                cond = (df_turns["from_node"] != df_turns["via_node"]) & (df_turns["to_node"] != df_turns["via_node"])
                 if not cond.all():
-                    self.log.warning(
-                        f"Invalid turns detected {df_turns[~cond][['from_node', 'via_node', 'to_node']]}"
-                    )
+                    self.log.warning(f"Invalid turns detected {df_turns[~cond][['from_node', 'via_node', 'to_node']]}")
                     df_turns = df_turns[cond]
 
         modes = set(self.modes.keys())
@@ -1462,11 +1343,7 @@ class Loader(BaseLoader):
         """
         self.log.debug("Adding links to graph...")
         for _, row in df_links.iterrows():
-            kwargs = {
-                k: row[k]
-                for k in df_links.columns
-                if k not in {"id", "from_node", "to_node", "lanes", "rcr"}
-            }
+            kwargs = {k: row[k] for k in df_links.columns if k not in {"id", "from_node", "to_node", "lanes", "rcr"}}
             kwargs["idx"] = int(row["id"])
             kwargs["i"] = int(row["from_node"])
             kwargs["j"] = int(row["to_node"])
@@ -1552,15 +1429,11 @@ class Loader(BaseLoader):
                     if "time" in row and not pd.isna(row["time"]):
                         kwargs["time"] = float(row["time"])
                         kwargs["time"] += (
-                            float("inf")
-                            if "penalty" not in row or pd.isna(row["penalty"])
-                            else float(row["penalty"])
+                            float("inf") if "penalty" not in row or pd.isna(row["penalty"]) else float(row["penalty"])
                         )
                     else:
                         kwargs["time"] = (
-                            float("inf")
-                            if "penalty" not in row or pd.isna(row["penalty"])
-                            else float(row["penalty"])
+                            float("inf") if "penalty" not in row or pd.isna(row["penalty"]) else float(row["penalty"])
                         )
                     if "modes" in row:
                         if pd.isna(row["modes"]):
@@ -1573,9 +1446,7 @@ class Loader(BaseLoader):
                             elif row["modes"].strip() == "":
                                 row["modes"] = modes.copy()
                             else:
-                                row["modes"] = set(
-                                    [m.strip() for m in row["modes"].split(",")]
-                                )
+                                row["modes"] = set([m.strip() for m in row["modes"].split(",")])
                         if self.ini.CHECK_INPUT:
                             m = row["modes"] & modes
                             if m != row["modes"]:

@@ -85,9 +85,7 @@ class MSA(AssignmentModel):
     def calc_task_steps(self):
         ite_con_cammini = min(self.max_ite, self.max_k)
         ite_senza_cammini = max(0, self.max_ite - ite_con_cammini)
-        return super().calc_task_steps() + len(self.global_intervals) * (
-            ite_con_cammini * 2 + ite_senza_cammini
-        )
+        return super().calc_task_steps() + len(self.global_intervals) * (ite_con_cammini * 2 + ite_senza_cammini)
 
     def run_assignment(self):
         calc_paths = not self.load_state_graph  # or self.m_paths.is_empty()
@@ -109,19 +107,13 @@ class MSA(AssignmentModel):
                     self.calculate_paths()
                     k_calculated += 1
                 if iteration < self.max_k:
-                    self.log.info(
-                        "Ite: %s - Preloading (k=%d)...", iteration, k_calculated
-                    )
+                    self.log.info("Ite: %s - Preloading (k=%d)...", iteration, k_calculated)
                     for (o, d, t_start, mode), k_paths in self.m_paths.all_kpaths():
-                        f = self.ODs[mode][
-                            o, d, self.current_time_start + t_start
-                        ] * self.eq_factors.get(mode, 1)
+                        f = self.ODs[mode][o, d, self.current_time_start + t_start] * self.eq_factors.get(mode, 1)
                         k = len(k_paths)
                         for path in k_paths:
                             path["path_flow"] = f / k
-                    self.log.info(
-                        "Ite: %s - Updating network performance...", iteration
-                    )
+                    self.log.info("Ite: %s - Updating network performance...", iteration)
                     self.calc_rgap()
                     self.update_performance()
                     self.update_infos()
@@ -131,9 +123,7 @@ class MSA(AssignmentModel):
             elif iteration == 0:
                 self.log.info("Ite: %s - Preloading...", iteration)
                 for (o, d, t_start, mode), k_paths in self.m_paths.all_kpaths():
-                    f = self.ODs[mode][
-                        o, d, self.current_time_start + t_start
-                    ] * self.eq_factors.get(mode, 1)
+                    f = self.ODs[mode][o, d, self.current_time_start + t_start] * self.eq_factors.get(mode, 1)
                     k = len(k_paths)
                     for path in k_paths:
                         path["path_flow"] = f / k
@@ -151,14 +141,9 @@ class MSA(AssignmentModel):
             I nuovi percorsi aumenteranno di 1/k il proprio flusso
             """
             for (o, d, t_start, mode), k_paths in self.m_paths.all_kpaths():
-                f = self.ODs[mode][
-                    o, d, self.current_time_start + t_start
-                ] * self.eq_factors.get(mode, 1)
+                f = self.ODs[mode][o, d, self.current_time_start + t_start] * self.eq_factors.get(mode, 1)
                 if self.loader.ini.MSA_K_BALANCING > 0:
-                    k = (
-                        max(iteration - len(k_paths), 0)
-                        + self.loader.ini.MSA_K_BALANCING
-                    )
+                    k = max(iteration - len(k_paths), 0) + self.loader.ini.MSA_K_BALANCING
                 else:
                     k = iteration + 1
                 for path in k_paths:
@@ -167,16 +152,11 @@ class MSA(AssignmentModel):
             for (o, d, t_start, mode), k_paths in self.m_paths.all_kpaths():
                 if o == d:
                     continue
-                f = self.ODs[mode][
-                    o, d, self.current_time_start + t_start
-                ] * self.eq_factors.get(mode, 1)
+                f = self.ODs[mode][o, d, self.current_time_start + t_start] * self.eq_factors.get(mode, 1)
                 if f > 0:
                     best = min(k_paths, key=lambda path: path["tot_cost"])
                     if self.loader.ini.MSA_K_BALANCING > 0:
-                        k = (
-                            max(iteration - len(k_paths), 0)
-                            + self.loader.ini.MSA_K_BALANCING
-                        )
+                        k = max(iteration - len(k_paths), 0) + self.loader.ini.MSA_K_BALANCING
                     else:
                         k = iteration + 1
                     best["path_flow"] += f / k

@@ -58,9 +58,7 @@ class Serializer:
     CLEVEL_DEFAULT: int = 5  # Default compression level (1-9 range)
 
     @staticmethod
-    def dumps(
-        data: Any, compression: str | None = None, clevel: int = 5, to_string=False
-    ) -> bytes | str:
+    def dumps(data: Any, compression: str | None = None, clevel: int = 5, to_string=False) -> bytes | str:
         """Serialize an object to bytes with optional compression.
 
         Converts the given object to a byte string using pickle serialization, optionally
@@ -152,9 +150,7 @@ class Serializer:
                 )
         else:
             if compression is not None:
-                warnings.warn(
-                    f"Compression {compression} not supported. Compression set to None."
-                )
+                warnings.warn(f"Compression {compression} not supported. Compression set to None.")
             compression = None
 
         # Serialize the object to bytes using pickle
@@ -195,9 +191,7 @@ class Serializer:
                 compression_type = zipfile.ZIP_STORED
             else:
                 compression_type = zipfile.ZIP_DEFLATED
-            with zipfile.ZipFile(
-                zip_buffer, "w", compression=compression_type, compresslevel=clevel
-            ) as zf:
+            with zipfile.ZipFile(zip_buffer, "w", compression=compression_type, compresslevel=clevel) as zf:
                 with zf.open("temp.pkl", "w") as f:
                     f.write(pickled)
             ret = zip_buffer.getvalue()
@@ -308,9 +302,7 @@ class Serializer:
                 )
         else:
             if compression is not None:
-                warnings.warn(
-                    f"Compression {compression} not supported. Compression set to None."
-                )
+                warnings.warn(f"Compression {compression} not supported. Compression set to None.")
             compression = None
 
         # Handle edge cases for empty or None data
@@ -360,9 +352,7 @@ class Serializer:
             return pickle.loads(snappy.decompress(data))  # type: ignore
 
     @staticmethod
-    def dump(
-        data: Any, path: str | Path, compression: str | None = None, clevel: int = 5
-    ):
+    def dump(data: Any, path: str | Path, compression: str | None = None, clevel: int = 5):
         """Save an object to a file with optional compression.
 
         Serializes the given object and saves it to the specified file path.
@@ -408,17 +398,11 @@ class Serializer:
             data = f.read()
         return Serializer.loads(data, compression=compression)
 
-    def save(
-        data: Any, path: str | Path, compression: str | None = None, clevel: int = 5
-    ):
+    def save(data: Any, path: str | Path, compression: str | None = None, clevel: int = 5):
         return Serializer.dump(data, path, compression=compression, clevel=clevel)
 
-    def serialize(
-        data: Any, compression: str | None = None, clevel: int = 5, to_string=False
-    ) -> bytes | str:
-        return Serializer.dumps(
-            data, compression=compression, clevel=clevel, to_string=to_string
-        )
+    def serialize(data: Any, compression: str | None = None, clevel: int = 5, to_string=False) -> bytes | str:
+        return Serializer.dumps(data, compression=compression, clevel=clevel, to_string=to_string)
 
     def deserialize(data: bytes | str | None, compression: str | None = None) -> Any:
         return Serializer.loads(data, compression=compression)

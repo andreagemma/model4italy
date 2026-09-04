@@ -18,9 +18,7 @@ from .base_m4i_model import BaseM4IModel
 class Dispatcher(BaseM4IModel):
     def __init__(self, params, ini, options: dict = None, execution: Execution = None):
         self.t_start: int = time.time()
-        self.parser: ParamsParser = ParamsParser(
-            params=params, settings=ini, options=options
-        )
+        self.parser: ParamsParser = ParamsParser(params=params, settings=ini, options=options)
         self.execution: Execution = execution
         self.execution_id: int = execution.id if execution else None
 
@@ -63,13 +61,9 @@ class Dispatcher(BaseM4IModel):
                 num_cpus=self.parser.ini.PARALLEL_NUMCPUS,
                 address=self.parser.ini.PARALLEL_CLUSTER_ADDRESS,
             )
-            self.log.info(
-                f"Parallel engine {Parallel.parallel_engine} initialized with {Parallel.num_cpus} cpus"
-            )
+            self.log.info(f"Parallel engine {Parallel.parallel_engine} initialized with {Parallel.num_cpus} cpus")
         else:
-            Parallel.initialize_parallel(
-                engine=Parallel.ENGINE_NONE, num_cpus=1, address=None
-            )
+            Parallel.initialize_parallel(engine=Parallel.ENGINE_NONE, num_cpus=1, address=None)
         self.loader: Loader = Loader(parser=self.parser)
         self.writer: Writer = Writer(parser=self.parser)
         if self.writer.has("params.params"):
@@ -147,9 +141,7 @@ class Dispatcher(BaseM4IModel):
                 raise ValueError(f"Operation {self.op} not recognized")
 
             if self.execution_id is None:
-                self.log.info(
-                    "Execution finished in %.2f seconds", time.time() - self.t_start
-                )
+                self.log.info("Execution finished in %.2f seconds", time.time() - self.t_start)
             else:
                 Execution.set_execution_success(self.execution_id)
                 self.log.info(
@@ -164,9 +156,7 @@ class Dispatcher(BaseM4IModel):
                     time.time() - self.t_start,
                 )
             else:
-                Execution.set_execution_failed(
-                    self.execution_id, ex=ex, raise_exception=False
-                )
+                Execution.set_execution_failed(self.execution_id, ex=ex, raise_exception=False)
                 self.log.info(
                     f"Execution ({self.execution_id}) terminated abnormally in %.2f seconds",
                     time.time() - self.t_start,

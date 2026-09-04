@@ -33,9 +33,7 @@ try:
     Base = mapper_registry.generate_base()
     _LOCK = threading.Lock()
 except:
-    warnings.warn(
-        "SQLAlchemy is required for database operations. Please install it using 'pip install SQLAlchemy'."
-    )
+    warnings.warn("SQLAlchemy is required for database operations. Please install it using 'pip install SQLAlchemy'.")
 
 
 class Token(Base):
@@ -47,9 +45,7 @@ class Token(Base):
     )
     token = Column(String, unique=True, nullable=False)
     user = Column(String, nullable=True)
-    created_at = Column(
-        DateTime(True), default=lambda: datetime.datetime.now(datetime.timezone.utc)
-    )
+    created_at = Column(DateTime(True), default=lambda: datetime.datetime.now(datetime.timezone.utc))
     expires_at = Column(DateTime(True), nullable=True)
 
     __table_args__ = (Index("idx_token", "token"), {"sqlite_autoincrement": True})
@@ -65,9 +61,7 @@ class Token(Base):
         self.id = id
         self.token = token
         self.user = user
-        self.created_at = (
-            created_at if created_at else datetime.datetime.now(datetime.timezone.utc)
-        )
+        self.created_at = created_at if created_at else datetime.datetime.now(datetime.timezone.utc)
         self.expires_at = expires_at
 
     def is_valid(self) -> bool:
@@ -82,21 +76,15 @@ class Token(Base):
         try:
             with DB.get_engine().connect() as conn:
                 # Check if a token already exists for the user
-                result = conn.execute(
-                    Token.__table__.select().where(Token.user == user)
-                )
+                result = conn.execute(Token.__table__.select().where(Token.user == user))
                 row = result.fetchone()
                 if row:
-                    existing_token = Token(
-                        id=row["id"], token=row["token"], expires_at=row["expires_at"]
-                    )
+                    existing_token = Token(id=row["id"], token=row["token"], expires_at=row["expires_at"])
                     if existing_token.is_valid():
                         return existing_token
 
                 # Create a new token if none exists or the existing one is invalid
-                new_token = Token(
-                    token=str(uuid.uuid4()), user=user, expires_at=expires_at
-                )
+                new_token = Token(token=str(uuid.uuid4()), user=user, expires_at=expires_at)
                 result = conn.execute(
                     Token.__table__.insert().values(
                         token=new_token.token,
@@ -115,9 +103,7 @@ class Token(Base):
         """Retrieve a token for the user if it exists and is valid."""
         try:
             with DB.get_engine().connect() as conn:
-                result = conn.execute(
-                    Token.__table__.select().where(Token.user == user)
-                )
+                result = conn.execute(Token.__table__.select().where(Token.user == user))
                 row = result.fetchone()
                 if row:
                     token = Token(
@@ -135,19 +121,11 @@ class Token(Base):
 
     def refresh(self):
         """Refresh the token's expiration date."""
-        if self.expires_at and self.expires_at > datetime.datetime.now(
-            datetime.timezone.utc
-        ):
-            self.expires_at = datetime.datetime.now(
-                datetime.timezone.utc
-            ) + datetime.timedelta(days=1)
+        if self.expires_at and self.expires_at > datetime.datetime.now(datetime.timezone.utc):
+            self.expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1)
             try:
                 with DB.get_engine().connect() as conn:
-                    conn.execute(
-                        Token.__table__.update()
-                        .where(Token.id == self.id)
-                        .values(expires_at=self.expires_at)
-                    )
+                    conn.execute(Token.__table__.update().where(Token.id == self.id).values(expires_at=self.expires_at))
             except SQLAlchemyError as ex:
                 DB.log.error("Error refreshing token: %s", ex)
                 raise
@@ -160,9 +138,7 @@ class Execution(Base):
         primary_key=True,
         autoincrement=True,
     )
-    uuid = Column(
-        String, default=lambda: str(uuid.uuid4()), unique=True, nullable=False
-    )
+    uuid = Column(String, default=lambda: str(uuid.uuid4()), unique=True, nullable=False)
     status = Column(String)
     start_time = Column(DateTime(True))
     end_time = Column(DateTime(True), nullable=True)
@@ -189,9 +165,7 @@ class Execution(Base):
     def create_execution(params: dict = None, raise_exception=True) -> dict:
         try:
             with DB.get_engine().connect() as conn:
-                now = datetime.datetime.fromtimestamp(
-                    time.time(), tz=datetime.timezone.utc
-                )
+                now = datetime.datetime.fromtimestamp(time.time(), tz=datetime.timezone.utc)
                 uid = str(uuid.uuid4())
                 result = conn.execute(
                     text("""
@@ -224,18 +198,14 @@ class Execution(Base):
 
     @staticmethod
     def set_execution_success(execution_id: int, raise_exception=True):
-        Execution._set_status(
-            execution_id, Status.SIM_COMPLETED, "success", raise_exception
-        )
+        Execution._set_status(execution_id, Status.SIM_COMPLETED, "success", raise_exception)
 
     @staticmethod
     def set_execution_failed(execution_id: int, ex=None, raise_exception=True):
         Execution._set_status(execution_id, Status.SIM_FAILED, str(ex), raise_exception)
 
     @staticmethod
-    def _set_status(
-        execution_id: int, status: str, result_value: str, raise_exception=True
-    ):
+    def _set_status(execution_id: int, status: str, result_value: str, raise_exception=True):
         try:
             with _LOCK:
                 with DB.get_engine().connect() as conn:
@@ -248,9 +218,7 @@ class Execution(Base):
                             WHERE id = :id
                         """),
                         {
-                            "end_time": datetime.datetime.fromtimestamp(
-                                time.time(), tz=datetime.timezone.utc
-                            ),
+                            "end_time": datetime.datetime.fromtimestamp(time.time(), tz=datetime.timezone.utc),
                             "status": status,
                             "result": result_value,
                             "id": execution_id,
@@ -263,9 +231,7 @@ class Execution(Base):
                 raise
 
     @staticmethod
-    def set_progress(
-        execution_id: int, progress: float, message: str = None, raise_exception=True
-    ):
+    def set_progress(execution_id: int, progress: float, message: str = None, raise_exception=True):
         try:
             with _LOCK:
                 with DB.get_engine().connect() as conn:
@@ -281,9 +247,7 @@ class Execution(Base):
                             "progress": progress,
                             "id": execution_id,
                             "last_message": message,
-                            "last_message_time": datetime.datetime.fromtimestamp(
-                                time.time(), tz=datetime.timezone.utc
-                            ),
+                            "last_message_time": datetime.datetime.fromtimestamp(time.time(), tz=datetime.timezone.utc),
                         },
                     )
                     conn.commit()
@@ -329,9 +293,7 @@ class DBHandler(logging.Handler):
                     """),
                     {
                         "execution_id": getattr(record, "execution_id", None),
-                        "created_at": datetime.datetime.fromtimestamp(
-                            record.created, tz=datetime.timezone.utc
-                        ),
+                        "created_at": datetime.datetime.fromtimestamp(record.created, tz=datetime.timezone.utc),
                         "log_level": record.levelno,
                         "log_levelname": record.levelname,
                         "created_by": record.name,
@@ -351,9 +313,7 @@ class DB:
     @staticmethod
     def init_db(DATABASE_URL: str):
         connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
-        DB._engine = create_engine(
-            DATABASE_URL, echo=False, pool_pre_ping=True, connect_args=connect_args
-        )
+        DB._engine = create_engine(DATABASE_URL, echo=False, pool_pre_ping=True, connect_args=connect_args)
         if DATABASE_URL.startswith("sqlite"):
 
             @event.listens_for(DB._engine, "connect")
@@ -362,9 +322,7 @@ class DB:
                 cursor.execute("PRAGMA journal_mode=DELETE;")
                 cursor.close()
 
-        DB._session_factory = scoped_session(
-            sessionmaker(bind=DB._engine, autoflush=True)
-        )
+        DB._session_factory = scoped_session(sessionmaker(bind=DB._engine, autoflush=True))
         try:
             Base.metadata.create_all(DB._engine)
             DB.log.info("Database initialized successfully.")
@@ -375,9 +333,7 @@ class DB:
     @staticmethod
     def open_db(DATABASE_URL: str):
         connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
-        DB._engine = create_engine(
-            DATABASE_URL, echo=False, pool_pre_ping=True, connect_args=connect_args
-        )
+        DB._engine = create_engine(DATABASE_URL, echo=False, pool_pre_ping=True, connect_args=connect_args)
         # Abilita WAL per SQLite
         if DATABASE_URL.startswith("sqlite"):
 

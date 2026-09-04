@@ -40,9 +40,7 @@ def monitor_process(
     :param directory: Folder in which to memorize the file (default: ".").
     """
     if output_file is None:
-        output_file = (
-            f"{process_name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
-        )
+        output_file = f"{process_name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 
     output_file_path = os.path.join(directory, output_file)
     header = ["Timestamp", "Process", "Memory", "CPU"]
@@ -53,9 +51,7 @@ def monitor_process(
         while True:
             t = time.time()
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            memory_usage, cpu_usage = aggregate_process_usage(
-                process_name, interval=0.1
-            )
+            memory_usage, cpu_usage = aggregate_process_usage(process_name, interval=0.1)
             with open(output_file_path, mode="a", newline="") as csv_file:
                 writer = csv.writer(csv_file)
                 if not file_exists:
@@ -81,9 +77,7 @@ def run_from_command_line():
     """
     Interface function for the use of command line.
     """
-    parser = argparse.ArgumentParser(
-        description="Monitor the use of memory and CPU for specific processes."
-    )
+    parser = argparse.ArgumentParser(description="Monitor the use of memory and CPU for specific processes.")
     parser.add_argument(
         "process_name",
         nargs="?",

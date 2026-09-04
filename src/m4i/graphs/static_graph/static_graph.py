@@ -194,9 +194,7 @@ class StaticGraph(AbstractGraph, dict):
         dict.__setitem__(nodes, idx, n)
         return n
 
-    def add_turn(
-        self, idx: Hashable, in_link: Hashable, out_link: Hashable, **kwargs
-    ) -> StaticTurn:
+    def add_turn(self, idx: Hashable, in_link: Hashable, out_link: Hashable, **kwargs) -> StaticTurn:
         """
         Add a turn to the graph.
 
@@ -276,9 +274,7 @@ class StaticGraph(AbstractGraph, dict):
         """
         return dict.__getitem__(self, "bws").get(j, {}).values()
 
-    def get_turn(
-        self, idx_or_in_link: Hashable, out_link: Optional[Hashable] = None
-    ) -> StaticTurn:
+    def get_turn(self, idx_or_in_link: Hashable, out_link: Optional[Hashable] = None) -> StaticTurn:
         """
         Get turns for given incoming and outgoing links.
 
@@ -289,11 +285,7 @@ class StaticGraph(AbstractGraph, dict):
         if out_link is None:
             return dict.__getitem__(self, "turns").get(idx_or_in_link)
         else:
-            return (
-                dict.__getitem__(self, "turns_fws")
-                .get(idx_or_in_link, {})
-                .get(out_link)
-            )
+            return dict.__getitem__(self, "turns_fws").get(idx_or_in_link, {}).get(out_link)
 
     def save(self, filename: str):
         """

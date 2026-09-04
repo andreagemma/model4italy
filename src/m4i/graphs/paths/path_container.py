@@ -134,12 +134,7 @@ class PathContainer(ABC, dict):
         for geom in ("geom", "geometry"):
             if geom in l:
                 df_paths[geom] = [
-                    MultiLineString(
-                        [
-                            multi_line_to_line(G.get_link(l_idx).get_value(geom))
-                            for l_idx in links
-                        ]
-                    )
+                    MultiLineString([multi_line_to_line(G.get_link(l_idx).get_value(geom)) for l_idx in links])
                     for links in df_paths["links"]
                 ]
                 df_paths = gpd.GeoDataFrame(df_paths, geometry=geom, crs=crs_link)

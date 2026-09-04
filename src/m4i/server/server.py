@@ -30,9 +30,7 @@ def execute():
             ).jsonify(), 400
     except Exception as ex:
         log.error("Error reading request body: %s", ex)
-        return Status(
-            status=Status.REQ_ERROR, error="Invalid JSON body", details=str(ex)
-        ).jsonify(), 400
+        return Status(status=Status.REQ_ERROR, error="Invalid JSON body", details=str(ex)).jsonify(), 400
 
     # Save the execution in the database with status "pending"
 
@@ -40,9 +38,7 @@ def execute():
         # Salva l'intero ExecutionParams nel campo execution.params
         new_execution = Execution.create_execution(execution_params)
     except Exception as ex:
-        return Status(
-            status=Status.REQ_ERROR, error="Database error", details=str(ex)
-        ).jsonify(), 500
+        return Status(status=Status.REQ_ERROR, error="Database error", details=str(ex)).jsonify(), 500
 
     # Launch the calculation asynchronously
     run_execution_in_thread(params=execution_params, execution=new_execution)
@@ -76,9 +72,7 @@ def run_execution_in_thread(params, execution=None):
         log.error("Execution terminated abnormally", exc_info=True)
 
         # Update the database with status "failed"
-        Execution.set_execution_failed(
-            execution_id=execution.id, ex=ex, raise_exception=False
-        )
+        Execution.set_execution_failed(execution_id=execution.id, ex=ex, raise_exception=False)
 
 
 @app.route("/status/<execution_id>", methods=["GET"])
@@ -89,9 +83,7 @@ def get_status(execution_id):
     with Session(DB.get_engine(), autoflush=False, autobegin=False) as session:
         try:
             session.begin()
-            execution: Execution = (
-                session.query(Execution).filter_by(id=execution_id).first()
-            )
+            execution: Execution = session.query(Execution).filter_by(id=execution_id).first()
             if not execution:
                 return Status(
                     status=Status.REQ_ERROR,
@@ -114,18 +106,14 @@ def get_status(execution_id):
             return response.jsonify(), 200
         except Exception as ex:
             log.error("Error fetching execution status: %s", ex)
-            return Status(
-                status=Status.REQ_ERROR, error="Database error", details=str(ex)
-            ).jsonify(), 500
+            return Status(status=Status.REQ_ERROR, error="Database error", details=str(ex)).jsonify(), 500
 
 
 def start_server(host, port, debug, config):
     try:
         from ..utils.parallel import Parallel
 
-        Parallel.initialize_parallel(
-            num_cpus=config.PARALLEL_NUMCPUS, engine=config.PARALLEL_ENGINE
-        )
+        Parallel.initialize_parallel(num_cpus=config.PARALLEL_NUMCPUS, engine=config.PARALLEL_ENGINE)
         app.run(debug=debug, host=host, port=port)
     except Exception as ex:
         log.error("Error running server: %s", ex)

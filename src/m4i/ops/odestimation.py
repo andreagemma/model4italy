@@ -44,9 +44,7 @@ class ODEstimation(OP):
         self.log.info("Inizializzazione dati")
         # %% associo alle zone i nodi O-D
 
-        stima = ODEstimatorOffline(
-            loader=self.loader, writer=self.writer, ODSeed=self.ODz2z.ods
-        )
+        stima = ODEstimatorOffline(loader=self.loader, writer=self.writer, ODSeed=self.ODz2z.ods)
         self.log.info("Inizio")
         start = int(max(self.loader.start, 0))
         end = int(min(self.loader.end, 1440))
@@ -92,9 +90,7 @@ class ODEstimation(OP):
                 #                self.df_grouped.to_csv("res_ite_%d.csv"%ite)
                 M = msa.ass_matrix
                 self.log.info("Ite: %s - Aggiornamento Matrice", ite)
-                od_updated = stima.update(
-                    OD=self.ODz2z.ods, M=M, tstart=tstart, tend=tend
-                )
+                od_updated = stima.update(OD=self.ODz2z.ods, M=M, tstart=tstart, tend=tend)
                 for t, od in od_updated.items():
                     self.ODz2z[t].mat = self.ODz2z[t].mat * 0 + od.mat
                 self.log.info("Ite: %s - FOB: %s", ite, stima.fob)

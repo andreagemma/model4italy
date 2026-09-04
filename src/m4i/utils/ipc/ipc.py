@@ -30,9 +30,7 @@ class IPC:
         self.compression_level = compression_level
         self.backend = backend
         self.prefix = f"{bucket}:" if bucket else ""
-        assert backend in ["redis", "local"], (
-            f"Backend {backend} non supportato. Scegli tra 'redis' o 'local'."
-        )
+        assert backend in ["redis", "local"], f"Backend {backend} non supportato. Scegli tra 'redis' o 'local'."
 
         if backend == "redis":
             self.ipc = RedisIPC(host=host, port=port, db=db)
@@ -46,9 +44,7 @@ class IPC:
             )
         elif backend == "local":
             self.ipc = WebSocketIPC(host="localhost", port=port)
-            self.shdmem = SharedMemory(
-                bucket=bucket, compression=compression, clevel=compression_level
-            )
+            self.shdmem = SharedMemory(bucket=bucket, compression=compression, clevel=compression_level)
 
     def _key(self, key) -> str:
         return f"{self.prefix}{key}"
@@ -146,9 +142,7 @@ class IPC:
 
         while True:
             try:
-                command = input(
-                    "Inserisci il comando (set/get/delete/keys/publish/subscribe/exit): "
-                )
+                command = input("Inserisci il comando (set/get/delete/keys/publish/subscribe/exit): ")
                 if command == "exit":
                     break
                 elif command.startswith("set"):
@@ -174,11 +168,7 @@ class IPC:
                 elif command.startswith("publish"):
                     channel = input("Inserisci canale: ").strip()
                     message = input("Inserisci messaggio: ").strip()
-                    message = (
-                        ast.literal_eval(message)
-                        if message.startswith("{")
-                        else message
-                    )
+                    message = ast.literal_eval(message) if message.startswith("{") else message
                     self.publish(channel, message)
                 elif command.startswith("subscribe"):
                     channel = input("Inserisci canale: ").strip()

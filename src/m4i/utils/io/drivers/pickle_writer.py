@@ -52,11 +52,7 @@ class PickleWriter(BaseDriver):
         if partitionby is not None:
             subdir = []
             for partition in partitionby:
-                if (
-                    hasattr(df, "__contains__")
-                    and hasattr(df, "__getitem__")
-                    and partition in df
-                ):
+                if hasattr(df, "__contains__") and hasattr(df, "__getitem__") and partition in df:
                     subdir.append(f"{partition}={df[partition]}")
             if subdir:
                 path = os.path.join(path, *subdir, os.path.basename(path))

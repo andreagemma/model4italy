@@ -28,9 +28,7 @@ class DynamicGraphElement(AbstractGraphElement):
         super().__init__()
         dict.__setitem__(self, "type", self.__class__.__name__)
         for key, value in kwargs.items():
-            self.add_attribute(
-                key=key, value=value, total_time=total_time, delta_t=delta_t
-            )
+            self.add_attribute(key=key, value=value, total_time=total_time, delta_t=delta_t)
 
     def add_attribute(
         self,
@@ -41,32 +39,18 @@ class DynamicGraphElement(AbstractGraphElement):
     ):
         if isinstance(value, DynamicAttribute):
             attr = value
-            attr.resize_attribute(
-                new_total_time=value["total_time"], new_delta_t=value["delta_t"]
-            )
+            attr.resize_attribute(new_total_time=value["total_time"], new_delta_t=value["delta_t"])
         elif isinstance(value, (list, tuple)) and not isinstance(value, str):
-            assert total_time is not None and delta_t is not None, (
-                "total_time and delta_t required for iterable value"
-            )
-            attr = DynamicTimeArrayAttribute(
-                value, total_time=total_time, delta_t=delta_t
-            )
+            assert total_time is not None and delta_t is not None, "total_time and delta_t required for iterable value"
+            attr = DynamicTimeArrayAttribute(value, total_time=total_time, delta_t=delta_t)
             attr.resize_attribute(new_total_time=total_time, new_delta_t=delta_t)
         elif callable(value):
-            assert total_time is not None and delta_t is not None, (
-                "total_time and delta_t required for callable value"
-            )
-            attr = DynamicCallableAttribute(
-                value, total_time=total_time, delta_t=delta_t
-            )
+            assert total_time is not None and delta_t is not None, "total_time and delta_t required for callable value"
+            attr = DynamicCallableAttribute(value, total_time=total_time, delta_t=delta_t)
             attr.resize_attribute(new_total_time=total_time, new_delta_t=delta_t)
         elif isinstance(value, str) and value.startswith("function.") and ":" in value:
-            assert total_time is not None and delta_t is not None, (
-                "total_time and delta_t required for callable value"
-            )
-            attr = DynamicCallableAttribute(
-                value, total_time=total_time, delta_t=delta_t
-            )
+            assert total_time is not None and delta_t is not None, "total_time and delta_t required for callable value"
+            attr = DynamicCallableAttribute(value, total_time=total_time, delta_t=delta_t)
             attr.resize_attribute(new_total_time=total_time, new_delta_t=delta_t)
         else:
             attr = value
@@ -88,9 +72,7 @@ class DynamicGraphElement(AbstractGraphElement):
         else:
             return value
 
-    def get_values(
-        self, name: str, list_t: Optional[Iterable[Number]] = None, **kwargs
-    ) -> List[Any]:
+    def get_values(self, name: str, list_t: Optional[Iterable[Number]] = None, **kwargs) -> List[Any]:
         value = dict.get(self, name)
         if isinstance(value, DynamicAttribute):
             kwargs["elem"] = self
@@ -106,9 +88,7 @@ class DynamicGraphElement(AbstractGraphElement):
         else:
             return []
 
-    def get_items(
-        self, name: str, list_t: Optional[Iterable[Number]] = None, **kwargs
-    ) -> List[Tuple[Number, Any]]:
+    def get_items(self, name: str, list_t: Optional[Iterable[Number]] = None, **kwargs) -> List[Tuple[Number, Any]]:
         value = dict.get(self, name)
         if isinstance(value, DynamicAttribute):
             kwargs["elem"] = self
@@ -155,9 +135,7 @@ class DynamicNode(AbstractNode, DynamicGraphElement):
         delta_t: Optional[Number] = None,
         **kwargs,
     ):
-        DynamicGraphElement.__init__(
-            self, total_time=total_time, delta_t=delta_t, **kwargs
-        )
+        DynamicGraphElement.__init__(self, total_time=total_time, delta_t=delta_t, **kwargs)
         dict.__setitem__(self, "idx", idx)
         self["type"] = self.__class__.__name__
 
@@ -178,9 +156,7 @@ class DynamicLink(AbstractLink, DynamicGraphElement):
         delta_t: Optional[Number] = None,
         **kwargs,
     ):
-        DynamicGraphElement.__init__(
-            self, total_time=total_time, delta_t=delta_t, **kwargs
-        )
+        DynamicGraphElement.__init__(self, total_time=total_time, delta_t=delta_t, **kwargs)
         dict.__setitem__(self, "idx", idx)
         dict.__setitem__(self, "i", i)
         dict.__setitem__(self, "j", j)
@@ -210,9 +186,7 @@ class DynamicTurn(AbstractTurn, DynamicGraphElement):
         delta_t: Optional[Number] = None,
         **kwargs,
     ):
-        DynamicGraphElement.__init__(
-            self, total_time=total_time, delta_t=delta_t, **kwargs
-        )
+        DynamicGraphElement.__init__(self, total_time=total_time, delta_t=delta_t, **kwargs)
         dict.__setitem__(self, "idx", idx)
         dict.__setitem__(self, "in_link", in_link)
         dict.__setitem__(self, "out_link", out_link)
@@ -275,9 +249,7 @@ class DynamicGraph(AbstractGraph, dict):
     def n_turns(self) -> int:
         return len(dict.__getitem__(self, "turns"))
 
-    def add_link(
-        self, idx: Hashable, i: Hashable, j: Hashable, **kwargs
-    ) -> DynamicLink:
+    def add_link(self, idx: Hashable, i: Hashable, j: Hashable, **kwargs) -> DynamicLink:
         """
         Add a link to the graph.
 
@@ -318,9 +290,7 @@ class DynamicGraph(AbstractGraph, dict):
         dict.__setitem__(nodes, idx, n)
         return n
 
-    def add_turn(
-        self, idx: Hashable, in_link: Hashable, out_link: Hashable, **kwargs
-    ) -> DynamicTurn:
+    def add_turn(self, idx: Hashable, in_link: Hashable, out_link: Hashable, **kwargs) -> DynamicTurn:
         """
         Add a turn to the graph.
 
@@ -463,9 +433,7 @@ class DynamicGraph(AbstractGraph, dict):
         """
         return dict.__getitem__(self, "bws").get(j, {}).values()
 
-    def get_turn(
-        self, idx_or_in_link: Hashable, out_link: Optional[Hashable] = None
-    ) -> DynamicTurn:
+    def get_turn(self, idx_or_in_link: Hashable, out_link: Optional[Hashable] = None) -> DynamicTurn:
         """
         Get turns for given incoming and outgoing links.
 
@@ -476,11 +444,7 @@ class DynamicGraph(AbstractGraph, dict):
         if out_link is None:
             return dict.__getitem__(self, "turns").get(idx_or_in_link)
         else:
-            return (
-                dict.__getitem__(self, "turns_fws")
-                .get(idx_or_in_link, {})
-                .get(out_link)
-            )
+            return dict.__getitem__(self, "turns_fws").get(idx_or_in_link, {}).get(out_link)
 
     def save(self, filename: str):
         """

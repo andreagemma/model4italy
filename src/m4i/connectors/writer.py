@@ -37,9 +37,7 @@ class Writer(ABC):
     def __init__(self, parser: ParamsParser):
         self.parser = parser
         self.execution_id = self.parser.get("execution_id")
-        self.log = Logger.getLogger(
-            self.__class__.__name__, execution_id=self.execution_id
-        )
+        self.log = Logger.getLogger(self.__class__.__name__, execution_id=self.execution_id)
         self.ini: IniClass = self.parser.ini
 
     def _write_dataset(
@@ -82,9 +80,7 @@ class Writer(ABC):
                                 tmp[field] = {"value": None}
                             elif isinstance(field, dict):
                                 if "name" not in field:
-                                    raise ValueError(
-                                        f"Missing 'name' key in additional field definition: {field}"
-                                    )
+                                    raise ValueError(f"Missing 'name' key in additional field definition: {field}")
                                 tmp[field["name"]] = field
                         additional_fields = tmp
 
@@ -104,13 +100,9 @@ class Writer(ABC):
                             df[additional_field] = s
                             if t is not None:
                                 if isinstance(df, (pd.DataFrame, gpd.GeoDataFrame)):
-                                    df[additional_field] = df[additional_field].astype(
-                                        t
-                                    )
+                                    df[additional_field] = df[additional_field].astype(t)
                                 elif isinstance(df, dict):
-                                    df[additional_field] = (
-                                        pd.Series([v]).astype(t).tolist()[0]
-                                    )
+                                    df[additional_field] = pd.Series([v]).astype(t).tolist()[0]
                     else:
                         raise ValueError(
                             f"Invalid 'additional_fields' definition: {additional_fields}. Must be a list of field {{name: <name>[, value: <value>][, dtype: <dtype>]}} or a dict {{<name>: {{value: <value>, dtype: <dtype>}}}}."
@@ -123,9 +115,7 @@ class Writer(ABC):
                 """
                 if dtype is None and check_definition is not None:
                     dtype = self.parser.get_dtype(check_definition, None)
-                if dtype is not None and isinstance(
-                    df, (pd.DataFrame, gpd.GeoDataFrame)
-                ):
+                if dtype is not None and isinstance(df, (pd.DataFrame, gpd.GeoDataFrame)):
                     df = self.parser.apply_dtype(
                         df=df,
                         dtype=dtype,
@@ -136,9 +126,7 @@ class Writer(ABC):
 
                 mapping = parameters.get("mapping")
 
-                if mapping is not None and isinstance(
-                    df, (pd.DataFrame, gpd.GeoDataFrame)
-                ):
+                if mapping is not None and isinstance(df, (pd.DataFrame, gpd.GeoDataFrame)):
                     df = self.parser.apply_mapping(df=df, mapping=mapping, writing=True)
 
                 if isinstance(df, gpd.GeoDataFrame):
@@ -204,9 +192,7 @@ class Writer(ABC):
     def has(self, name):
         return self.parser.get(name) is not None
 
-    def write_agg_results(
-        self, results: gpd.GeoDataFrame, mode=None, params=None, **kwargs
-    ):
+    def write_agg_results(self, results: gpd.GeoDataFrame, mode=None, params=None, **kwargs):
         kwargs["df"] = results
         kwargs["dtype"] = self.parser.get_dtype("aggregated_results")
         kwargs["parameters"] = self.parser.get_output_parameters(
@@ -216,9 +202,7 @@ class Writer(ABC):
         kwargs["check_definition"] = "aggregated_results"
         return self._write_dataset(**kwargs)
 
-    def write_agg_results_stats(
-        self, results: gpd.GeoDataFrame, mode=None, params=None, **kwargs
-    ):
+    def write_agg_results_stats(self, results: gpd.GeoDataFrame, mode=None, params=None, **kwargs):
         kwargs["df"] = results
         # kwargs["dtype"] = self.parser.get_dtype("aggregated_results_stats")
         kwargs["parameters"] = self.parser.get_output_parameters(
@@ -229,9 +213,7 @@ class Writer(ABC):
         kwargs["check_definition"] = "aggregated_results_stats"
         return self._write_dataset(**kwargs)
 
-    def write_trace_results(
-        self, results: gpd.GeoDataFrame, mode=None, params=None, **kwargs
-    ):
+    def write_trace_results(self, results: gpd.GeoDataFrame, mode=None, params=None, **kwargs):
         kwargs["df"] = results
         # kwargs["dtype"] = self.parser.get_dtype("trace_results")
         kwargs["parameters"] = self.parser.get_output_parameters(
@@ -241,9 +223,7 @@ class Writer(ABC):
         kwargs["check_definition"] = "trace_results"
         return self._write_dataset(**kwargs)
 
-    def write_signal_results(
-        self, results: gpd.GeoDataFrame, mode=None, params=None, **kwargs
-    ):
+    def write_signal_results(self, results: gpd.GeoDataFrame, mode=None, params=None, **kwargs):
         kwargs["df"] = results
         # kwargs["dtype"] = self.parser.get_dtype("signal_results")
         kwargs["parameters"] = self.parser.get_output_parameters(
@@ -304,9 +284,7 @@ class Writer(ABC):
         """
         if parameters is None:
             if path:
-                parameters = self.parser.get_output_parameters(
-                    path, df=results, from_input=from_input
-                )
+                parameters = self.parser.get_output_parameters(path, df=results, from_input=from_input)
             else:
                 raise KeyError("key 'parameters' not found in execution parameters")
         kwargs["df"] = results

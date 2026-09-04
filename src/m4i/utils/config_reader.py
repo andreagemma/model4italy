@@ -25,9 +25,7 @@ class ConfigReader:
         self.use_db = use_db
         self.db_url = db_url
         self.table_name = table_name
-        self.db_query = (
-            db_query or f"SELECT value FROM {self.table_name} WHERE name = :name"
-        )
+        self.db_query = db_query or f"SELECT value FROM {self.table_name} WHERE name = :name"
         self.db_session = None
 
         if self.use_db and self.db_url:
@@ -45,9 +43,7 @@ class ConfigReader:
             for item in settings:
                 self.config_from_settings(item)
         else:
-            raise ValueError(
-                "Invalid settings format. Must be a file path, dict, list or tuple."
-            )
+            raise ValueError("Invalid settings format. Must be a file path, dict, list or tuple.")
 
     def items(self):
         for sec in self.config.sections():
@@ -85,9 +81,7 @@ class ConfigReader:
         if not self.db_session:
             return None
         try:
-            result = self.db_session.execute(
-                self.db_query, {"name": name, "section": section}
-            ).fetchone()
+            result = self.db_session.execute(self.db_query, {"name": name, "section": section}).fetchone()
             return result[0] if result else None
         except SQLAlchemyError as ex:
             print(f"Error fetching {name} from database: {ex}")
@@ -117,9 +111,7 @@ class ConfigReader:
             # print(f"ConfigReader: got {name}={value} from INI file")
 
         if source == "ENV":
-            logging.debug(
-                f"ConfigReader: got {name}={value} from environment variable M4I_{name}"
-            )
+            logging.debug(f"ConfigReader: got {name}={value} from environment variable M4I_{name}")
         elif source == "DB":
             logging.debug(f"ConfigReader: got {name}={value} from database query")
         elif source == "INI":

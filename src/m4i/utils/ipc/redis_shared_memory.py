@@ -66,9 +66,7 @@ class RedisSharedMemory:
         """
         self.client.set(
             self._key(key),
-            Serializer.serialize(
-                value, compression=self.compression, clevel=self.clevel
-            ),
+            Serializer.serialize(value, compression=self.compression, clevel=self.clevel),
         )
 
     def get(self, key):
@@ -77,9 +75,7 @@ class RedisSharedMemory:
         L'oggetto viene deserializzato con pickle.
         """
         data = self.client.get(self._key(key))
-        return (
-            Serializer.deserialize(data, compression=self.compression) if data else None
-        )
+        return Serializer.deserialize(data, compression=self.compression) if data else None
 
     def delete(self, key):
         """
@@ -95,9 +91,7 @@ class RedisSharedMemory:
             for key in self.client.keys():
                 self.client.delete(key)
         else:
-            raise ValueError(
-                "Non è possibile eliminare tutte le chiavi senza un bucket specificato."
-            )
+            raise ValueError("Non è possibile eliminare tutte le chiavi senza un bucket specificato.")
 
     def keys(self):
         """

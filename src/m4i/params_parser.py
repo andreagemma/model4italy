@@ -45,9 +45,7 @@ class ParamsParser:
         self.ini: IniClass | None = settings
         self.update_params()
 
-    def update_date(
-        self, dt=None, name="simulation", override=True, time=True, date=True
-    ) -> None:
+    def update_date(self, dt=None, name="simulation", override=True, time=True, date=True) -> None:
         if dt:
             dt = to_datetime_auto(dt)
         now = dt or datetime.now()
@@ -134,9 +132,7 @@ class ParamsParser:
         return parser
 
     @staticmethod
-    def from_file(
-        params: Union[str, dict, list, tuple], settings: str = "settings.ini"
-    ) -> ParamsParser:
+    def from_file(params: Union[str, dict, list, tuple], settings: str = "settings.ini") -> ParamsParser:
         """
         Load parameters from a JSON file.
         """
@@ -150,21 +146,13 @@ class ParamsParser:
             date_simulation = datetime.now()
             # self.set_value("date",datetime.datetime.now().strftime("%Y-%m-%d"))
         else:
-            date_simulation = to_datetime_auto(
-                self.get("date_simulation"), tz_localize=self.ini.TZ_LOCAL
-            )
+            date_simulation = to_datetime_auto(self.get("date_simulation"), tz_localize=self.ini.TZ_LOCAL)
         if "start" not in self.params:
             time_start = datetime.now(tz=pytz.timezone(self.ini.TZ_LOCAL))
             # discretizza time_start al passo di delta_t
             time_start = time_start.replace(second=0, microsecond=0)
-            time_start_min = (
-                (time_start.hour * 60 + time_start.minute)
-                // self.ini.DELTA_T
-                * self.ini.DELTA_T
-            )
-            time_start = time_start.replace(
-                hour=time_start_min // 60, minute=time_start_min % 60
-            )
+            time_start_min = (time_start.hour * 60 + time_start.minute) // self.ini.DELTA_T * self.ini.DELTA_T
+            time_start = time_start.replace(hour=time_start_min // 60, minute=time_start_min % 60)
         else:
             time_start = to_datetime_auto(
                 self.get("start"),
@@ -175,14 +163,8 @@ class ParamsParser:
         if "end" not in self.params:
             time_end = time_start + timedelta(minutes=60)
             time_end = time_end.replace(second=0, microsecond=0)
-            time_end_min = (
-                (time_end.hour * 60 + time_end.minute)
-                // self.ini.DELTA_T
-                * self.ini.DELTA_T
-            )
-            time_end = time_end.replace(
-                hour=time_end_min // 60, minute=time_end_min % 60
-            )
+            time_end_min = (time_end.hour * 60 + time_end.minute) // self.ini.DELTA_T * self.ini.DELTA_T
+            time_end = time_end.replace(hour=time_end_min // 60, minute=time_end_min % 60)
         else:
             time_end = to_datetime_auto(
                 self.get("end"),
@@ -196,13 +178,9 @@ class ParamsParser:
             tzinfo=pytz.timezone(self.ini.TZ_LOCAL),
         )
         self.update_date(dt=dt, name="simulation", override=True, time=True, date=True)
-        self.update_date(
-            dt=time_start, name="start", override=True, time=True, date=True
-        )
+        self.update_date(dt=time_start, name="start", override=True, time=True, date=True)
         self.update_date(dt=time_end, name="end", override=True, time=True, date=True)
-        self.set_default(
-            "total_time", int((time_end - time_start).total_seconds() / 60)
-        )
+        self.set_default("total_time", int((time_end - time_start).total_seconds() / 60))
         self.set_default("delta_t", self.ini.DELTA_T)
         self.set_default("num_intervals", self.get("total_time") // self.get("delta_t"))
         """
@@ -272,17 +250,13 @@ class ParamsParser:
                 return pd.isna(x)
 
         def is_int(series: pd.Series) -> bool:
-            return pd.api.types.is_integer_dtype(series) or pd.api.types.is_integer(
-                series
-            )
+            return pd.api.types.is_integer_dtype(series) or pd.api.types.is_integer(series)
 
         def is_float(series: pd.Series) -> bool:
             return pd.api.types.is_float_dtype(series) or pd.api.types.is_float(series)
 
         def is_number(series: pd.Series) -> bool:
-            return pd.api.types.is_numeric_dtype(series) or pd.api.types.is_number(
-                series
-            )
+            return pd.api.types.is_numeric_dtype(series) or pd.api.types.is_number(series)
 
         def is_str(series: pd.Series) -> bool:
             return pd.api.types.is_string_dtype(series) or isinstance(series, str)
@@ -290,14 +264,7 @@ class ParamsParser:
         def is_dict(series: pd.Series) -> bool:
             if isinstance(series, dict) or series is None:
                 return True
-            return all(
-                [
-                    is_null(x)
-                    or isinstance(x, dict)
-                    or isinstance(ast.literal_eval(x), dict)
-                    for x in series
-                ]
-            )
+            return all([is_null(x) or isinstance(x, dict) or isinstance(ast.literal_eval(x), dict) for x in series])
 
         def is_list(series: pd.Series) -> bool:
             if isinstance(series, list) or series is None:
@@ -337,26 +304,17 @@ class ParamsParser:
         def is_line(series: pd.Series) -> bool:
             if isinstance(series, (LineString, MultiLineString)) or series is None:
                 return True
-            return all(
-                [
-                    is_null(x) or isinstance(x, (LineString, MultiLineString))
-                    for x in series
-                ]
-            )
+            return all([is_null(x) or isinstance(x, (LineString, MultiLineString)) for x in series])
 
         def is_point(series: pd.Series) -> bool:
             if isinstance(series, (Point, MultiPoint)) or series is None:
                 return True
-            return all(
-                [is_null(x) or isinstance(x, (Point, MultiPoint)) for x in series]
-            )
+            return all([is_null(x) or isinstance(x, (Point, MultiPoint)) for x in series])
 
         def is_polygon(series: pd.Series) -> bool:
             if isinstance(series, (Polygon, MultiPolygon)) or series is None:
                 return True
-            return all(
-                [is_null(x) or isinstance(x, (Polygon, MultiPolygon)) for x in series]
-            )
+            return all([is_null(x) or isinstance(x, (Polygon, MultiPolygon)) for x in series])
 
         def is_bool(series: pd.Series) -> bool:
             if isinstance(series, bool) or series is None:
@@ -368,12 +326,7 @@ class ParamsParser:
             elif pd.api.types.is_bool_dtype(series):
                 return True
             elif pd.api.types.is_string_dtype(series):
-                return (
-                    series[pd.notna(series)]
-                    .str.lower()
-                    .isin({"true", "false", "1", "0", "t", "f"})
-                    .all()
-                )
+                return series[pd.notna(series)].str.lower().isin({"true", "false", "1", "0", "t", "f"}).all()
             elif pd.api.types.is_numeric_dtype(series):
                 return series[pd.notna(series)].isin((0, 1)).all()
             return False
@@ -389,9 +342,7 @@ class ParamsParser:
                     return False
             if pd.api.types.is_string_dtype(series):
                 try:
-                    pd.to_datetime(
-                        series[pd.notna(series)], format="%H:%M", errors="raise"
-                    )
+                    pd.to_datetime(series[pd.notna(series)], format="%H:%M", errors="raise")
                     return True
                 except ValueError:
                     return False
@@ -436,11 +387,7 @@ class ParamsParser:
         def parse_set(series):
             if pd.api.types.is_string_dtype(series):
                 try:
-                    return pd.Series(
-                        map(
-                            lambda x: set(x.split(",")) if pd.notna(x) else None, series
-                        )
-                    )
+                    return pd.Series(map(lambda x: set(x.split(",")) if pd.notna(x) else None, series))
                 except ValueError:
                     raise ValueError(f"Invalid set string: {series}")
             return series
@@ -820,18 +767,14 @@ class ParamsParser:
                     "type": is_float,
                     "dtype": "Float64",
                     "required": False,
-                    "default": lambda row: (
-                        row["geometry"].coords[0] if pd.notna(row["geometry"]) else None
-                    ),
+                    "default": lambda row: row["geometry"].coords[0] if pd.notna(row["geometry"]) else None,
                 },
                 {
                     "name": "lat",
                     "type": is_float,
                     "dtype": "Float64",
                     "required": False,
-                    "default": lambda row: (
-                        row["geometry"].coords[1] if pd.notna(row["geometry"]) else None
-                    ),
+                    "default": lambda row: row["geometry"].coords[1] if pd.notna(row["geometry"]) else None,
                 },
                 {
                     "name": "geometry",
@@ -839,9 +782,7 @@ class ParamsParser:
                     "dtype": "geometry",
                     "required": False,
                     "default": lambda row: (
-                        Point(row["lon"], row["lat"])
-                        if pd.notna(row["lon"]) and pd.notna(row["lat"])
-                        else None
+                        Point(row["lon"], row["lat"]) if pd.notna(row["lon"]) and pd.notna(row["lat"]) else None
                     ),
                 },
             ],
@@ -875,9 +816,7 @@ class ParamsParser:
         }
         return fields
 
-    def check_fields(
-        self, name: str, df: Union[pd.DataFrame, gpd.GeoDataFrame, dict]
-    ) -> str:
+    def check_fields(self, name: str, df: Union[pd.DataFrame, gpd.GeoDataFrame, dict]) -> str:
         params = self.fields.get(name, None)
 
         if params is None:
@@ -888,9 +827,7 @@ class ParamsParser:
             df = pd.DataFrame.from_dict(df)
         for field in params:
             if field.get("required", False) and field["name"] not in df.columns:
-                raise ValueError(
-                    f"Missing required field: {field['name']} in {name} layer"
-                )
+                raise ValueError(f"Missing required field: {field['name']} in {name} layer")
             if "default" in field:
                 if field["name"] not in df.columns:
                     if isinstance(field["default"], Callable):
@@ -900,16 +837,10 @@ class ParamsParser:
                 else:
                     if field["default"] is not None:
                         if isinstance(field["default"], Callable):
-                            df[field["name"]] = df.apply(
-                                field["default"](df), axis=1
-                            ).infer_objects(copy=False)
+                            df[field["name"]] = df.apply(field["default"](df), axis=1).infer_objects(copy=False)
                         else:
-                            df.loc[pd.isnull(df[field["name"]]), field["name"]] = field[
-                                "default"
-                            ]
-                            df[field["name"]] = df[field["name"]].infer_objects(
-                                copy=False
-                            )
+                            df.loc[pd.isnull(df[field["name"]]), field["name"]] = field["default"]
+                            df[field["name"]] = df[field["name"]].infer_objects(copy=False)
                     else:
                         df.loc[pd.isnull(df[field["name"]]), field["name"]] = None
 
@@ -971,9 +902,7 @@ class ParamsParser:
             base = "params.input"
         else:
             base = "params.output"
-        ret = self.get_parameters(
-            name_or_params=name_or_params, index=index, df=df, base=base
-        )
+        ret = self.get_parameters(name_or_params=name_or_params, index=index, df=df, base=base)
         if ret is None:
             return ret
         if connector := ret.get("connector", None):
@@ -981,16 +910,12 @@ class ParamsParser:
                 ret["connector"] = connector.replace("Loader", "Writer")
         return ret
 
-    def get_input_parameters(
-        self, name_or_params: str, index: int = None, from_output=False
-    ) -> dict:
+    def get_input_parameters(self, name_or_params: str, index: int = None, from_output=False) -> dict:
         if from_output:
             base = "params.output"
         else:
             base = "params.input"
-        ret = self.get_parameters(
-            name_or_params=name_or_params, index=index, df=None, base=base
-        )
+        ret = self.get_parameters(name_or_params=name_or_params, index=index, df=None, base=base)
         if ret is None:
             return ret
         if connector := ret.get("connector", None):

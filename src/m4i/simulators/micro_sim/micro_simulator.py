@@ -63,9 +63,7 @@ class SigNode:
             if phase["type"] == "left_turn":
                 if phase["permitted"] == True:
                     self.G["signalized_turns"][key]["permitted"] = True
-                    self.G["signalized_turns"][key]["opposite_turn"] = phase[
-                        "opposite_turn"
-                    ]
+                    self.G["signalized_turns"][key]["opposite_turn"] = phase["opposite_turn"]
                     self.G["signalized_turns"][key]["permitted_movs"] = 2
 
     def update_cap(self, t, t1):
@@ -124,9 +122,7 @@ class YieldNode:
 
 
 class MicroSimulator(BaseSimulator):
-    def __init__(
-        self, loader: Loader, monitored_links=None, yield_nodes=None, **kwargs
-    ):
+    def __init__(self, loader: Loader, monitored_links=None, yield_nodes=None, **kwargs):
         super().__init__(loader=loader, **kwargs)
         self.simustep = self.loader.ini.SIMU_STEP  # [s] simulation step in seconds
         self.G: AbstractGraph = self.loader.G
@@ -139,9 +135,7 @@ class MicroSimulator(BaseSimulator):
         self.deltat = self.simustep / 60  # [min] simulation delta t
         self.t_slice = self.G["delta_t"]  # [min] duration of a simulation slice
         # self.ints_agg = 1
-        self.ints_agg = int(
-            self.agg_int * 60 / self.simustep
-        )  # number of simusteps within agg_int
+        self.ints_agg = int(self.agg_int * 60 / self.simustep)  # number of simusteps within agg_int
         self.G["q_trace"] = []
         self.G["signalized_turns"] = {}
         self.G["signalized_links"] = set()
@@ -154,8 +148,7 @@ class MicroSimulator(BaseSimulator):
         self.ind_res = kwargs.get("ind_res", self.loader.ini.OUTPUT_IND_RES)
         self.mon_veh = kwargs.get("mon_veh", self.loader.ini.MONITORED_VEH)
         self.signalized_nodes = [
-            SigNode(id=1, node=s_n, graph=self.G, simustep=self.simustep)
-            for s_n in self.loader.sign_nodes
+            SigNode(id=1, node=s_n, graph=self.G, simustep=self.simustep) for s_n in self.loader.sign_nodes
         ]
 
         self.monitored_flows = []
@@ -165,9 +158,7 @@ class MicroSimulator(BaseSimulator):
         self.k_jam = 1 / self.l_car
         self.min_speed = self.loader.ini.MIN_SPEED
         self.coef = self.loader.coefficients
-        self.links_list = [
-            l["idx"] for l in self.G.get_all_links()
-        ]  # list of the links
+        self.links_list = [l["idx"] for l in self.G.get_all_links()]  # list of the links
         self.preload = False
 
         self.ass_results = []
@@ -209,9 +200,7 @@ class MicroSimulator(BaseSimulator):
                 end_t = measure["end"]
                 m = measure.copy()
                 arc_list = measure["arc_list"]
-                arc_list_agg = list(
-                    set([links_dict[link] for link in arc_list if link in links_dict])
-                )
+                arc_list_agg = list(set([links_dict[link] for link in arc_list if link in links_dict]))
                 m["start_t"] = start_t
                 m["end_t"] = end_t
                 m["arc_list"] = arc_list_agg
@@ -225,21 +214,15 @@ class MicroSimulator(BaseSimulator):
         closures = ["ramps", "heavy_vehicles_ban"]
         for event in closures:
             for measure in self.params.get(event, []):
-                if (measure["start_t"] >= time_start) & (
-                    measure["start_t"] <= time_end
-                ):
+                if (measure["start_t"] >= time_start) & (measure["start_t"] <= time_end):
                     ints = self.G["num_intervals"]
                     for interval in range(ints):
                         t_start = time_start + interval * self.t_slice
                         t_end = t_start + self.t_slice
-                        if (measure["start_t"] <= t_start) & (
-                            measure["end_t"] >= t_end
-                        ):
+                        if (measure["start_t"] <= t_start) & (measure["end_t"] >= t_end):
                             for l in measure["arc_list"]:
                                 link = self.G.get_link(l)
-                                link["time"].set_value(
-                                    t=interval * self.t_slice, value=9999999
-                                )
+                                link["time"].set_value(t=interval * self.t_slice, value=9999999)
 
     def update_network(self, t):
         "Update network based on the parameters"
@@ -260,9 +243,7 @@ class MicroSimulator(BaseSimulator):
             elif t == measure["end"] - self.deltat:
                 for l in measure["arc_list"]:
                     link = self.G.get_link(l)
-                    link["storage_cap"] = max(
-                        1, (link["length"] * link["numlanes"]) / self.l_car
-                    )
+                    link["storage_cap"] = max(1, (link["length"] * link["numlanes"]) / self.l_car)
                     link["disabled"] = False
 
     def set_speedlims(self, t):
@@ -318,9 +299,7 @@ class MicroSimulator(BaseSimulator):
                     if isinstance(link, str):  # per gestire paramatri tipo ["S","C"]
                         tl = [tl]
                     num_lanes = [self.coef["Corsia"][l] for l in tl]
-                    num_lanes = max(
-                        num_lanes
-                    )  # i caso multiplo allora prende il massimo (veirificare se ha senso)
+                    num_lanes = max(num_lanes)  # i caso multiplo allora prende il massimo (veirificare se ha senso)
                     default_capacity = (
                         (link["capacity"] / 60 * self.deltat) / link["default_numlanes"]
                         if link["default_numlanes"] > 0
@@ -328,9 +307,7 @@ class MicroSimulator(BaseSimulator):
                     )  # UPDATE: Gemma
                     link["cap_dt"] = link["cap_dt"] - num_lanes * default_capacity
                     link["numlanes"] -= max(num_lanes, 0)  # UPDATE: Gemma
-                    link["storage_cap"] = max(
-                        1, (link["length"] * link["numlanes"]) / self.l_car
-                    )
+                    link["storage_cap"] = max(1, (link["length"] * link["numlanes"]) / self.l_car)
                     link["n_cl_lanes"] += 1
 
                     if link["n_cl_lanes"] == link["default_numlanes"]:
@@ -349,16 +326,12 @@ class MicroSimulator(BaseSimulator):
                     link["n_cl_lanes"] -= 1
                     link["cap_dt"] = link["cap_dt"] + num_lanes * default_capacity
                     link["numlanes"] += num_lanes
-                    link["storage_cap"] = max(
-                        1, (link["length"] * link["numlanes"]) / self.l_car
-                    )
+                    link["storage_cap"] = max(1, (link["length"] * link["numlanes"]) / self.l_car)
 
                     if link["n_cl_lanes"] == 0:
                         link["disabled"] = False
                         link["numlanes"] = link["default_numlanes"]
-                        link["storage_cap"] = max(
-                            1, (link["length"] * link["numlanes"]) / self.l_car
-                        )
+                        link["storage_cap"] = max(1, (link["length"] * link["numlanes"]) / self.l_car)
                         link["cap_dt"] = link["capacity"] / 60 * self.deltat
 
     def initialize_graph(self, graph):
@@ -475,21 +448,14 @@ class MicroSimulator(BaseSimulator):
             length = "length"
             v_max = "v0"
 
-            freq = (
-                str(self.agg_int) + "min"
-                if self.agg_int >= 1
-                else str(int(self.agg_int * 60)) + "s"
-            )
+            freq = str(self.agg_int) + "min" if self.agg_int >= 1 else str(int(self.agg_int * 60)) + "s"
             # UPDATE: GEMMA - Corretto il time che ora usa date_simulation
             times = pd.date_range(
                 start=self.loader.parser.get("start", default=min2hhmm(tstart)),
                 end=self.loader.parser.get("end", default=min2hhmm(tend)),
                 freq=freq,
             )
-            ints = [
-                tstart + i * self.agg_int
-                for i in range(int((tend + 1 - tstart) / self.agg_int))
-            ]
+            ints = [tstart + i * self.agg_int for i in range(int((tend + 1 - tstart) / self.agg_int))]
 
             col = [
                 "time",
@@ -507,17 +473,13 @@ class MicroSimulator(BaseSimulator):
                 "n_updates",
             ]
             df_aggregated = pd.DataFrame(data=self.ass_results, columns=col)
-            df_aggregated[
-                [avg_mov_vehs, avg_que_vehs, avg_speed, avg_density, avg_tt]
-            ] = df_aggregated[
+            df_aggregated[[avg_mov_vehs, avg_que_vehs, avg_speed, avg_density, avg_tt]] = df_aggregated[
                 [avg_mov_vehs, avg_que_vehs, avg_speed, avg_density, avg_tt]
             ].div(df_aggregated.n_updates, axis=0)
             dic = {i: time for (i, time) in zip(ints, times)}
 
             df_aggregated["time"] = df_aggregated.time.map(dic)
-            df_aggregated[
-                [light_flow_in, heavy_flow_in, light_flow_out, heavy_flow_out]
-            ] = df_aggregated[
+            df_aggregated[[light_flow_in, heavy_flow_in, light_flow_out, heavy_flow_out]] = df_aggregated[
                 [light_flow_in, heavy_flow_in, light_flow_out, heavy_flow_out]
             ] * (60 / self.agg_int)
 
@@ -541,9 +503,7 @@ class MicroSimulator(BaseSimulator):
 
             if unroll_results:
                 self.conv_table[id_link] = self.conv_table["id_simpl"]
-                mapped_result = pd.merge(
-                    df_aggregated, self.conv_table, how="outer", on=[id_link, id_link]
-                )
+                mapped_result = pd.merge(df_aggregated, self.conv_table, how="outer", on=[id_link, id_link])
                 mapped_result[id_link] = mapped_result["id_orig"]
                 result = mapped_result[col[:-1]]
                 result = result[~result["time"].isna()]
@@ -567,22 +527,13 @@ class MicroSimulator(BaseSimulator):
             ],
             columns=["id_link", "geometry", v_max, "length", "lanes", "connector"],
         )
-        result = pd.merge(
-            result, links_l, left_on=id_link, right_on="id_link", suffixes=("", "")
-        )
-        result = gpd.GeoDataFrame(
-            result, geometry="geometry", crs=self.loader.ini.CRS_CALC
-        )
+        result = pd.merge(result, links_l, left_on=id_link, right_on="id_link", suffixes=("", ""))
+        result = gpd.GeoDataFrame(result, geometry="geometry", crs=self.loader.ini.CRS_CALC)
 
         result[avg_speed] = result[length] / result[avg_tt] * 60
         result[avg_speed] = np.minimum(result[avg_speed], result[v_max])
         result[max_q] = result[max_q].clip(lower=0)
-        result["q_length"] = (
-            (result["max_q"] / result["lanes"])
-            * (self.ini.CAR_LENGTH / 1000)
-            / result[length]
-            * 100
-        )
+        result["q_length"] = (result["max_q"] / result["lanes"]) * (self.ini.CAR_LENGTH / 1000) / result[length] * 100
         result["q_length"] = result["q_length"].clip(upper=100)
 
         result = result[
@@ -639,9 +590,7 @@ class MicroSimulator(BaseSimulator):
             ]
         ].copy()
         result_light["mode"] = "c"
-        result_light.rename(
-            columns={light_flow_in: "flow_in", light_flow_out: "flow_out"}, inplace=True
-        )
+        result_light.rename(columns={light_flow_in: "flow_in", light_flow_out: "flow_out"}, inplace=True)
 
         result_heavy = result[
             [
@@ -662,9 +611,7 @@ class MicroSimulator(BaseSimulator):
             ]
         ].copy()
         result_heavy["mode"] = "h"
-        result_heavy.rename(
-            columns={heavy_flow_in: "flow_in", heavy_flow_out: "flow_out"}, inplace=True
-        )
+        result_heavy.rename(columns={heavy_flow_in: "flow_in", heavy_flow_out: "flow_out"}, inplace=True)
 
         result["flow_in"] = result["light_flow_in"] + result["heavy_flow_in"]
         result["flow_out"] = result["light_flow_out"] + result["heavy_flow_out"]
@@ -721,15 +668,9 @@ class MicroSimulator(BaseSimulator):
                 tot_distance = sum(dat[avg_density] * dat.length)
                 if tot_distance == 0:
                     tot_distance = 1
-                d["v_avg"] = (
-                    sum(dat[avg_density] * dat[avg_speed] * dat[length]) / tot_distance
-                )  # velocita' media
-                d["p_tot"] = sum(
-                    dat[avg_density] * dat[avg_speed] * dat[length] * deltat
-                )  # vehi x km
-                d["t_tot"] = sum(
-                    dat[avg_density] * dat[length] * deltat
-                )  # Tempo veicoli x km
+                d["v_avg"] = sum(dat[avg_density] * dat[avg_speed] * dat[length]) / tot_distance  # velocita' media
+                d["p_tot"] = sum(dat[avg_density] * dat[avg_speed] * dat[length] * deltat)  # vehi x km
+                d["t_tot"] = sum(dat[avg_density] * dat[length] * deltat)  # Tempo veicoli x km
                 for i, v0 in enumerate(cong_levels[:-1]):
                     v1 = cong_levels[i + 1]
                     mask = (
@@ -787,19 +728,13 @@ class MicroSimulator(BaseSimulator):
 
                 if "geom" in shape.columns:
                     try:
-                        shape["geometry"] = shape["geom"].apply(
-                            lambda x: wkb.loads(bytes.fromhex(x))
-                        )
+                        shape["geometry"] = shape["geom"].apply(lambda x: wkb.loads(bytes.fromhex(x)))
                     except:
                         shape["geometry"] = shape["geom"].apply(wkb.loads)
 
-                    shape = gpd.GeoDataFrame(
-                        shape, geometry="geometry", crs=self.loader.ini.CRS_CALC
-                    )
+                    shape = gpd.GeoDataFrame(shape, geometry="geometry", crs=self.loader.ini.CRS_CALC)
                 else:
-                    raise ValueError(
-                        "DataFrame does not contain a 'geom' column for geometry conversion."
-                    )
+                    raise ValueError("DataFrame does not contain a 'geom' column for geometry conversion.")
 
             id_link = "id"
             shape.set_index(id_link, inplace=True)
@@ -813,15 +748,11 @@ class MicroSimulator(BaseSimulator):
                     tot_data.extend(veh.trace)
 
             if len(tot_data) > 0:
-                trace_res = pd.DataFrame(
-                    tot_data, columns=["t", "p", "id_link", "status", "id"]
-                )
+                trace_res = pd.DataFrame(tot_data, columns=["t", "p", "id_link", "status", "id"])
             else:
                 trace_res = pd.DataFrame(columns=["t", "p", "id_link", "status", "id"])
 
-            trace_res = trace_res.astype(
-                {"t": float, "p": float, "id_link": int, "status": str, "id": int}
-            )
+            trace_res = trace_res.astype({"t": float, "p": float, "id_link": int, "status": str, "id": int})
             # UPDATE: GEMMA - Corretto il time che ora usa date_simulation
             times = pd.date_range(
                 start=self.loader.parser.get("start", default=min2hhmm(tstart)),
@@ -829,17 +760,12 @@ class MicroSimulator(BaseSimulator):
                 freq=str(agg_trace) + "s",
             )
             # times = pd.date_range(start=min2hhmm(tstart), end=min2hhmm(tend), freq=str(agg_trace)+'s')
-            dic = {
-                tstart + i / 60: time
-                for (i, time) in zip(range(0, (tend - tstart) * 60, agg_trace), times)
-            }
+            dic = {tstart + i / 60: time for (i, time) in zip(range(0, (tend - tstart) * 60, agg_trace), times)}
 
             trace_res["time"] = trace_res.t.map(dic)
             trace_res = trace_res[~trace_res["time"].isna()]
             trace_res = trace_res[trace_res["status"].isin(["mov", "queue"])]
-            trace_res = trace_res.astype(
-                {"id_link": int, "p": float, "id_link": int, "time": "datetime64[ns]"}
-            )
+            trace_res = trace_res.astype({"id_link": int, "p": float, "id_link": int, "time": "datetime64[ns]"})
             trace_res = trace_res.join(shape, on="id_link")
 
             def point(geo, p):
@@ -876,12 +802,8 @@ class MicroSimulator(BaseSimulator):
             if trace_res.empty:
                 trace_res = trace_res.assign(point=None, rotation=None)
             else:
-                trace_res["point"] = trace_res.apply(
-                    lambda row: point(row.geometry, row.p), axis=1
-                )
-                trace_res["rotation"] = trace_res.apply(
-                    lambda row: azimuth_tangent_robust(row.geometry, row.p), axis=1
-                )
+                trace_res["point"] = trace_res.apply(lambda row: point(row.geometry, row.p), axis=1)
+                trace_res["rotation"] = trace_res.apply(lambda row: azimuth_tangent_robust(row.geometry, row.p), axis=1)
             geo_trace = gpd.GeoDataFrame(
                 data=trace_res[["id", "id_link", "time", "status", "p", "rotation"]],
                 geometry=trace_res["point"],
@@ -890,17 +812,15 @@ class MicroSimulator(BaseSimulator):
 
             geo_trace = geo_trace.to_crs(crs=self.loader.ini.CRS_CALC)
 
-            geo_trace = geo_trace.astype(
-                {"id": int, "id_link": int, "rotation": float, "time": "datetime64[ns]"}
-            )
+            geo_trace = geo_trace.astype({"id": int, "id_link": int, "rotation": float, "time": "datetime64[ns]"})
 
             return geo_trace
 
     def get_signalized_res(self, tstart, tend):
         "Get signalized nodes results"
-        sign_res = pd.DataFrame(
-            columns=["id_from", "id_to", "t", "type", "status"]
-        ).astype({"id_from": int, "id_to": int, "t": int, "type": str, "status": str})
+        sign_res = pd.DataFrame(columns=["id_from", "id_to", "t", "type", "status"]).astype(
+            {"id_from": int, "id_to": int, "t": int, "type": str, "status": str}
+        )
         agg_trace = int(self.simustep)
         # UPDATE: GEMMA - Corretto il time che ora usa date_simulation
         times = pd.date_range(
@@ -909,10 +829,7 @@ class MicroSimulator(BaseSimulator):
             freq=str(agg_trace) + "s",
         )
         # times = pd.date_range(start=min2hhmm(tstart), end=min2hhmm(tend), freq=str(agg_trace)+'s')#range(0, self.simint);
-        dic = {
-            tstart + i / 60: time
-            for (i, time) in zip(range(0, (tend - tstart) * 60, agg_trace), times)
-        }
+        dic = {tstart + i / 60: time for (i, time) in zip(range(0, (tend - tstart) * 60, agg_trace), times)}
 
         if self.signalized_nodes:
             for node in self.signalized_nodes:
@@ -929,25 +846,17 @@ class MicroSimulator(BaseSimulator):
 
                 if "geom" in shape.columns:
                     try:
-                        shape["geometry"] = shape["geom"].apply(
-                            lambda x: wkb.loads(bytes.fromhex(x))
-                        )
+                        shape["geometry"] = shape["geom"].apply(lambda x: wkb.loads(bytes.fromhex(x)))
                     except:
                         shape["geometry"] = shape["geom"].apply(wkb.loads)
 
-                    shape = gpd.GeoDataFrame(
-                        shape, geometry="geometry", crs=self.loader.ini.CRS_CALC
-                    )
+                    shape = gpd.GeoDataFrame(shape, geometry="geometry", crs=self.loader.ini.CRS_CALC)
                 else:
-                    raise ValueError(
-                        "DataFrame does not contain a 'geom' column for geometry conversion."
-                    )
+                    raise ValueError("DataFrame does not contain a 'geom' column for geometry conversion.")
 
             id_link = "id"
             shape = shape.to_crs(crs=self.loader.ini.CRS_CALC)
-            sign_res = shape.merge(
-                sign_res, left_on=id_link, right_on="id_from"
-            ).to_crs(epsg=4326)
+            sign_res = shape.merge(sign_res, left_on=id_link, right_on="id_from").to_crs(epsg=4326)
 
             return sign_res
 
@@ -961,8 +870,7 @@ class MicroSimulator(BaseSimulator):
                 for d in self.destinazioni:
                     if o != d:
                         fod = (
-                            od[o, d, tstart + n * self.t_slice] * (self.t_slice / 60)
-                            + self.res_flow[o, d]
+                            od[o, d, tstart + n * self.t_slice] * (self.t_slice / 60) + self.res_flow[o, d]
                         )  # sum the residual flow from previous int
 
                         if fod > 0.5:  # at least one vehicle is created
@@ -993,9 +901,7 @@ class MicroSimulator(BaseSimulator):
                             else:
                                 f = random.choices(range(int(k)), k=fod_out)
 
-                            heavy_toss = random.choices(
-                                [True, False], weights=[heavy_p, 1 - heavy_p], k=fod_out
-                            )
+                            heavy_toss = random.choices([True, False], weights=[heavy_p, 1 - heavy_p], k=fod_out)
                             delta_emi = self.t_slice / fod_out
                             self.res_flow[o, d] = fod - fod_out
 
@@ -1037,9 +943,7 @@ class MicroSimulator(BaseSimulator):
         ini_t = self.t_i
         fin_t = self.t_f
 
-        int_update = int(
-            self.t_slice / self.deltat
-        )  # number of simulation steps within t_slice
+        int_update = int(self.t_slice / self.deltat)  # number of simulation steps within t_slice
         for t in range(ini_t, fin_t):
             t1 = tstart + (t - ini_t) * self.deltat
             self.update_network(t1)
@@ -1083,37 +987,20 @@ class MicroSimulator(BaseSimulator):
         if self.yield_nodes:
             [node.update_cap() for node in self.yield_nodes]  # update yield nodes
         if self.signalized_nodes:
-            [
-                node.update_cap(t, t1) for node in self.signalized_nodes
-            ]  # update yield nodes
+            [node.update_cap(t, t1) for node in self.signalized_nodes]  # update yield nodes
         # ts_cap() #update signalized nodes
 
     def yield_cap(self, yield_nodes, G):
         "Yeild capacity model"
         for node in yield_nodes:
-            main_flow = (
-                sum([G.get_link(ix)["ent_veh"] for ix in node["main_links"]])
-                * 60
-                / self.deltat
-            )
-            main_cap = (
-                sum([G.get_link(ix)["cap_dt"] for ix in node["main_links"]])
-                * 60
-                / self.deltat
-            )
-            perc = (1 - node["lim"]) * math.exp(-5.4 / main_cap * main_flow) + node[
-                "lim"
-            ]
+            main_flow = sum([G.get_link(ix)["ent_veh"] for ix in node["main_links"]]) * 60 / self.deltat
+            main_cap = sum([G.get_link(ix)["cap_dt"] for ix in node["main_links"]]) * 60 / self.deltat
+            perc = (1 - node["lim"]) * math.exp(-5.4 / main_cap * main_flow) + node["lim"]
 
             for link in node["yield_links"]:
                 G.get_link(link)["inflow_cap"] = G.get_link(link)["cap_dt"] * perc
 
-            p = sum(
-                [
-                    G.get_link(ix)["l_queue"] / G.get_link(ix)["length"]
-                    for ix in node["yield_links"]
-                ]
-            )
+            p = sum([G.get_link(ix)["l_queue"] / G.get_link(ix)["length"] for ix in node["yield_links"]])
             if p > 0.3:
                 for link in node["main_links"]:
                     G.get_link(link)["inflow_cap"] = G.get_link(link)["cap_dt"] * 0.85
@@ -1246,9 +1133,7 @@ class MicroSimulator(BaseSimulator):
             link["flow"].reset(0)
             link["ex_veh_h"] = 0
             link["ex_veh"] = 0
-            link["storage_cap"] = max(
-                1, (link["length"] * link["numlanes"]) / self.l_car
-            )
+            link["storage_cap"] = max(1, (link["length"] * link["numlanes"]) / self.l_car)
             link["inflow_cap"] = link["cap_dt"]
             link["que_vehs"] = 0
             link["mov_vehs"] = 0
@@ -1336,9 +1221,7 @@ class MicroSimulator(BaseSimulator):
         else:
             link["inflow_cap"] = link["cap_dt"]
 
-        if ((link["disabled"]) or (link["mov_vehs"] > 0) or (link["que_vehs"] > 0)) & (
-            not (link["connector"] == 1)
-        ):
+        if ((link["disabled"]) or (link["mov_vehs"] > 0) or (link["que_vehs"] > 0)) & (not (link["connector"] == 1)):
             "Update times on links"
 
             free_link = link["length"] - link["l_queue"]
@@ -1347,20 +1230,10 @@ class MicroSimulator(BaseSimulator):
                     ff_speed = link["v0"]
                     nv = link["mov_vehs"]
                     if nv >= 0:  # UPDATE: GEMMA
-                        density = (
-                            (nv) / (free_link * link["numlanes"])
-                            if link["numlanes"] > 0
-                            else float("inf")
-                        )
+                        density = (nv) / (free_link * link["numlanes"]) if link["numlanes"] > 0 else float("inf")
                     else:
-                        density = (
-                            (nv) / (free_link * link["numlanes"])
-                            if link["numlanes"] > 0
-                            else 0
-                        )
-                    speed = ff_speed * math.exp(
-                        -(1 / link["alpha"]) * (density / link["r_cr"]) ** link["alpha"]
-                    )
+                        density = (nv) / (free_link * link["numlanes"]) if link["numlanes"] > 0 else 0
+                    speed = ff_speed * math.exp(-(1 / link["alpha"]) * (density / link["r_cr"]) ** link["alpha"])
 
                 else:
                     density = self.k_jam
@@ -1374,10 +1247,7 @@ class MicroSimulator(BaseSimulator):
                 density = 0
 
             link["density"] = density
-            speed = (
-                link["last_speed"] * (self.filt - 1) / self.filt
-                + speed * (1) / self.filt
-            )
+            speed = link["last_speed"] * (self.filt - 1) / self.filt + speed * (1) / self.filt
             link["last_speed"] = speed
 
             link["speed"] = speed
@@ -1386,9 +1256,7 @@ class MicroSimulator(BaseSimulator):
             link["ta"] = (link["length"] / speed) * 60
             link["ksi"] = min(1, link["ta"] / self.deltat)
             link["l_queue"] = (
-                min(link["length"], (link["que_vehs"] * self.l_car / link["numlanes"]))
-                if link["numlanes"] > 0
-                else 0
+                min(link["length"], (link["que_vehs"] * self.l_car / link["numlanes"])) if link["numlanes"] > 0 else 0
             )  # UPDATE: GEMMA
             link["tt"] = link["ta"] + link["que_vehs"] / link["cap_dt"]
             link["cum_tt"] += link["tt"]

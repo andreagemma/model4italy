@@ -65,15 +65,11 @@ class TaskBase:
             if self.task_logger:
                 self.task_logger.warning("Step done called after task finished.")
             return
-        self.task_completed += (
-            self.task_weight / self.task_steps if self.task_steps > 0 else 1
-        ) * w
+        self.task_completed += (self.task_weight / self.task_steps if self.task_steps > 0 else 1) * w
         self.task_last_message = message
         if self.task_logger and message:
             self.task_logger.info(f"Step done: {message}")
-        if (
-            not isclose(self.task_progress, 100, abs_tol=1e-3)
-        ) and self.task_progress > 100:
+        if (not isclose(self.task_progress, 100, abs_tol=1e-3)) and self.task_progress > 100:
             warning_msg = "Progress exceeded 100%."
             if self.task_logger:
                 self.task_logger.warning(warning_msg)
@@ -108,9 +104,7 @@ class TaskBase:
             else:
                 total_steps = self.task_weight + subtask_weight
                 partial_progress = sum(subtask_progress)
-                prog = min(
-                    100, (self.task_completed + partial_progress) / total_steps * 100
-                )
+                prog = min(100, (self.task_completed + partial_progress) / total_steps * 100)
         else:
             if self.task_steps == 0:
                 prog = 100
@@ -132,9 +126,7 @@ class TaskBase:
 
     def task_finish(self):
         self.task_finished = True
-        if (
-            not isclose(self.task_progress, 100, abs_tol=1e-3)
-        ) and self.task_progress < 100:
+        if (not isclose(self.task_progress, 100, abs_tol=1e-3)) and self.task_progress < 100:
             msg = f"Task finished but progress is {self.task_progress:.2f}%"
             if self.task_logger:
                 self.task_logger.warning(msg)

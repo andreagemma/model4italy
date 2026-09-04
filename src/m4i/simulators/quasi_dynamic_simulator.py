@@ -15,9 +15,7 @@ from . import BaseSimulator
 class QuasiDynamicSimulator(BaseSimulator):
     log = Logger.getLogger("SIM")
 
-    def __init__(
-        self, loader: Loader, links_vdf: str, nodes_vdf: str, turns_vdf: str
-    ) -> None:
+    def __init__(self, loader: Loader, links_vdf: str, nodes_vdf: str, turns_vdf: str) -> None:
         self.loader: Loader = loader
         self.paths: KPathContainer = None
         self.G: Graph = loader.G
@@ -34,9 +32,7 @@ class QuasiDynamicSimulator(BaseSimulator):
             for link_idx, cost in zip(path.get_links(), path.get_costs()):
                 link: Link = self.G.get_link(link_idx)
                 node: Node = self.G.get_node(link["i"])
-                turns: list[Turn] = self.G.get_turns(
-                    in_link=prev_link["idx"], out_link=link_idx
-                )
+                turns: list[Turn] = self.G.get_turns(in_link=prev_link["idx"], out_link=link_idx)
 
                 link.add_value(name="flow", t=cost, value=path["path_flow"])
                 node.add_value(name="flow", t=cost, value=path["path_flow"])
@@ -78,9 +74,7 @@ class QuasiDynamicSimulator(BaseSimulator):
             prev_link = None
             for link_idx, cost in zip(path.get_links(), path.get_costs()):
                 link = self.G.get_link(link_idx)
-                link.set_value(
-                    "n_paths", value=link.get_value("n_paths", t=cost) + 1, t=cost
-                )
+                link.set_value("n_paths", value=link.get_value("n_paths", t=cost) + 1, t=cost)
                 link_time = link.get_value(
                     name=self.links_vdf,
                     t=cost,
@@ -89,14 +83,10 @@ class QuasiDynamicSimulator(BaseSimulator):
                     default=0,
                 )
                 if link_time != 0:
-                    link.set_value(
-                        "time", value=link.get_value("time", t=cost) + link_time, t=cost
-                    )
+                    link.set_value("time", value=link.get_value("time", t=cost) + link_time, t=cost)
 
                 node = self.G.get_node(link["i"])
-                node.set_value(
-                    "n_paths", value=node.get_value("n_paths", t=cost) + 1, t=cost
-                )
+                node.set_value("n_paths", value=node.get_value("n_paths", t=cost) + 1, t=cost)
                 node_time = node.get_value(
                     name=self.nodes_vdf,
                     t=cost,
@@ -106,19 +96,13 @@ class QuasiDynamicSimulator(BaseSimulator):
                     default=0,
                 )
                 if node_time != 0:
-                    node.set_value(
-                        "time", value=node.get_value("time", t=cost) + node_time, t=cost
-                    )
+                    node.set_value("time", value=node.get_value("time", t=cost) + node_time, t=cost)
 
                 turns = self.G.get_turns(in_link=prev_link, out_link=link)
 
                 for turn in turns:
-                    turn.set_value(
-                        "n_paths", value=turn.get_value("n_paths", t=cost) + 1, t=cost
-                    )
-                    turn_time = turn.get_value(
-                        name=self.nodes_vdf, t=cost, graph=self.G, default=0
-                    )
+                    turn.set_value("n_paths", value=turn.get_value("n_paths", t=cost) + 1, t=cost)
+                    turn_time = turn.get_value(name=self.nodes_vdf, t=cost, graph=self.G, default=0)
                     if turn_time != 0:
                         turn.set_value(
                             "time",

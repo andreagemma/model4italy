@@ -72,13 +72,9 @@ class WebSocketIPC:
                     elif msg_type == "publish":
                         payload = data.get("message")
                         if isinstance(payload, str):
-                            self.logger.debug(
-                                f"Client published message on channel '{channel}': {payload}"
-                            )
+                            self.logger.debug(f"Client published message on channel '{channel}': {payload}")
                         else:
-                            self.logger.debug(
-                                f"Client published binary message on channel '{channel}'"
-                            )
+                            self.logger.debug(f"Client published binary message on channel '{channel}'")
                         await self.broadcast(channel, payload)
 
         except websockets.ConnectionClosed:
@@ -104,9 +100,7 @@ class WebSocketIPC:
 
     def listen(self):
         """Ascolta i messaggi in arrivo e invoca le callback associate al canale."""
-        self.logger.debug(
-            f"Listening for messages on channels: {', '.join(self.callbacks.keys())}"
-        )
+        self.logger.debug(f"Listening for messages on channels: {', '.join(self.callbacks.keys())}")
         while True:
             try:
                 data = self.conn.recv()
@@ -136,9 +130,7 @@ class WebSocketIPC:
         """Avvia il server WebSocket."""
 
         async def fn():
-            self.logger.debug(
-                f"Starting WebSocket IPC server on {self.host}:{self.port}"
-            )
+            self.logger.debug(f"Starting WebSocket IPC server on {self.host}:{self.port}")
             async with websockets.serve(self.handler, self.host, self.port):
                 await asyncio.Future()  # run forever
 
@@ -181,9 +173,7 @@ class WebSocketIPC:
 
     def init(self):
         """Inizializza il server WebSocket."""
-        self.logger.debug(
-            f"Initializing WebSocket IPC server on {self.host}:{self.port}"
-        )
+        self.logger.debug(f"Initializing WebSocket IPC server on {self.host}:{self.port}")
         if not self.running():
             self.start(blocking=False)
 

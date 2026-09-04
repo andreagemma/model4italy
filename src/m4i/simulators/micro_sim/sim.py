@@ -17,9 +17,7 @@ from ...log import Logger
 class Simulator:
     def __init__(self):
         log = Logger.getLogger("SIM")
-        log.info(
-            "Simulatore Inizializzato: modello del secondo ordine di deflusso autostradale"
-        )
+        log.info("Simulatore Inizializzato: modello del secondo ordine di deflusso autostradale")
         np.random.seed(0)
 
     def aggiorna_tempi(self, graph, mpaths):
@@ -39,15 +37,13 @@ class Simulator:
 
     def spec_demand(self, flows):
         "costruisce, la matrici di flussi in entrata, in uscita e le percentuali di svolta data la domanda"
-        (preload, Inflow, R_mod_tot, Beta_out_tot, Beta_div_tot) = (
-            read_od.get_demand_profile(
-                flows,
-                self.sim_duration,
-                self.Ramps,
-                self.Stars,
-                self.Topology,
-                self.SimuGraph,
-            )
+        (preload, Inflow, R_mod_tot, Beta_out_tot, Beta_div_tot) = read_od.get_demand_profile(
+            flows,
+            self.sim_duration,
+            self.Ramps,
+            self.Stars,
+            self.Topology,
+            self.SimuGraph,
         )
         return (preload, Inflow, R_mod_tot, Beta_out_tot, Beta_div_tot)
 
@@ -58,28 +54,14 @@ class Simulator:
             v = self.results[1]
             r = self.results[2]
             links = self.results[3]
-            start_date = pd.DatetimeIndex(
-                [
-                    self.parameters.header.date_simulation
-                    + " "
-                    + self.parameters.header.start
-                ]
-            )
-            end_date = pd.DatetimeIndex(
-                [
-                    self.parameters.header.date_simulation
-                    + " "
-                    + self.parameters.header.end
-                ]
-            )
+            start_date = pd.DatetimeIndex([self.parameters.header.date_simulation + " " + self.parameters.header.start])
+            end_date = pd.DatetimeIndex([self.parameters.header.date_simulation + " " + self.parameters.header.end])
             datevec = np.arange(
                 start_date[0],
                 end_date[0],
                 timedelta(seconds=self.parameters.header.time_step_s),
             )
-            datevec_repeat = np.concatenate(
-                [np.tile(datevec[ix], len(links)) for ix in range(len(datevec))]
-            ).ravel()
+            datevec_repeat = np.concatenate([np.tile(datevec[ix], len(links)) for ix in range(len(datevec))]).ravel()
             d = np.vstack(
                 [
                     np.tile(links, self.sim_duration),
@@ -88,9 +70,7 @@ class Simulator:
                     v[:-1, :].flatten(),
                 ]
             ).T
-            df = pd.DataFrame(
-                index=datevec_repeat, data=d, columns=["id_cav", "q", "r", "v"]
-            )
+            df = pd.DataFrame(index=datevec_repeat, data=d, columns=["id_cav", "q", "r", "v"])
             df_grouped = df.groupby("id_cav").resample(agg_int).mean()
             df_grouped = df_grouped.reset_index(level=0, drop=True).round(2)
             df_grouped["time"] = df_grouped.index

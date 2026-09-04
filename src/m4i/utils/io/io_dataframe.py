@@ -18,12 +18,8 @@ class IO_DataFrame:
         self._drivers: Dict[str, BaseDriver] = {}
         self._load_all_drivers(**kwargs)
 
-    def register_driver(
-        self, driver_cls: Type[BaseDriver], kwargs: Optional[dict] = None
-    ):
-        pattern: Union[
-            str, re.Pattern, List[Union[str, Tuple[str, dict], re.Pattern]]
-        ] = driver_cls.pattern()
+    def register_driver(self, driver_cls: Type[BaseDriver], kwargs: Optional[dict] = None):
+        pattern: Union[str, re.Pattern, List[Union[str, Tuple[str, dict], re.Pattern]]] = driver_cls.pattern()
         name: str = driver_cls.name()
         kwargs = kwargs or {}
         if name in kwargs:
@@ -37,30 +33,19 @@ class IO_DataFrame:
                 pat = re.compile(pat)
             if isinstance(pat, re.Pattern):
                 if pat in self._pattern_to_driver:
-                    warnings.warn(
-                        f"Il pattern '{pat}' è già registrato. Il driver precedente verrà sovrascritto."
-                    )
+                    warnings.warn(f"Il pattern '{pat}' è già registrato. Il driver precedente verrà sovrascritto.")
                 self._pattern_to_driver[pat] = driver
                 self._patterns[pat] = pat
             else:
-                warnings.warn(
-                    f"Il pattern '{pat}' non è una stringa o un oggetto re.Pattern valido. Ignorato."
-                )
+                warnings.warn(f"Il pattern '{pat}' non è una stringa o un oggetto re.Pattern valido. Ignorato.")
 
     def _load_all_drivers(self, **kwargs):
         from . import drivers
 
         # estrae i pacakges dei driver
-        modules = [
-            modname
-            for _, modname, ispkg in pkgutil.iter_modules(drivers.__path__)
-            if not ispkg
-        ]
+        modules = [modname for _, modname, ispkg in pkgutil.iter_modules(drivers.__path__) if not ispkg]
         # li importa dinamicamente
-        modules = [
-            importlib.import_module(f".drivers.{modname}", package=__package__)
-            for modname in modules
-        ]
+        modules = [importlib.import_module(f".drivers.{modname}", package=__package__) for modname in modules]
         # estrae le classi dai moduli importati
         classes = [
             getattr(module, attr)
@@ -69,9 +54,7 @@ class IO_DataFrame:
             if isinstance(getattr(module, attr), type)
         ]
         # filtra le classi per quelle che sono sottoclassi di BaseDriver
-        classes = [
-            c for c in classes if issubclass(c, BaseDriver) and c is not BaseDriver
-        ]
+        classes = [c for c in classes if issubclass(c, BaseDriver) and c is not BaseDriver]
         # ordina le classi in base alla priorità
         classes = sorted(classes, key=lambda x: x.priority, reverse=True)
         for cls in classes:
@@ -119,9 +102,7 @@ class IO_DataFrame:
         kwargs_driver.pop("path", None)
         kwargs_driver.pop("filters", None)
         kwargs_driver.pop("dtype", None)
-        df = driver.import_dataframe(
-            path, filters=filters, dtype=dtype, **kwargs_driver
-        )
+        df = driver.import_dataframe(path, filters=filters, dtype=dtype, **kwargs_driver)
         if force_geodataframe is not None and isinstance(df, pd.DataFrame):
             if force_geodataframe and not isinstance(df, gpd.GeoDataFrame):
                 df = gpd.GeoDataFrame(df)
@@ -164,6 +145,4 @@ class IO_DataFrame:
         kwargs_driver.pop("mode", None)
         kwargs_driver.pop("partitionby", None)
         kwargs_driver.pop("force_partitioning", None)
-        driver.export_dataframe(
-            df, path, mode=mode, partitionby=partitionby, **kwargs_driver
-        )
+        driver.export_dataframe(df, path, mode=mode, partitionby=partitionby, **kwargs_driver)

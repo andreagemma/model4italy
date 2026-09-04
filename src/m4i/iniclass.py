@@ -30,9 +30,7 @@ class IniClass:
         if options is not None:
             db_url = options.get("settings", {}).get("DB_SETTINGS_URL", db_url)
             use_db = options.get("settings", {}).get("DB_SETTINGS_USE", use_db)
-            db_table_name = options.get("settings", {}).get(
-                "DB_SETTINGS_TABLE_NAME", "settings"
-            )
+            db_table_name = options.get("settings", {}).get("DB_SETTINGS_TABLE_NAME", "settings")
             db_query = options.get("settings", {}).get(
                 "DB_SETTINGS_QUERY",
                 f"SELECT value FROM {db_table_name} WHERE name = :name",
@@ -44,21 +42,13 @@ class IniClass:
             if use_db:
                 if db_url:
                     if not ConfigReader.check_db_connection(db_url):
-                        raise ConnectionError(
-                            f"Database connection failed for settings database '{db_url}'."
-                        )
+                        raise ConnectionError(f"Database connection failed for settings database '{db_url}'.")
                     elif not ConfigReader.check_db_exists(db_url, db_table_name):
-                        raise FileNotFoundError(
-                            f"'{db_table_name}' table not found at '{db_url}'."
-                        )
+                        raise FileNotFoundError(f"'{db_table_name}' table not found at '{db_url}'.")
                 else:
-                    raise ValueError(
-                        "Database URL is required when using database for configuration."
-                    )
+                    raise ValueError("Database URL is required when using database for configuration.")
             else:
-                raise FileNotFoundError(
-                    f"Configuration file '{ini_file}' not found and database usage is disabled."
-                )
+                raise FileNotFoundError(f"Configuration file '{ini_file}' not found and database usage is disabled.")
         self.config_reader = ConfigReader(
             settings=ini_file,
             db_url=db_url,
@@ -66,41 +56,21 @@ class IniClass:
             db_query=db_query,
             table_name=db_table_name,
         )
-        self.DB_SETTINGS_USE = self.config_reader.getboolean(
-            "DB_SETTINGS_USE", "DATABASE_SETTINGS", False
-        )
-        self.DB_SETTINGS_TABLE_NAME = self.config_reader.get(
-            "DB_SETTINGS_TABLE_NAME", "DATABASE_SETTINGS", "settings"
-        )
+        self.DB_SETTINGS_USE = self.config_reader.getboolean("DB_SETTINGS_USE", "DATABASE_SETTINGS", False)
+        self.DB_SETTINGS_TABLE_NAME = self.config_reader.get("DB_SETTINGS_TABLE_NAME", "DATABASE_SETTINGS", "settings")
         self.DB_SETTINGS_QUERY = self.config_reader.get(
             "DB_SETTINGS_QUERY",
             "DATABASE_SETTINGS",
             f"SELECT value FROM {self.DB_SETTINGS_TABLE_NAME} WHERE name = :name",
         )
-        self.DB_SETTINGS_TYPE = self.config_reader.get(
-            "DB_SETTINGS_TYPE", "DATABASE_SETTINGS", "sqlite"
-        )
-        self.DB_SETTINGS_DRIVER = self.config_reader.get(
-            "DB_SETTINGS_DRIVER", "DATABASE_SETTINGS", "sqlite"
-        )
-        self.DB_SETTINGS_USER = self.config_reader.get(
-            "DB_SETTINGS_USER", "DATABASE_SETTINGS", ""
-        )
-        self.DB_SETTINGS_PASS = self.config_reader.get(
-            "DB_SETTINGS_PASS", "DATABASE_SETTINGS", ""
-        )
-        self.DB_SETTINGS_HOST = self.config_reader.get(
-            "DB_SETTINGS_HOST", "DATABASE_SETTINGS", ""
-        )
-        self.DB_SETTINGS_PORT = self.config_reader.get(
-            "DB_SETTINGS_PORT", "DATABASE_SETTINGS", ""
-        )
-        self.DB_SETTINGS_NAME = self.config_reader.get(
-            "DB_SETTINGS_NAME", "DATABASE_SETTINGS", "settings.db"
-        )
-        self.DB_SETTINGS_URL = self.config_reader.get(
-            "DB_SETTINGS_URL", "DATABASE_SETTINGS", ""
-        )
+        self.DB_SETTINGS_TYPE = self.config_reader.get("DB_SETTINGS_TYPE", "DATABASE_SETTINGS", "sqlite")
+        self.DB_SETTINGS_DRIVER = self.config_reader.get("DB_SETTINGS_DRIVER", "DATABASE_SETTINGS", "sqlite")
+        self.DB_SETTINGS_USER = self.config_reader.get("DB_SETTINGS_USER", "DATABASE_SETTINGS", "")
+        self.DB_SETTINGS_PASS = self.config_reader.get("DB_SETTINGS_PASS", "DATABASE_SETTINGS", "")
+        self.DB_SETTINGS_HOST = self.config_reader.get("DB_SETTINGS_HOST", "DATABASE_SETTINGS", "")
+        self.DB_SETTINGS_PORT = self.config_reader.get("DB_SETTINGS_PORT", "DATABASE_SETTINGS", "")
+        self.DB_SETTINGS_NAME = self.config_reader.get("DB_SETTINGS_NAME", "DATABASE_SETTINGS", "settings.db")
+        self.DB_SETTINGS_URL = self.config_reader.get("DB_SETTINGS_URL", "DATABASE_SETTINGS", "")
         if self.DB_SETTINGS_USE:
             # Stringhe di connessione
             if self.DB_SETTINGS_URL == "":
@@ -130,15 +100,9 @@ class IniClass:
         self.LOG_NAME = self.config_reader.get("LOG_NAME", "LOGGING", "M4I")
         self.LOG_USE = self.config_reader.getboolean("LOG_USE", "LOGGING", True)
         self.LOG_DIR = self.config_reader.get("LOG_DIR", "LOGGING", "log")
-        self.LOG_ON_DATABASE = self.config_reader.getboolean(
-            "LOG_ON_DATABASE", "LOGGING", False
-        )
-        self.LOG_ON_CONSOLE = self.config_reader.getboolean(
-            "LOG_ON_CONSOLE", "LOGGING", True
-        )
-        self.LOG_ON_FILE = self.config_reader.getboolean(
-            "LOG_ON_FILE", "LOGGING", False
-        )
+        self.LOG_ON_DATABASE = self.config_reader.getboolean("LOG_ON_DATABASE", "LOGGING", False)
+        self.LOG_ON_CONSOLE = self.config_reader.getboolean("LOG_ON_CONSOLE", "LOGGING", True)
+        self.LOG_ON_FILE = self.config_reader.getboolean("LOG_ON_FILE", "LOGGING", False)
         self.LOG_LEVEL = self.config_reader.get("LOG_LEVEL", "LOGGING", "DEBUG")
         self.LOG_EXECUTION_FORMAT = self.config_reader.get(
             "LOG_EXECUTION_FORMAT",
@@ -154,23 +118,15 @@ class IniClass:
         # GENERAL
         self.SRC_COEFS = self.config_reader.get("SRC_COEFS", "GENERAL", None)
         if not self.SRC_COEFS:
-            self.SRC_COEFS = os.path.join(
-                os.path.dirname(__file__), "coefficients.json"
-            )
+            self.SRC_COEFS = os.path.join(os.path.dirname(__file__), "coefficients.json")
         self.SRC_CONV_TBL = self.config_reader.get("SRC_CONV_TBL", "GENERAL", None)
         self.DEBUG = self.config_reader.getboolean("DEBUG", "GENERAL", False)
-        self.CRS = self.config_reader.get(
-            "CRS", "GENERAL", "EPSG:4326"
-        )  # Coordinate Reference System
+        self.CRS = self.config_reader.get("CRS", "GENERAL", "EPSG:4326")  # Coordinate Reference System
         self.CRS_CALC = self.config_reader.get(
             "CRS_CALC", "GENERAL", "EPSG:6875"
         )  # Coordinate Reference System for calculation
-        self.TZ_LOCAL = self.config_reader.get(
-            "TZ_LOCAL", "GENERAL", "Europe/Rome"
-        )  # Timezone locale
-        self.TZ_CALC = self.config_reader.get(
-            "TZ_CALC", "GENERAL", "UTC"
-        )  # Timezone for calculations
+        self.TZ_LOCAL = self.config_reader.get("TZ_LOCAL", "GENERAL", "Europe/Rome")  # Timezone locale
+        self.TZ_CALC = self.config_reader.get("TZ_CALC", "GENERAL", "UTC")  # Timezone for calculations
         self.CHECK_INPUT = self.config_reader.getboolean(
             "CHECK_INPUT", "GENERAL", False
         )  # Controlla la validità dei dati in ingresso
@@ -181,96 +137,48 @@ class IniClass:
             self.rnd.seed(self.RANDOM_SEED)
 
         # SIMULATOR
-        self.SIMU_STEP = self.config_reader.getfloat(
-            "SIMU_STEP", "SIMULATOR", 6
-        )  # step di simulazione
-        self.CAR_LENGTH = self.config_reader.getfloat(
-            "CAR_LENGTH", "SIMULATOR", 5
-        )  # lunghezza veicolo in metri
-        self.MIN_SPEED = self.config_reader.getfloat(
-            "MIN_SPEED", "SIMULATOR", 4
-        )  # velocità minima per la coda
+        self.SIMU_STEP = self.config_reader.getfloat("SIMU_STEP", "SIMULATOR", 6)  # step di simulazione
+        self.CAR_LENGTH = self.config_reader.getfloat("CAR_LENGTH", "SIMULATOR", 5)  # lunghezza veicolo in metri
+        self.MIN_SPEED = self.config_reader.getfloat("MIN_SPEED", "SIMULATOR", 4)  # velocità minima per la coda
         # self.AGG_INT = self.config_reader.getint("AGG_INT", 'SIMULATOR', 5)  # intervallo di aggregazione in secondi
-        self.LT1 = self.config_reader.getfloat(
-            "LT1", "SIMULATOR", 0
-        )  # perditempo 1 alla partenza del veicolo
-        self.LT2 = self.config_reader.getfloat(
-            "LT2", "SIMULATOR", 0
-        )  # perditempo 2 alla partenza del veicolo
+        self.LT1 = self.config_reader.getfloat("LT1", "SIMULATOR", 0)  # perditempo 1 alla partenza del veicolo
+        self.LT2 = self.config_reader.getfloat("LT2", "SIMULATOR", 0)  # perditempo 2 alla partenza del veicolo
 
         # ASSIGNMENT
-        self.CLASS_EQ_FACT = self.config_reader.getdict(
-            "CLASS_EQ_FACT", "ASSIGNMENT", {"c": 1, "h": 2}
-        )
+        self.CLASS_EQ_FACT = self.config_reader.getdict("CLASS_EQ_FACT", "ASSIGNMENT", {"c": 1, "h": 2})
         self.MSA_MAX_ITE = self.config_reader.getint("MSA_MAX_ITE", "ASSIGNMENT", 6)
         self.MSA_RGAP = self.config_reader.getfloat("MSA_RGAP", "ASSIGNMENT", 0.01)
         self.MSA_K = self.config_reader.getint("MSA_K", "ASSIGNMENT", 3)
-        self.MSA_MAX_TIMESLICE = self.config_reader.getint(
-            "MSA_MAX_TIMESLICE", "ASSIGNMENT", int(3 * 60)
-        )
-        self.MSA_SPP_NUMCPUS = self.config_reader.getint(
-            "MSA_SPP_NUMCPUS", "ASSIGNMENT", 0
-        )
-        self.MSA_K_BALANCING = self.config_reader.getint(
-            "MSA_K_BALANCING", "ASSIGNMENT", -1
-        )
+        self.MSA_MAX_TIMESLICE = self.config_reader.getint("MSA_MAX_TIMESLICE", "ASSIGNMENT", int(3 * 60))
+        self.MSA_SPP_NUMCPUS = self.config_reader.getint("MSA_SPP_NUMCPUS", "ASSIGNMENT", 0)
+        self.MSA_K_BALANCING = self.config_reader.getint("MSA_K_BALANCING", "ASSIGNMENT", -1)
         self.DELTA_T = self.config_reader.getint("DELTA_T", "ASSIGNMENT", 15)
         self.MSA_PRELOAD = self.config_reader.getint("MSA_PRELOAD", "ASSIGNMENT", 0)
         self.MSA_POSTLOAD = self.config_reader.getint("MSA_POSTLOAD", "ASSIGNMENT", 0)
-        self.SAVE_GRAPH = self.config_reader.getboolean(
-            "SAVE_GRAPH", "ASSIGNMENT", False
-        )
-        self.LOAD_GRAPH = self.config_reader.getboolean(
-            "LOAD_GRAPH", "ASSIGNMENT", False
-        )
-        self.SAVE_PATHS = self.config_reader.getboolean(
-            "SAVE_PATHS", "ASSIGNMENT", False
-        )
-        self.LOAD_PATHS = self.config_reader.getboolean(
-            "LOAD_PATHS", "ASSIGNMENT", False
-        )
+        self.SAVE_GRAPH = self.config_reader.getboolean("SAVE_GRAPH", "ASSIGNMENT", False)
+        self.LOAD_GRAPH = self.config_reader.getboolean("LOAD_GRAPH", "ASSIGNMENT", False)
+        self.SAVE_PATHS = self.config_reader.getboolean("SAVE_PATHS", "ASSIGNMENT", False)
+        self.LOAD_PATHS = self.config_reader.getboolean("LOAD_PATHS", "ASSIGNMENT", False)
         self.USE_OBSERVED_PATHS = self.config_reader.getboolean(
             "USE_OBSERVED_PATHS", "ASSIGNMENT", True
         )  # Indica se vengono usati i percorsi osservati
 
         # OD ESTIMATION
-        self.OD_ESTIMATION_WHISKERS = self.config_reader.getint(
-            "OD_ESTIMATION_WHISKERS", "OD_ESTIMATION", 60
-        )
-        self.OD_ESTIMATION_MAX_ITE = self.config_reader.getint(
-            "OD_ESTIMATION_MAX_ITE", "OD_ESTIMATION", 2
-        )
-        self.OD_ESTIMATION_RGAP = self.config_reader.getfloat(
-            "OD_ESTIMATION_RGAP", "OD_ESTIMATION", 0.01
-        )
-        self.OD_ESTIMATION_MSA_MAX_ITE = self.config_reader.getint(
-            "OD_ESTIMATION_MSA_MAX_ITE", "OD_ESTIMATION", 6
-        )
-        self.OD_ESTIMATION_MSA_K = self.config_reader.getint(
-            "OD_ESTIMATION_MSA_K", "OD_ESTIMATION", 3
-        )
-        self.OD_ESTIMATION_MSA_RGAP = self.config_reader.getfloat(
-            "OD_ESTIMATION_MSA_RGAP", "OD_ESTIMATION", 0.01
-        )
-        self.OD_ESTIMATION_MSA_TIMESLICE = self.config_reader.getint(
-            "OD_ESTIMATION_MSA_TIMESLICE", "OD_ESTIMATION", 60
-        )
+        self.OD_ESTIMATION_WHISKERS = self.config_reader.getint("OD_ESTIMATION_WHISKERS", "OD_ESTIMATION", 60)
+        self.OD_ESTIMATION_MAX_ITE = self.config_reader.getint("OD_ESTIMATION_MAX_ITE", "OD_ESTIMATION", 2)
+        self.OD_ESTIMATION_RGAP = self.config_reader.getfloat("OD_ESTIMATION_RGAP", "OD_ESTIMATION", 0.01)
+        self.OD_ESTIMATION_MSA_MAX_ITE = self.config_reader.getint("OD_ESTIMATION_MSA_MAX_ITE", "OD_ESTIMATION", 6)
+        self.OD_ESTIMATION_MSA_K = self.config_reader.getint("OD_ESTIMATION_MSA_K", "OD_ESTIMATION", 3)
+        self.OD_ESTIMATION_MSA_RGAP = self.config_reader.getfloat("OD_ESTIMATION_MSA_RGAP", "OD_ESTIMATION", 0.01)
+        self.OD_ESTIMATION_MSA_TIMESLICE = self.config_reader.getint("OD_ESTIMATION_MSA_TIMESLICE", "OD_ESTIMATION", 60)
         self.OD_ESTIMATION_USE_OBSERVED_PATHS = self.config_reader.getboolean(
             "OD_ESTIMATION_USE_OBSERVED_PATHS", "OD_ESTIMATION", True
         )  # Indica se vengono usati i percorsi osservati
 
-        self.OD_ESTIMATION_GAMMA1 = self.config_reader.getfloat(
-            "OD_ESTIMATION_GAMMA1", "OD_ESTIMATION", 0
-        )
-        self.OD_ESTIMATION_GAMMA2 = self.config_reader.getfloat(
-            "OD_ESTIMATION_GAMMA2", "OD_ESTIMATION", 1
-        )
-        self.OD_ESTIMATION_GAMMA3 = self.config_reader.getfloat(
-            "OD_ESTIMATION_GAMMA3", "OD_ESTIMATION", 1
-        )
-        self.OD_ESTIMATION_ITESA = self.config_reader.getint(
-            "OD_ESTIMATION_ITESA", "OD_ESTIMATION", 100
-        )
+        self.OD_ESTIMATION_GAMMA1 = self.config_reader.getfloat("OD_ESTIMATION_GAMMA1", "OD_ESTIMATION", 0)
+        self.OD_ESTIMATION_GAMMA2 = self.config_reader.getfloat("OD_ESTIMATION_GAMMA2", "OD_ESTIMATION", 1)
+        self.OD_ESTIMATION_GAMMA3 = self.config_reader.getfloat("OD_ESTIMATION_GAMMA3", "OD_ESTIMATION", 1)
+        self.OD_ESTIMATION_ITESA = self.config_reader.getint("OD_ESTIMATION_ITESA", "OD_ESTIMATION", 100)
         self.OD_ESTIMATION_LAMBDA_LB = self.config_reader.getfloat(
             "OD_ESTIMATION_LAMBDA_LB", "OD_ESTIMATION", 0
         )  # Estremo inferiore della ricerca monodimensionale
@@ -341,9 +249,7 @@ class IniClass:
             "FCD_MAP_MATCHING_MAX_ANGLE", "FCD_MAP_MATCHING", 45
         )  # angolo massimo per il map matching in gradi
 
-        self.FCD_ROUTING_CPUS = self.config_reader.getint(
-            "FCD_ROUTING_CPUS", "FCD_ROUTING", 1
-        )
+        self.FCD_ROUTING_CPUS = self.config_reader.getint("FCD_ROUTING_CPUS", "FCD_ROUTING", 1)
         self.FCD_ROUTING_START_FROM_ZONE = self.config_reader.getboolean(
             "FCD_ROUTING_START_FROM_ZONE", "FCD_ROUTING", False
         )  # se True il path inizia dalla zona di partenza
@@ -387,10 +293,8 @@ class IniClass:
         self.FCD_TRIPS_MAX_V3 = self.config_reader.getfloat(
             "FCD_TRIPS_MAX_V3", "FCD_TRIPS", 69.44444444444444
         )  # max speed for V3 in m/s
-        self.FCD_TRIPS_MAX_DISTANCE_OVERRIDE_POSITION_FIRST_POINT = (
-            self.config_reader.getfloat(
-                "FCD_TRIPS_MAX_DISTANCE_OVERRIDE_POSITION_FIRST_POINT", "FCD_TRIPS", 200
-            )
+        self.FCD_TRIPS_MAX_DISTANCE_OVERRIDE_POSITION_FIRST_POINT = self.config_reader.getfloat(
+            "FCD_TRIPS_MAX_DISTANCE_OVERRIDE_POSITION_FIRST_POINT", "FCD_TRIPS", 200
         )  # max distance override in meters
         self.FCD_TRIPS_MIN_LENGTH = self.config_reader.getfloat(
             "FCD_TRIPS_MIN_LENGTH", "FCD_TRIPS", 100
@@ -409,12 +313,8 @@ class IniClass:
         )  # max delta progression in meters
 
         # OUPTUT
-        self.OUTPUT_AGG_INT = self.config_reader.getfloat(
-            "OUTPUT_AGG_INT", "OUTPUT", 15
-        )
-        self.OUTPUT_STATE_COMPRESSION = self.config_reader.get(
-            "OUTPUT_STATE_COMPRESSION", "OUTPUT", None
-        )
+        self.OUTPUT_AGG_INT = self.config_reader.getfloat("OUTPUT_AGG_INT", "OUTPUT", 15)
+        self.OUTPUT_STATE_COMPRESSION = self.config_reader.get("OUTPUT_STATE_COMPRESSION", "OUTPUT", None)
         self.OUTPUT_STATE_LEVEL_COMPRESSION = self.config_reader.getint(
             "OUTPUT_STATE_LEVEL_COMPRESSION", "OUTPUT", 5
         )  # livello di compressione per lo stato (1-9)
@@ -430,43 +330,23 @@ class IniClass:
         self.OUTPUT_CONG_LEVELS = self.config_reader.get(
             "OUTPUT_CONG_LEVELS", "OUTPUT", [0, 0.1, 0.25, 0.75, 0.9, 5]
         )  # Livelli di congestione
-        self.LOS_CRITICO = self.config_reader.getfloat(
-            "LOS_CRITICO", "OUTPUT", 0.25
-        )  # Livello di congestione critico
+        self.LOS_CRITICO = self.config_reader.getfloat("LOS_CRITICO", "OUTPUT", 0.25)  # Livello di congestione critico
 
         # WEB_SERVER
-        self.WEB_SERVER_HOST = self.config_reader.get(
-            "WEB_SERVER_HOST", "WEB_SERVER", "0.0.0.0"
-        )
-        self.WEB_SERVER_PORT = self.config_reader.getint(
-            "WEB_SERVER_PORT", "WEB_SERVER", 5000
-        )
-        self.WEB_SERVER_DEBUG = self.config_reader.getboolean(
-            "WEB_SERVER_DEBUG", "WEB_SERVER", True
-        )
+        self.WEB_SERVER_HOST = self.config_reader.get("WEB_SERVER_HOST", "WEB_SERVER", "0.0.0.0")
+        self.WEB_SERVER_PORT = self.config_reader.getint("WEB_SERVER_PORT", "WEB_SERVER", 5000)
+        self.WEB_SERVER_DEBUG = self.config_reader.getboolean("WEB_SERVER_DEBUG", "WEB_SERVER", True)
 
         # INTERNAL DATABASE
-        self.DATABASE_URL = self.config_reader.get(
-            "DATABASE_URL", "DATABASE", "sqlite:///executions.db"
-        )
+        self.DATABASE_URL = self.config_reader.get("DATABASE_URL", "DATABASE", "sqlite:///executions.db")
 
         # IPC
-        self.IPC_USE = self.config_reader.getboolean(
-            "IPC_USE", "IPC", True
-        )  # True or False
+        self.IPC_USE = self.config_reader.getboolean("IPC_USE", "IPC", True)  # True or False
         self.IPC_BUCKET = self.config_reader.get("IPC_BUCKET", "IPC", "m4i")
-        self.IPC_BACKEND = self.config_reader.get(
-            "IPC_BACKEND", "IPC", "local"
-        )  # local or redis
-        self.IPC_HOST = self.config_reader.get(
-            "IPC_HOST", "IPC", "localhost"
-        )  # localhost or redis server address
-        self.IPC_PORT = self.config_reader.getint(
-            "IPC_PORT", "IPC", 6379
-        )  # redis server port or free port for local
-        self.IPC_DB = self.config_reader.getint(
-            "IPC_DB", "IPC", 0
-        )  # redis db number or not used for local
+        self.IPC_BACKEND = self.config_reader.get("IPC_BACKEND", "IPC", "local")  # local or redis
+        self.IPC_HOST = self.config_reader.get("IPC_HOST", "IPC", "localhost")  # localhost or redis server address
+        self.IPC_PORT = self.config_reader.getint("IPC_PORT", "IPC", 6379)  # redis server port or free port for local
+        self.IPC_DB = self.config_reader.getint("IPC_DB", "IPC", 0)  # redis db number or not used for local
         self.IPC_COMPRESSION = self.config_reader.get(
             "IPC_COMPRESSION", "IPC", "lz4"
         )  # compression method for data tranfer # "blosclz", "lz4", "lz4hc", "snappy", "zlib", "zstd", "gzip", "bz2", "zip", "lzma" or None (lz4 default)
@@ -475,25 +355,13 @@ class IniClass:
         )  # compression level for data tranfer (1-9) (default 5)
 
         # PARALLEL
-        self.PARALLEL_USE = self.config_reader.getboolean(
-            "PARALLEL_USE", "PARALLEL", False
-        )
-        self.PARALLEL_NUMCPUS = self.config_reader.getint(
-            "PARALLEL_NUMCPUS", "PARALLEL", 1
-        )
-        self.PARALLEL_ENGINE = self.config_reader.get(
-            "PARALLEL_ENGINE", "PARALLEL", "ray"
-        )
-        self.PARALLEL_CLUSTER_ADDRESS = self.config_reader.get(
-            "PARALLEL_CLUSTER_ADDRESS", "PARALLEL", None
-        )
+        self.PARALLEL_USE = self.config_reader.getboolean("PARALLEL_USE", "PARALLEL", False)
+        self.PARALLEL_NUMCPUS = self.config_reader.getint("PARALLEL_NUMCPUS", "PARALLEL", 1)
+        self.PARALLEL_ENGINE = self.config_reader.get("PARALLEL_ENGINE", "PARALLEL", "ray")
+        self.PARALLEL_CLUSTER_ADDRESS = self.config_reader.get("PARALLEL_CLUSTER_ADDRESS", "PARALLEL", None)
 
-        self.GRAPH_ADD_TURN_PENALTIES = self.config_reader.getboolean(
-            "GRAPH_ADD_TURN_PENALTIES", "GRAPH", True
-        )
-        self.GRAPH_PENALTY_ANGLES = self.config_reader.getlist(
-            "GRAPH_PENALTY_ANGLES", "GRAPH", [30, 60, 120, 150]
-        )
+        self.GRAPH_ADD_TURN_PENALTIES = self.config_reader.getboolean("GRAPH_ADD_TURN_PENALTIES", "GRAPH", True)
+        self.GRAPH_PENALTY_ANGLES = self.config_reader.getlist("GRAPH_PENALTY_ANGLES", "GRAPH", [30, 60, 120, 150])
         self.GRAPH_PENALTY_RIGHT_SLIGHT = self.config_reader.getint(
             "GRAPH_PENALTY_RIGHT_SLIGHT", "GRAPH", 1
         )  # in seconds
@@ -506,21 +374,13 @@ class IniClass:
         self.GRAPH_PENALTY_LEFT_SLIGHT = self.config_reader.getint(
             "GRAPH_PENALTY_LEFT_SLIGHT", "GRAPH", 4
         )  # in seconds
-        self.GRAPH_PENALTY_LEFT_ELBOW = self.config_reader.getint(
-            "GRAPH_PENALTY_LEFT_ELBOW", "GRAPH", 5
-        )  # in seconds
-        self.GRAPH_PENALTY_LEFT_SHARP = self.config_reader.getint(
-            "GRAPH_PENALTY_LEFT_SHARP", "GRAPH", 6
-        )  # in seconds
-        self.GRAPH_PENALTY_U = self.config_reader.getint(
-            "GRAPH_PENALTY_U", "GRAPH", 7
-        )  # in seconds
+        self.GRAPH_PENALTY_LEFT_ELBOW = self.config_reader.getint("GRAPH_PENALTY_LEFT_ELBOW", "GRAPH", 5)  # in seconds
+        self.GRAPH_PENALTY_LEFT_SHARP = self.config_reader.getint("GRAPH_PENALTY_LEFT_SHARP", "GRAPH", 6)  # in seconds
+        self.GRAPH_PENALTY_U = self.config_reader.getint("GRAPH_PENALTY_U", "GRAPH", 7)  # in seconds
 
         for section, name, value in self.config_reader.items():
             if not hasattr(self, name.upper()):
-                logging.warning(
-                    f"Setting {section}:{name.upper()} not found in IniClass, setting it to {value}"
-                )
+                logging.warning(f"Setting {section}:{name.upper()} not found in IniClass, setting it to {value}")
                 setattr(self, name.upper(), value)
 
         IniClass.environ.update(os.environ)  # Copy existing environment variables

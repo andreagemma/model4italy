@@ -55,9 +55,7 @@ class MatrixODT:
         self.mode = mode
 
     def copy(self, copy_data: bool = True) -> "MatrixODT":
-        return MatrixODT(
-            self.rows, self.cols, self.timestamps, init=self, copy=copy_data
-        )
+        return MatrixODT(self.rows, self.cols, self.timestamps, init=self, copy=copy_data)
 
     def __getitem__(self, pos: Union[tuple, int]) -> Union[MatrixOD, float]:
         if isinstance(pos, int):
@@ -69,9 +67,7 @@ class MatrixODT:
             else:
                 return 0
 
-    def get(
-        self, pos: Union[tuple, int], default: Optional[MatrixOD] = None
-    ) -> Union[MatrixOD, float]:
+    def get(self, pos: Union[tuple, int], default: Optional[MatrixOD] = None) -> Union[MatrixOD, float]:
         if isinstance(pos, int):
             return self.ods.get(pos, default)
         else:
@@ -81,9 +77,7 @@ class MatrixODT:
             else:
                 return default if default is not None else 0
 
-    def __setitem__(
-        self, pos: Union[tuple, int], value: Union[MatrixOD, float]
-    ) -> None:
+    def __setitem__(self, pos: Union[tuple, int], value: Union[MatrixOD, float]) -> None:
         if isinstance(pos, int):
             self.ods[pos] = value
         else:
@@ -191,9 +185,7 @@ class MatrixODT:
                 if ts in self.timestamps:
                     self.ods[ts] /= mat
                 else:
-                    self.ods[ts] = (
-                        MatrixOD(rows=self.rows, cols=self.cols, init=0) / mat
-                    )
+                    self.ods[ts] = MatrixOD(rows=self.rows, cols=self.cols, init=0) / mat
         elif isinstance(other, (int, float)):
             for ts, mat in self.ods.items():
                 mat -= other

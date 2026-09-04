@@ -30,7 +30,5 @@ class ODEstimator(BaseM4IModel):
         self.detectors: pd.DataFrame = self.loader.detectors
         self.ODseed: MatrixODT = ODSeed.copy()
 
-    def update(
-        self, OD: MatrixODT, M: MatrixAss, tstart: int, tend: int, **kwargs
-    ) -> MatrixODT:
+    def update(self, OD: MatrixODT, M: MatrixAss, tstart: int, tend: int, **kwargs) -> MatrixODT:
         raise NotImplementedError("The method is not implemented")

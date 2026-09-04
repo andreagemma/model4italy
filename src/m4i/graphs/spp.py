@@ -69,24 +69,18 @@ class SPP:
                     "mode": mode,
                 }
                 if node_mode is not None:
-                    available_modes: set = source_node.get_value(
-                        name=node_mode, default=set(), **kwargs
-                    )
+                    available_modes: set = source_node.get_value(name=node_mode, default=set(), **kwargs)
                     if not (modes & available_modes or "all" in available_modes):
                         continue
 
                 if link_mode is not None:
-                    available_modes: set = l.get_value(
-                        name=link_mode, default=set(), **kwargs
-                    )
+                    available_modes: set = l.get_value(name=link_mode, default=set(), **kwargs)
                     if not (modes & available_modes or "all" in available_modes):
                         continue
 
                 l_i, l_j, l_idx = l["i"], l["j"], l["idx"]
                 initial_cost = l.get_value(name=link_cost, default=0, **kwargs)
-                initial_cost += graph.get_node(l_i).get_value(
-                    name=node_cost, default=0, **kwargs
-                )
+                initial_cost += graph.get_node(l_i).get_value(name=node_cost, default=0, **kwargs)
 
                 paths_costs[l_idx] = initial_cost
                 paths_links[l_idx] = [l_idx]
@@ -97,9 +91,7 @@ class SPP:
             # The code snippet you provided is part of the Dijkstra's algorithm implementation within the
             # `dijkstra` method of the `SPP` class. Let's break down what this part of the code is doing:
             while pq:
-                current_cost, current_l_idx, current_l_i, current_l_j, current_l = pop(
-                    pq
-                )
+                current_cost, current_l_idx, current_l_i, current_l_j, current_l = pop(pq)
                 if current_l_idx in visited:
                     continue
                 visited.add(current_l_idx)
@@ -114,9 +106,7 @@ class SPP:
                         "mode": mode,
                     }
                     current_l_j_node = graph.get_node(current_l_j)
-                    available_modes: set = current_l_j_node.get_value(
-                        name=node_mode, default=set(), **kwargs
-                    )
+                    available_modes: set = current_l_j_node.get_value(name=node_mode, default=set(), **kwargs)
                     if not (modes & available_modes or "all" in available_modes):
                         continue
 
@@ -149,9 +139,7 @@ class SPP:
                         "mode": mode,
                     }
                     if link_mode is not None:
-                        available_modes: set = next_l.get_value(
-                            name=link_mode, default=set(), **kwargs
-                        )
+                        available_modes: set = next_l.get_value(name=link_mode, default=set(), **kwargs)
                         if not (modes & available_modes or "all" in available_modes):
                             continue
                     new_cost += next_l.get_value(name=link_cost, default=0, **kwargs)
@@ -164,12 +152,8 @@ class SPP:
                     turn: AbstractTurn = graph.get_turn(current_l_idx, next_l_idx)
                     if turn is not None:
                         if turn_mode is not None:
-                            available_modes: set = turn.get_value(
-                                name=turn_mode, default={}, **kwargs
-                            )
-                            if not (
-                                modes & available_modes or "all" in available_modes
-                            ):
+                            available_modes: set = turn.get_value(name=turn_mode, default={}, **kwargs)
+                            if not (modes & available_modes or "all" in available_modes):
                                 continue
                         new_cost += turn.get_value(name=turn_cost, default=0, **kwargs)
 
@@ -179,9 +163,7 @@ class SPP:
                     if new_cost < paths_costs.get(next_l_idx, float("inf")):
                         push(pq, (new_cost, next_l_idx, next_l_i, next_l_j, next_l))
                         # assert len(paths_links[next_l_idx])==0, 'li'
-                        paths_links[next_l_idx] = paths_links[current_l_idx] + [
-                            next_l_idx
-                        ]
+                        paths_links[next_l_idx] = paths_links[current_l_idx] + [next_l_idx]
                         paths_costs[next_l_idx] = new_cost
             for target in targets:
                 target_link = node_preds.get(target, None)
@@ -236,9 +218,7 @@ class SPP:
         return ret
 
     @staticmethod
-    def __multiple_tasks_single_processor(
-        graph: AbstractGraph, tasks: Iterable[dict], **kwargs
-    ) -> PathList:
+    def __multiple_tasks_single_processor(graph: AbstractGraph, tasks: Iterable[dict], **kwargs) -> PathList:
         ret = PathList()
         if len(tasks) == 0:
             return ret
@@ -262,9 +242,7 @@ class SPP:
     ) -> PathList:
 
         def generate_combinations(origins, destinations, t_starts, modes):
-            for o, d, t_start, mode in itertools.product(
-                origins, destinations, t_starts, modes
-            ):
+            for o, d, t_start, mode in itertools.product(origins, destinations, t_starts, modes):
                 yield {
                     "source": o,
                     "targets": d,
