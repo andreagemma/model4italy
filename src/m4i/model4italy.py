@@ -14,9 +14,7 @@ def main(**kwargs) -> Optional[BaseM4IModel]:
     try:
         # Controlla se esistono argomaenti passati alla line di comando
         if len(sys.argv) > 1 and not kwargs:
-            parser = argparse.ArgumentParser(
-                description="Run an elaboration or start the server"
-            )
+            parser = argparse.ArgumentParser(description="Run an elaboration or start the server")
             parser.add_argument(
                 "-p",
                 "--params",
@@ -45,9 +43,7 @@ def main(**kwargs) -> Optional[BaseM4IModel]:
                 action="append",
                 help="Option parameter. Override JSON setting.",
             )
-            parser.add_argument(
-                "-e", "--env", action="append", help="Override Enviroment Variables."
-            )
+            parser.add_argument("-e", "--env", action="append", help="Override Enviroment Variables.")
             subparsers = parser.add_subparsers(dest="command", help="Sub-command help")
 
             # Subparser for the "run" command
@@ -69,18 +65,14 @@ def main(**kwargs) -> Optional[BaseM4IModel]:
                 default="settings.ini",
                 help="Configuration file (default: settings.ini)",
             )
-            parser_run.add_argument(
-                "-o", "--op", help="Operation. Override JSON setting (default: None)"
-            )
+            parser_run.add_argument("-o", "--op", help="Operation. Override JSON setting (default: None)")
             parser_run.add_argument(
                 "-O",
                 "--option",
                 action="append",
                 help="Option parameter. Override JSON setting.",
             )
-            parser_run.add_argument(
-                "-e", "--env", action="append", help="Override Enviroment Variables."
-            )
+            parser_run.add_argument("-e", "--env", action="append", help="Override Enviroment Variables.")
 
             # Subparser for the "server" command
             parser_server = subparsers.add_parser("server", help="Start the web server")
@@ -93,9 +85,7 @@ def main(**kwargs) -> Optional[BaseM4IModel]:
                 help="Enable web server debug mode",
             )
 
-            parser_init_db = subparsers.add_parser(
-                "init_db", help="Initialize the database"
-            )
+            parser_init_db = subparsers.add_parser("init_db", help="Initialize the database")
             parser_init_db.add_argument("-u", "--url", help="Database URL")
             parser_init_db.add_argument("-H", "--host", help="Database host address")
             parser_init_db.add_argument("-P", "--port", help="Database port")
@@ -148,9 +138,7 @@ def main(**kwargs) -> Optional[BaseM4IModel]:
                 try:
                     key, value = option.split("=", 1)
                 except:
-                    raise Exception(
-                        f"Invalid option format: {option}. Use key:subkey:subsubkey=value format."
-                    )
+                    raise Exception(f"Invalid option format: {option}. Use key:subkey:subsubkey=value format.")
                 options[key] = value
             options = nested_dict_from_key_value_list(options)
         for k, v in os.environ.items():
@@ -182,9 +170,7 @@ def main(**kwargs) -> Optional[BaseM4IModel]:
                 return run(
                     ini_file=args.config,
                     params=args.params,
-                    params_data=args.params_data
-                    if args.params_data is not None
-                    else "params_data.json",
+                    params_data=args.params_data if args.params_data is not None else "params_data.json",
                     options=options,
                 )
 
@@ -219,9 +205,7 @@ def launch_monitor(directory="monitor"):
     prc = None
 
     def monitor():
-        monitor_process(
-            process_name="python", interval=5, output_file=None, directory=directory
-        )
+        monitor_process(process_name="python", interval=5, output_file=None, directory=directory)
 
     prc = mp.Process(target=monitor, daemon=True)
     prc.start()

@@ -104,9 +104,7 @@ def log_execution(logger=None, log_args=False, log_result=False):
                     f"Executing {getmodule(func).__name__}.{func.__name__} (id:{wrapper.id}) with args: {args} and kwargs: {kwargs}"
                 )
             else:
-                log.debug(
-                    f"Executing {getmodule(func).__name__}.{func.__name__} (id:{wrapper.id})"
-                )
+                log.debug(f"Executing {getmodule(func).__name__}.{func.__name__} (id:{wrapper.id})")
             results = func(*args, **kwargs)
             if log_result:
                 log.debug(
@@ -184,9 +182,7 @@ def add_dict_methods(cls: Type[Any]) -> Type[Any]:
       i valori nel tipo appropriato.
     """
     if not is_dataclass(cls):
-        raise TypeError(
-            "add_dict_methods decorator should be applied to dataclasses only."
-        )
+        raise TypeError("add_dict_methods decorator should be applied to dataclasses only.")
 
     def to_dict(self) -> dict:
         return {field.name: getattr(self, field.name) for field in fields(self)}

@@ -91,10 +91,7 @@ class MatrixOD:
             if row == "...":
                 rows_str += f"{row:>4} {'...':>8} {'...':>8} {'...':>8}\n"
             else:
-                row_data = " ".join(
-                    f"{self[row, col]:>8.2f}" if col != "..." else "..."
-                    for col in col_labels
-                )
+                row_data = " ".join(f"{self[row, col]:>8.2f}" if col != "..." else "..." for col in col_labels)
                 rows_str += f"{row:>4} {row_data}\n"
         return header + rows_str
 
@@ -196,9 +193,7 @@ class MatrixOD:
 
     def set_diagonal(self, values: List[float]) -> None:
         if len(values) != min(self.mat.shape):
-            raise ValueError(
-                "Length of values must match the length of the matrix diagonal."
-            )
+            raise ValueError("Length of values must match the length of the matrix diagonal.")
         np.fill_diagonal(self.mat, values)
 
     def nan_to_num(self, copy=True, nan=0.0, posinf=None, neginf=None):
@@ -246,9 +241,7 @@ class MatrixOD:
             return MatrixOD(rows=rows, cols=cols, init=grouped)
 
     @staticmethod
-    def read_csv(
-        rows: List, cols: List, file: str, o_field="o", d_field="d", value_field="value"
-    ) -> "MatrixOD":
+    def read_csv(rows: List, cols: List, file: str, o_field="o", d_field="d", value_field="value") -> "MatrixOD":
         df = pd.read_csv(file, usecols=[o_field, d_field, value_field])
         return MatrixOD.read_df(
             rows=rows,
@@ -272,8 +265,6 @@ class MatrixOD:
                 )
         return pd.DataFrame(data)
 
-    def write_csv(
-        self, file: str, o_field="o", d_field="d", value_field="value"
-    ) -> None:
+    def write_csv(self, file: str, o_field="o", d_field="d", value_field="value") -> None:
         df = self.write_df(o_field=o_field, d_field=d_field, value_field=value_field)
         df.to_csv(file, index=False)

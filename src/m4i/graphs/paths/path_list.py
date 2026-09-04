@@ -19,9 +19,7 @@ class PathList(PathContainer):
         dict.__setitem__(self, "paths", {})
 
     def add_path(self, to_add: Path, **kwargs):
-        self["paths"][to_add.key() if self["key"] is None else self["key"](to_add)] = (
-            to_add
-        )
+        self["paths"][to_add.key() if self["key"] is None else self["key"](to_add)] = to_add
 
     def get_sources(
         self,
@@ -119,9 +117,7 @@ class PathList(PathContainer):
     def n_paths(self, **kwargs) -> int:
         return len(self["paths"])
 
-    def filter(
-        self, filter: Callable[[Path], bool] = None, inplace=False, **kwargs
-    ) -> None:
+    def filter(self, filter: Callable[[Path], bool] = None, inplace=False, **kwargs) -> None:
         if inplace:
             if filter is None:
                 self["paths"] = {}

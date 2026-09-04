@@ -55,9 +55,7 @@ class JsonWriter(BaseDriver):
                         raise ValueError(f"File JSON non consistenti tra di loro")
                     data.update(json_data)
                 else:
-                    raise ValueError(
-                        f"Il file JSON '{file_path}' non contiene un oggetto o una lista di oggetti."
-                    )
+                    raise ValueError(f"Il file JSON '{file_path}' non contiene un oggetto o una lista di oggetti.")
             return data
         return json_load_file(path)
 
@@ -93,9 +91,7 @@ class JsonWriter(BaseDriver):
                     filename=os.path.splitext(filename)[0],
                     i=str(int(i) + 1),
                 )
-                json_serialize.save(
-                    df, os.path.join(os.path.dirname(path), f"{file_name}{extension}")
-                )
+                json_serialize.save(df, os.path.join(os.path.dirname(path), f"{file_name}{extension}"))
             else:
                 json_serialize(df, path)
         else:

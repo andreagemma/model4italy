@@ -121,9 +121,7 @@ def load_dict(file_name: str, compression=None) -> dict:
 
 
 def create_unique_name(prefix: Optional[str] = None) -> str:
-    return ("T" if prefix is None else prefix) + str(
-        "".join([str(x) for x in uuid4().fields])
-    )
+    return ("T" if prefix is None else prefix) + str("".join([str(x) for x in uuid4().fields]))
 
 
 def serialize(obj: Any, compression: str = None, clevel=5) -> bytes:
@@ -199,20 +197,13 @@ def normalize_name(
                 name = sub(k, v, name)
 
         if recursive and original != name:
-            return normalize_name(
-                name, replace=replace, str_fun=str_fun, recursive=recursive
-            )
+            return normalize_name(name, replace=replace, str_fun=str_fun, recursive=recursive)
         return name
 
     elif isinstance(name, Iterable):
-        return [
-            normalize_name(c, replace=replace, str_fun=str_fun, recursive=recursive)
-            for c in name
-        ]
+        return [normalize_name(c, replace=replace, str_fun=str_fun, recursive=recursive) for c in name]
     else:
-        return normalize_name(
-            str(name), replace=replace, str_fun=str_fun, recursive=recursive
-        )
+        return normalize_name(str(name), replace=replace, str_fun=str_fun, recursive=recursive)
 
 
 def generate_series(
@@ -396,9 +387,7 @@ def hhmm2min(timestr):
     return int(h1) * 60 + int(m1)
 
 
-def min_from_midnight(
-    date: Union[datetime, str], date_base: Optional[Union[datetime, str]] = None
-) -> Optional[int]:
+def min_from_midnight(date: Union[datetime, str], date_base: Optional[Union[datetime, str]] = None) -> Optional[int]:
     """
     Convert a time string in the format HH:MM to the number of minutes from midnight.
 
@@ -406,11 +395,7 @@ def min_from_midnight(
     :return: The number of minutes from midnight as an integer.
     """
     date = to_datetime_auto(date)
-    date_base = (
-        to_datetime_auto(date_base)
-        if date_base
-        else date.replace(hour=0, minute=0, second=0, microsecond=0)
-    )
+    date_base = to_datetime_auto(date_base) if date_base else date.replace(hour=0, minute=0, second=0, microsecond=0)
     if date is None or date_base is None:
         return None
     return (date - date_base).total_seconds() // 60  # Restituisce i minuti come intero
@@ -469,13 +454,9 @@ def to_datetime_auto(
     :return: A datetime object or None if conversion fails.
     """
     if date_default is None:
-        date_default = datetime.fromtimestamp(
-            0
-        ).date()  # Default to epoch date (1970-01-01)
+        date_default = datetime.fromtimestamp(0).date()  # Default to epoch date (1970-01-01)
     if time_default is None:
-        time_default = datetime.fromtimestamp(
-            0
-        ).time()  # Default to midnight (00:00:00)
+        time_default = datetime.fromtimestamp(0).time()  # Default to midnight (00:00:00)
 
     def refine(dt: datetime):
         if dt is None:
@@ -492,9 +473,7 @@ def to_datetime_auto(
             else:
                 if tz != dt.tzinfo:
                     dt = tz.localize(dt.replace(tzinfo=None))
-                    warnings.warn(
-                        "Datetime is already timezone-aware, localizing may lead to unexpected results."
-                    )
+                    warnings.warn("Datetime is already timezone-aware, localizing may lead to unexpected results.")
         if tz_convert is not None:
             if isinstance(tz_convert, str):
                 tz = pytz.timezone(tz_convert)
@@ -546,9 +525,7 @@ def to_datetime_auto(
     elif isinstance(t, (int, float)):
         # Se è un numero, lo interpretiamo come timestamp (secondi dall'epoca)
         _kwargs = {unit: float(t)}
-        return refine(
-            datetime.combine(date_default, time_default) + timedelta(**_kwargs)
-        )
+        return refine(datetime.combine(date_default, time_default) + timedelta(**_kwargs))
     elif isinstance(t, datetime):
         return refine(t)
     elif isinstance(t, date):
@@ -685,10 +662,7 @@ def memory_usage(
 
             # Controlla se il processo soddisfa almeno uno dei filtri
             matches_name = (
-                any(
-                    re.search(pattern, process_name.lower())
-                    for pattern in process_names
-                )
+                any(re.search(pattern, process_name.lower()) for pattern in process_names)
                 if process_name and process_names
                 else False
             )
@@ -768,9 +742,7 @@ def print_loaded_modules():
     custom_loaded_modules = loaded_modules - standard_modules
 
     # Filtra ulteriormente per escludere i moduli built-in (che iniziano con "_")
-    custom_loaded_modules = {
-        mod for mod in custom_loaded_modules if not mod.startswith("_")
-    }
+    custom_loaded_modules = {mod for mod in custom_loaded_modules if not mod.startswith("_")}
 
     # Stampa i pacchetti caricati che non sono standard
     for package in sorted(custom_loaded_modules):
@@ -827,37 +799,19 @@ def export_dataframe(df, file_path, mode="w", **kwargs):
 
         table = pa.Table.from_pandas(df, preserve_index=index)
         # genrete unuique name for the partition
-        uid = (
-            str(int(datetime.now().timestamp()))
-            + "_"
-            + str(uuid4())
-            + "_"
-            + str(getpid())
-            + "_{i}"
-            + extension
-        )
-        existing_data_behavior = (
-            "delete_matching" if not append else "overwrite_or_ignore"
-        )
-        schema = (
-            pa.Schema.from_pandas(df[partition_cols], preserve_index=index)
-            if partition_cols
-            else None
-        )
+        uid = str(int(datetime.now().timestamp())) + "_" + str(uuid4()) + "_" + str(getpid()) + "_{i}" + extension
+        existing_data_behavior = "delete_matching" if not append else "overwrite_or_ignore"
+        schema = pa.Schema.from_pandas(df[partition_cols], preserve_index=index) if partition_cols else None
         ds.write_dataset(
             table,
             base_dir=base_dir,
             format="parquet",
             basename_template=uid,
-            partitioning=ds.partitioning(schema=schema, flavor="hive")
-            if partition_cols
-            else None,
+            partitioning=ds.partitioning(schema=schema, flavor="hive") if partition_cols else None,
             existing_data_behavior=existing_data_behavior,
         )
 
-    def to_geoparquet(
-        df, base_dir, partition_cols=None, append=False, index=False, crs=None
-    ):
+    def to_geoparquet(df, base_dir, partition_cols=None, append=False, index=False, crs=None):
         import pyarrow as pa
         import pyarrow.dataset as ds
         import pandas as pd
@@ -879,31 +833,15 @@ def export_dataframe(df, file_path, mode="w", **kwargs):
         warnings.filterwarnings("default", category=UserWarning, module="geopandas")
         table = pa.Table.from_pandas(df, preserve_index=index)
 
-        existing_data_behavior = (
-            "delete_matching" if not append else "overwrite_or_ignore"
-        )
-        uid = (
-            str(int(datetime.now().timestamp()))
-            + "_"
-            + str(uuid4())
-            + "_"
-            + str(getpid())
-            + "_{i}"
-            + extension
-        )
-        schema = (
-            pa.Schema.from_pandas(df[partition_cols], preserve_index=index)
-            if partition_cols
-            else None
-        )
+        existing_data_behavior = "delete_matching" if not append else "overwrite_or_ignore"
+        uid = str(int(datetime.now().timestamp())) + "_" + str(uuid4()) + "_" + str(getpid()) + "_{i}" + extension
+        schema = pa.Schema.from_pandas(df[partition_cols], preserve_index=index) if partition_cols else None
         ds.write_dataset(
             table,
             base_dir=base_dir,
             format="parquet",
             basename_template=uid,
-            partitioning=ds.partitioning(schema=schema, flavor="hive")
-            if partition_cols
-            else None,
+            partitioning=ds.partitioning(schema=schema, flavor="hive") if partition_cols else None,
             existing_data_behavior=existing_data_behavior,
         )
 
@@ -916,9 +854,7 @@ def export_dataframe(df, file_path, mode="w", **kwargs):
 
     # Mappa estensioni a metodi di esportazione
     export_methods_gpd = {
-        ".shp": lambda df, x, **kwargs: (
-            df.to_file(x, index=index, mode=mode) if hasattr(df, "to_file") else None
-        ),
+        ".shp": lambda df, x, **kwargs: df.to_file(x, index=index, mode=mode) if hasattr(df, "to_file") else None,
         ".parquet": lambda df, x, **kwargs: to_geoparquet(
             df, x, partition_cols=partition_cols, append=append, index=index
         ),
@@ -939,35 +875,19 @@ def export_dataframe(df, file_path, mode="w", **kwargs):
     }
 
     export_methods_pd = {
-        ".csv": lambda df, x, **kwargs: (
-            df.to_csv(x, mode=mode, index=index) if hasattr(df, "to_csv") else None
-        ),
-        ".excel": lambda df, x, **kwargs: (
-            df.to_excel(x, index=index) if hasattr(df, "to_excel") else None
-        ),
-        ".xls": lambda df, x, **kwargs: (
-            df.to_excel(x, index=index) if hasattr(df, "to_excel") else None
-        ),
-        ".xlsx": lambda df, x, **kwargs: (
-            df.to_excel(x, index=index) if hasattr(df, "to_excel") else None
-        ),
+        ".csv": lambda df, x, **kwargs: df.to_csv(x, mode=mode, index=index) if hasattr(df, "to_csv") else None,
+        ".excel": lambda df, x, **kwargs: df.to_excel(x, index=index) if hasattr(df, "to_excel") else None,
+        ".xls": lambda df, x, **kwargs: df.to_excel(x, index=index) if hasattr(df, "to_excel") else None,
+        ".xlsx": lambda df, x, **kwargs: df.to_excel(x, index=index) if hasattr(df, "to_excel") else None,
         ".parquet": lambda df, x, **kwargs: to_parquet(
             df, x, partition_cols=partition_cols, append=append, index=index
         ),
-        ".json": lambda df, x, **kwargs: (
-            df.to_json(x, mode=mode) if hasattr(df, "to_json") else None
-        ),
-        ".html": lambda df, x, **kwargs: (
-            df.to_html(x, index=index, **kwargs) if hasattr(df, "to_html") else None
-        ),
+        ".json": lambda df, x, **kwargs: df.to_json(x, mode=mode) if hasattr(df, "to_json") else None,
+        ".html": lambda df, x, **kwargs: df.to_html(x, index=index, **kwargs) if hasattr(df, "to_html") else None,
         ".feather": lambda df, x, **kwargs: (
-            df.to_feather(x, index=index, **kwargs)
-            if hasattr(df, "to_feather")
-            else None
+            df.to_feather(x, index=index, **kwargs) if hasattr(df, "to_feather") else None
         ),
-        ".pickle": lambda df, x, **kwargs: (
-            x.to_pickle if hasattr(df, "to_pickle") else None
-        ),
+        ".pickle": lambda df, x, **kwargs: x.to_pickle if hasattr(df, "to_pickle") else None,
     }
 
     try:
@@ -1003,33 +923,21 @@ def export_dataframe(df, file_path, mode="w", **kwargs):
     return False
 
 
-def inner_filter_to_query_expression(
-    filters, rename=None, quoting='"', op_boolean_symbols=False
-):
+def inner_filter_to_query_expression(filters, rename=None, quoting='"', op_boolean_symbols=False):
     expressions = []
     if isinstance(filters, (tuple, list)):
-        if (
-            len(filters) == 3
-            and isinstance(filters[0], str)
-            and isinstance(filters[1], str)
-        ):
+        if len(filters) == 3 and isinstance(filters[0], str) and isinstance(filters[1], str):
             column, operator, value = filters
             if isinstance(value, str):
                 value = f"'{value}'"
             expressions.append(f"({quoting}{column}{quoting} {operator} {value})")
         else:
             for filter in filters:
-                if (
-                    len(filter) == 3
-                    and isinstance(filter[0], str)
-                    and isinstance(filter[1], str)
-                ):
+                if len(filter) == 3 and isinstance(filter[0], str) and isinstance(filter[1], str):
                     column, operator, value = filter
                     if isinstance(value, str):
                         value = f"'{value}'"
-                    expressions.append(
-                        f"({quoting}{column}{quoting} {operator} {value})"
-                    )
+                    expressions.append(f"({quoting}{column}{quoting} {operator} {value})")
                 else:
                     raise ValueError(
                         "Invalid filter format. The inner filter must be a list of tuple with 3 elements (column,operator,value)."
@@ -1052,9 +960,7 @@ def filters_to_query_expression(filters, quoting='"', op_boolean_symbols=False):
 
     for group in filters:
         group_expressions.append(
-            inner_filter_to_query_expression(
-                group, quoting=quoting, op_boolean_symbols=op_boolean_symbols
-            )
+            inner_filter_to_query_expression(group, quoting=quoting, op_boolean_symbols=op_boolean_symbols)
         )  # Chiamata ricorsiva per gestire gruppi e tuple
 
     # Unisci i gruppi con 'or'
@@ -1099,9 +1005,7 @@ def import_dataframe(file_path, filters=None, dtype={}, driver=None, **kwargs):
             filters = None
         elif isinstance(filters, (tuple, list)):
             if extension not in ("parquet", "geoparquet"):
-                where = filters_to_query_expression(
-                    filters, quoting="", op_boolean_symbols=True
-                )
+                where = filters_to_query_expression(filters, quoting="", op_boolean_symbols=True)
     import_methods_pd = {}
     import_methods_gpd = {}
     try:
@@ -1156,17 +1060,13 @@ def import_dataframe(file_path, filters=None, dtype={}, driver=None, **kwargs):
             if geom_cols:
                 crs = kwargs.pop("crs", None)
                 if not crs:
-                    raise ValueError(
-                        f"CRS must be specified when importing geometry columns for file {file_path}."
-                    )
+                    raise ValueError(f"CRS must be specified when importing geometry columns for file {file_path}.")
                 import geopandas
 
                 for col in geom_cols:
                     if col in df.columns:
                         geometry = geopandas.GeoSeries.from_wkt(df[col])
-                        df = geopandas.GeoDataFrame(
-                            df.drop(columns=[col]), geometry=geometry, crs=crs
-                        )
+                        df = geopandas.GeoDataFrame(df.drop(columns=[col]), geometry=geometry, crs=crs)
                         break
 
         df = df.astype(dtype, copy=True)
@@ -1216,9 +1116,7 @@ def generate_sqlalchemy_url(
 def parse_sqlalchemy_url(url):
     result = urlparse(url)
     components = {
-        "db_type": result.scheme.split("+")[0]
-        if "+" in result.scheme
-        else result.scheme,
+        "db_type": result.scheme.split("+")[0] if "+" in result.scheme else result.scheme,
         "db_driver": result.scheme.split("+")[1] if "+" in result.scheme else None,
         "db_user": result.username,
         "db_password": result.password,
@@ -1230,9 +1128,7 @@ def parse_sqlalchemy_url(url):
     return components
 
 
-def generate_postgres_dns(
-    db_host=None, db_port=None, db_user=None, db_password=None, db_name=None, **kwargs
-):
+def generate_postgres_dns(db_host=None, db_port=None, db_user=None, db_password=None, db_name=None, **kwargs):
     return f"host={db_host} port={db_port} dbname={db_name} user={db_user} password={db_password}"
 
 
@@ -1273,9 +1169,7 @@ def to_namedtuple(dict_obj):
 
     return json.loads(
         json.dumps(dict_obj),
-        object_hook=lambda d: (
-            namedtuple("X", d.keys())(*d.values()) if isinstance(d, dict) else d
-        ),
+        object_hook=lambda d: namedtuple("X", d.keys())(*d.values()) if isinstance(d, dict) else d,
     )
 
 
@@ -1284,11 +1178,7 @@ from string import Formatter
 
 def get_parametric_name(name, **kwargs):
     if isinstance(name, str):
-        keys = [
-            i[1]
-            for i in Formatter().parse(name)
-            if i[1] is not None and i[1] not in kwargs
-        ]
+        keys = [i[1] for i in Formatter().parse(name) if i[1] is not None and i[1] not in kwargs]
         # print(keys)
         if keys:
             kwargs = kwargs.copy()
@@ -1461,11 +1351,7 @@ def pd_concat(df_list, ignore_index=True, sort=False, **kwargs):
 
 def file_ordered_list(cartella, estensioni=None, reverse=False):
     p = Path(cartella)
-    files = [
-        f
-        for f in p.rglob("*")
-        if f.is_file() and (estensioni is None or f.suffix.lower() in estensioni)
-    ]
+    files = [f for f in p.rglob("*") if f.is_file() and (estensioni is None or f.suffix.lower() in estensioni)]
     return sorted(files, key=lambda x: x.stat().st_mtime, reverse=reverse)
 
 
@@ -1770,18 +1656,12 @@ def _sql_list_to_py_list(text_inside_parens: str, str_map: dict) -> str:
     return "[" + ", ".join(items) + "]"
 
 
-def _like_to_pandas(
-    col: str, str_token: str, str_map: dict, *, insensitive=False, neg=False
-) -> str:
+def _like_to_pandas(col: str, str_token: str, str_map: dict, *, insensitive=False, neg=False) -> str:
     """Converte (I)LIKE in .str.contains/startswith/endswith o uguaglianza."""
     lit = str_map.get(str_token, str_token)  # es: "'abc%'" (python-quoted)
     # togli apici esterni
-    if len(lit) >= 2 and (
-        (lit[0] == "'" and lit[-1] == "'") or (lit[0] == '"' and lit[-1] == '"')
-    ):
-        pat = (
-            lit[1:-1].encode("utf-8").decode("unicode_escape")
-        )  # gestisce eventuali escape
+    if len(lit) >= 2 and ((lit[0] == "'" and lit[-1] == "'") or (lit[0] == '"' and lit[-1] == '"')):
+        pat = lit[1:-1].encode("utf-8").decode("unicode_escape")  # gestisce eventuali escape
     else:
         pat = lit
 
@@ -1804,9 +1684,7 @@ def _like_to_pandas(
         if pat.endswith("%") and pat.find("%") == len(pat) - 1:
             stem = pat[:-1]
             if insensitive:
-                expr = (
-                    f"{col}.str.lower().str.startswith({_python_quote(stem.lower())})"
-                )
+                expr = f"{col}.str.lower().str.startswith({_python_quote(stem.lower())})"
             else:
                 expr = f"{col}.str.startswith({_python_quote(stem)})"
             return _wrap(expr, neg)
@@ -1822,9 +1700,7 @@ def _like_to_pandas(
         if pat.startswith("%") and pat.endswith("%") and pat.count("%") == 2:
             core = pat[1:-1]
             # contains
-            expr = f"{col}.str.contains({_python_quote(core)}, regex=False" + (
-                ", case=False)" if insensitive else ")"
-            )
+            expr = f"{col}.str.contains({_python_quote(core)}, regex=False" + (", case=False)" if insensitive else ")")
             return _wrap(expr, neg)
 
     # Caso generale: traduciamo %/_ in regex .*/.
@@ -1837,9 +1713,7 @@ def _like_to_pandas(
         else:
             regex_parts.append(re.escape(ch))
     regex = "".join(regex_parts)
-    expr = f"{col}.str.contains({_python_quote(regex)}, regex=True" + (
-        ", case=False)" if insensitive else ")"
-    )
+    expr = f"{col}.str.contains({_python_quote(regex)}, regex=True" + (", case=False)" if insensitive else ")")
     return _wrap(expr, neg)
 
 
@@ -1876,20 +1750,12 @@ def sql_where_to_pandas(expr: str) -> str:
     )
 
     # 4) IS NULL / IS NOT NULL
-    s = re.sub(
-        r"(?P<col>[\w\.__ID]+)\s+IS\s+NOT\s+NULL\b", r"\g<col>.notnull()", s, flags=re.I
-    )
-    s = re.sub(
-        r"(?P<col>[\w\.__ID]+)\s+IS\s+NULL\b", r"\g<col>.isnull()", s, flags=re.I
-    )
+    s = re.sub(r"(?P<col>[\w\.__ID]+)\s+IS\s+NOT\s+NULL\b", r"\g<col>.notnull()", s, flags=re.I)
+    s = re.sub(r"(?P<col>[\w\.__ID]+)\s+IS\s+NULL\b", r"\g<col>.isnull()", s, flags=re.I)
 
     # 5) Confronti con NULL usando =, <> o !=
-    s = re.sub(
-        r"(?P<col>[\w\.__ID]+)\s*(=)\s*NULL\b", r"\g<col>.isnull()", s, flags=re.I
-    )
-    s = re.sub(
-        r"(?P<col>[\w\.__ID]+)\s*(<>|!=)\s*NULL\b", r"\g<col>.notnull()", s, flags=re.I
-    )
+    s = re.sub(r"(?P<col>[\w\.__ID]+)\s*(=)\s*NULL\b", r"\g<col>.isnull()", s, flags=re.I)
+    s = re.sub(r"(?P<col>[\w\.__ID]+)\s*(<>|!=)\s*NULL\b", r"\g<col>.notnull()", s, flags=re.I)
 
     # 6) IN / NOT IN
     def _in_repl(m):

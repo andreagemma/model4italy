@@ -44,9 +44,7 @@ class StaticSimulator(BaseSimulator):
 
         from ..utils.parallel import Parallel
 
-        for flows, mode_flows in Parallel.execute(
-            calc, tasks=self.paths.all_paths(), G=self.G, n_workers=4
-        ):
+        for flows, mode_flows in Parallel.execute(calc, tasks=self.paths.all_paths(), G=self.G, n_workers=4):
             for (link_idx, t_start), flow in flows.items():
                 link = self.G.get_link(link_idx)
                 link["flow"] += flow, t_start
@@ -79,9 +77,7 @@ class StaticSimulator(BaseSimulator):
 
         agg_int = str(agg_int) + "min"
 
-        times = pd.date_range(start=min2hhmm(tstart), end=min2hhmm(tend), freq=agg_int)[
-            :-1
-        ]
+        times = pd.date_range(start=min2hhmm(tstart), end=min2hhmm(tend), freq=agg_int)[:-1]
         ret = {
             "time": [],
             "mode": [],

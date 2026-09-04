@@ -34,9 +34,7 @@ class StateManager(object):
     def __init__(self, parser: ParamsParser):
         self.parser = parser
         self.execution_id = self.parser.get("execution_id")
-        self.log = Logger.getLogger(
-            self.__class__.__name__, execution_id=self.execution_id
-        )
+        self.log = Logger.getLogger(self.__class__.__name__, execution_id=self.execution_id)
         self.ini: IniClass = self.parser.ini
         self.default_ext = (
             f".pickle.{self.parser.ini.OUTPUT_STATE_COMPRESSION}"
@@ -58,9 +56,7 @@ class StateManager(object):
         if src is None:
             raise Exception("'state' not defined")
         if not isinstance(src, str):
-            raise Exception(
-                "'state' hase to be a string indicating the folder location"
-            )
+            raise Exception("'state' hase to be a string indicating the folder location")
 
         src = join(src, name)
         if partition is not None:
@@ -86,9 +82,7 @@ class StateManager(object):
         if src is None:
             raise Exception("'state' not defined")
         if not isinstance(src, str):
-            raise Exception(
-                "'state' hase to be a string indicating the folder location"
-            )
+            raise Exception("'state' hase to be a string indicating the folder location")
 
         if partition is not None:
             src = join(src, partition)

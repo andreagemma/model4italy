@@ -77,9 +77,7 @@ class car:
         self.current_link = self.G.get_link(self.path_links[self.c_l])
         self.last_link = self.G.get_link(self.path_links[-1])
         if self.status == "sleeping":
-            self.current_link["mov_vehs"] += (
-                1  # add one vehicle on the current link link
-            )
+            self.current_link["mov_vehs"] += 1  # add one vehicle on the current link link
             self.current_link[self.field_ent] += 1
 
     def link_transfer(self, t):
@@ -97,9 +95,7 @@ class car:
         #     pdb.set_trace()
         self.tt = tt
         self.s_t = s_t
-        free_link = (
-            1 - self.current_link["l_queue"] / self.current_link["length"]
-        )  # space link free of queue
+        free_link = 1 - self.current_link["l_queue"] / self.current_link["length"]  # space link free of queue
 
         if (self.c_l_tf > tt) & (s_t < free_link):  # still traveling
             self.status = "mov"
@@ -115,9 +111,7 @@ class car:
             s_t >= free_link
         ):  # encountred queue but would not have exited, need to update exit time
             self.status = "queueing"
-            self.c_l_tf = max(
-                tt + self.deltat, free_link * (self.c_l_tf - self.c_l_ti) + self.c_l_ti
-            )
+            self.c_l_tf = max(tt + self.deltat, free_link * (self.c_l_tf - self.c_l_ti) + self.c_l_ti)
             self.current_link["mov_vehs"] -= 1
             self.current_link["que_vehs"] += 1
             self.current_link["storage_cap"] -= 1 - self.current_link["ksi"]
@@ -126,33 +120,23 @@ class car:
     def node_transfer(self, t):
         permitted_turn = True
         # if self.status in node_conditions: #  implementato a livello superiore per evitare la chiamata
-        if (
-            self.status == "queueing"
-        ):  # if it just encountred the queue, update exit time and put it as queuing vehicle
+        if self.status == "queueing":  # if it just encountred the queue, update exit time and put it as queuing vehicle
             self.status = "queue"
 
         else:  # the vehicle arrived to a node and needs to check capacity constraints
-            if (
-                self.current_link is self.last_link
-            ):  # arrived at the end of the last link
+            if self.current_link is self.last_link:  # arrived at the end of the last link
                 self.status = "arrived"
                 self.current_link["que_vehs"] -= 1
                 self.current_link["storage_cap"] += 1
 
             else:
-                self.next_link = self.G.get_link(
-                    self.path_links[self.n_l]
-                )  # assign new next link
+                self.next_link = self.G.get_link(self.path_links[self.n_l])  # assign new next link
 
                 l = self.current_link["idx"]
                 nl = self.next_link["idx"]
 
                 try:
-                    nnl = (
-                        None
-                        if self.n_l + 1 >= len(self.path_links)
-                        else self.path_links[self.n_l + 1]
-                    )
+                    nnl = None if self.n_l + 1 >= len(self.path_links) else self.path_links[self.n_l + 1]
                 except:
                     nnl = None
 
@@ -168,9 +152,7 @@ class car:
                             if self.signalized_turns[key]["permitted"] & permitted_turn:
                                 # pdb.set_trace()
 
-                                fl = self.G["signalized_turns"][key]["opposite_turn"][
-                                    "from_link"
-                                ]
+                                fl = self.G["signalized_turns"][key]["opposite_turn"]["from_link"]
                                 fl = self.G.get_link(fl)  # match opposite direction
                                 mv = fl["mov_vehs"]
 
@@ -179,16 +161,11 @@ class car:
                                 else:
                                     dmv = 100000
 
-                                if (
-                                    dmv > self.critical_gap
-                                    or self.signalized_turns[key]["permitted_movs"] == 0
-                                ):
+                                if dmv > self.critical_gap or self.signalized_turns[key]["permitted_movs"] == 0:
                                     permitted_turn = False
 
                 if (
-                    (self.current_link["inflow_cap"] >= 1)
-                    & (self.next_link["storage_cap"] >= 1)
-                    & permitted_turn
+                    (self.current_link["inflow_cap"] >= 1) & (self.next_link["storage_cap"] >= 1) & permitted_turn
                 ):  # capacity of next link and on current link
                     self.update_cap(self.current_link, self.next_link)
 
@@ -225,9 +202,7 @@ class car:
         if self.status == "sleeping":
             if t >= self.ent_time:
                 self.status = "moving"
-                self.c_l_tf = (
-                    self.c_l_ti + self.current_link["ta"]
-                )  # exit time on current link
+                self.c_l_tf = self.c_l_ti + self.current_link["ta"]  # exit time on current link
 
         test = 0
         while self.status not in transfer_condition:

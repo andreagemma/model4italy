@@ -49,27 +49,19 @@ class MatrixAss:
         self.origins = loader.origins
         self.destinations = loader.destinations
 
-        self.detectors = sorted(
-            loader.detectors["id_link"].to_list()
-            if links_detected is None
-            else links_detected
-        )
+        self.detectors = sorted(loader.detectors["id_link"].to_list() if links_detected is None else links_detected)
 
         self.delta_t = loader.delta_t
         self.n_intervals = n_intervals
         self.pre_intervals = (
-            int(loader.ini.OD_ESTIMATION_WHISKERS / self.delta_t)
-            if pre_intervals is None
-            else pre_intervals
+            int(loader.ini.OD_ESTIMATION_WHISKERS / self.delta_t) if pre_intervals is None else pre_intervals
         )
 
         self.mats = {}
         self.d_mats = {}
 
         self.o2i = dict([(self.origins[i], i) for i in range(len(self.origins))])
-        self.d2i = dict(
-            [(self.destinations[i], i) for i in range(len(self.destinations))]
-        )
+        self.d2i = dict([(self.destinations[i], i) for i in range(len(self.destinations))])
         self.l2i = dict([(self.detectors[i], i) for i in range(len(self.detectors))])
 
         for tenter in range(self.n_intervals):
@@ -78,9 +70,7 @@ class MatrixAss:
                 # print(tenter,tstart)
                 if tenter - tstart > self.pre_intervals:
                     continue
-                self.mats[(tenter, tstart)] = MatrixAss.OD(
-                    self.origins, self.destinations, self.detectors
-                )
+                self.mats[(tenter, tstart)] = MatrixAss.OD(self.origins, self.destinations, self.detectors)
 
     def from_df(self, df):
         df = df.to_dict(orient="records")
@@ -112,9 +102,7 @@ class MatrixAss:
                     writer.writerow(["tstart", "link", "od", "value"])
                 for r in range(od.mat.shape[0]):
                     for ind in range(od.mat.indptr[r], od.mat.indptr[r + 1]):
-                        writer.writerow(
-                            (tstart, r, od.mat.indices[ind], od.mat.data[ind])
-                        )
+                        writer.writerow((tstart, r, od.mat.indices[ind], od.mat.data[ind]))
 
             # fname = os.path.join(folder, f"md_{int(k[0])}_{int(k[1])}.csv")
             # df = pd.DataFrame(data=od.mat.todense()).replace(0,None)

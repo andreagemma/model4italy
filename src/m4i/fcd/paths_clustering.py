@@ -50,11 +50,7 @@ def clustering(df, crs_data, crs_calc, eps=100):
     df["cluster"] = model.fit_predict(D)
     df["_geometry"] = df.geometry.to_crs(crs_data)
     # per ogni gruppo prendo quello con tot_cost minimo
-    agg = {
-        c: (c, "first")
-        for c in df.columns
-        if c in {"source", "target", "mode", "links", "_geometry"}
-    }
+    agg = {c: (c, "first") for c in df.columns if c in {"source", "target", "mode", "links", "_geometry"}}
     if "tot_cost" in df.columns:
         agg["tot_cost"] = ("tot_cost", "mean")
     agg["n_paths"] = ("source", "count")
@@ -67,9 +63,7 @@ def clustering(df, crs_data, crs_calc, eps=100):
 
 
 class PathsClustering(BaseM4IModel):
-    def __init__(
-        self, loader: Loader, writer: Writer, ipc: IPC, n_workers=-1, **kwargs
-    ):
+    def __init__(self, loader: Loader, writer: Writer, ipc: IPC, n_workers=-1, **kwargs):
         super().__init__(loader=loader, writer=writer, ipc=ipc, **kwargs)
         self.n_workers = Parallel.get_num_min_cpus(n_workers)
         self.log.info(f"Initializing Parallel...")
@@ -80,9 +74,7 @@ class PathsClustering(BaseM4IModel):
         )
         self.log.info(f"Parallel initialized with {Parallel.num_cpus} workers")
 
-    def run(
-        self, df: Union[gpd.GeoDataFrame], eps=100, mode=None, **kwargs
-    ) -> gpd.GeoDataFrame:
+    def run(self, df: Union[gpd.GeoDataFrame], eps=100, mode=None, **kwargs) -> gpd.GeoDataFrame:
         if df is None:
             self
         """
@@ -103,18 +95,12 @@ class PathsClustering(BaseM4IModel):
 
         crs_calc = self.loader.parser.ini.CRS_CALC
         crs_data = self.loader.parser.ini.CRS
-        eps = (
-            eps
-            if eps is not None
-            else self.loader.parser.ini.FCD_ROUTING_CLUSTERING_EPS
-        )
+        eps = eps if eps is not None else self.loader.parser.ini.FCD_ROUTING_CLUSTERING_EPS
 
         def fn(tasks):
             ret = None
             for name, df_group in tasks:
-                tmp = clustering(
-                    df_group, crs_calc=crs_calc, crs_data=crs_data, eps=eps
-                )
+                tmp = clustering(df_group, crs_calc=crs_calc, crs_data=crs_data, eps=eps)
                 if ret is None and tmp is not None and not tmp.empty:
                     ret = tmp
                 else:
@@ -126,9 +112,7 @@ class PathsClustering(BaseM4IModel):
                     if isinstance(ret, dd.DataFrame):
                         ret = ret.compute()
                 except ImportError:
-                    raise ImportError(
-                        "Dask is not installed. Please install dask to use this feature."
-                    )
+                    raise ImportError("Dask is not installed. Please install dask to use this feature.")
                 if isinstance(ret, pd.DataFrame):
                     ret = gpd.GeoDataFrame(ret, crs=crs_calc, geometry=ret.geometry)
             if ret is not None and ret.crs is None:
@@ -144,9 +128,7 @@ class PathsClustering(BaseM4IModel):
         ret = None
         total_tasks = list(grp)
         counts = 0
-        for i, tmp in enumerate(
-            Parallel.execute(fn, total_tasks, n_workers=self.n_workers)
-        ):
+        for i, tmp in enumerate(Parallel.execute(fn, total_tasks, n_workers=self.n_workers)):
             if ret is None and tmp is not None and not tmp.empty:
                 ret = tmp
             else:

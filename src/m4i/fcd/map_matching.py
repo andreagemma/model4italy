@@ -11,9 +11,7 @@ from ..utils import Parallel
 
 
 class MapMatching:
-    def __init__(
-        self, links_gdf, links_id_col="id", links_direction_col=None, segments_gdf=None
-    ):
+    def __init__(self, links_gdf, links_id_col="id", links_direction_col=None, segments_gdf=None):
         self.links_gdf = links_gdf
         self.links_id_col = links_id_col
         self.link_direction_col = links_direction_col
@@ -41,28 +39,20 @@ class MapMatching:
 
     # Suddivisione link in segmenti elementari utilizzando GeoPandas
     @staticmethod
-    def split_links_to_segments(
-        links_gdf, link_id_col="id_link", link_direction_col=None
-    ):
+    def split_links_to_segments(links_gdf, link_id_col="id_link", link_direction_col=None):
         segments_list = []
-        if (
-            link_direction_col
-        ):  # Se i link hanno una direzione calcolo gli archi in direzione opposta
+        if link_direction_col:  # Se i link hanno una direzione calcolo gli archi in direzione opposta
             dir_reverse = links_gdf[link_direction_col] == -1
-            links_gdf.loc[dir_reverse, "geometry"] = links_gdf[
-                dir_reverse
-            ].geometry.apply(lambda x: LineString(list(x.coords)[::-1]))
+            links_gdf.loc[dir_reverse, "geometry"] = links_gdf[dir_reverse].geometry.apply(
+                lambda x: LineString(list(x.coords)[::-1])
+            )
 
             double_direction = links_gdf[link_direction_col] == 0
             links_to_add_reverse = links_gdf[double_direction].copy()
-            links_to_add_reverse.loc[:, "geometry"] = (
-                links_to_add_reverse.geometry.apply(
-                    lambda x: LineString(list(x.coords)[::-1])
-                )
+            links_to_add_reverse.loc[:, "geometry"] = links_to_add_reverse.geometry.apply(
+                lambda x: LineString(list(x.coords)[::-1])
             )
-            links_to_add_reverse.loc[:, link_id_col] = -links_to_add_reverse[
-                link_id_col
-            ]
+            links_to_add_reverse.loc[:, link_id_col] = -links_to_add_reverse[link_id_col]
             links_gdf = pd.concat([links_gdf, links_to_add_reverse], ignore_index=True)
 
         for _, row in links_gdf.iterrows():
@@ -75,9 +65,7 @@ class MapMatching:
                 segment_geom = LineString([points[i], points[i + 1]])
                 start_pos = geom.project(Point(points[i])) / total_length
                 end_pos = geom.project(Point(points[i + 1])) / total_length
-                azimuth = MapMatching.calculate_azimuth(
-                    Point(points[i]), Point(points[i + 1])
-                )
+                azimuth = MapMatching.calculate_azimuth(Point(points[i]), Point(points[i + 1]))
 
                 segments_list.append(
                     {
@@ -108,9 +96,7 @@ class MapMatching:
         segments_sindex = segments_gdf.sindex
 
         for idx, gps in gps_gdf.iterrows():
-            possible_matches_index = list(
-                segments_sindex.intersection(gps.geometry.buffer(max_distance).bounds)
-            )
+            possible_matches_index = list(segments_sindex.intersection(gps.geometry.buffer(max_distance).bounds))
             possible_matches = segments_gdf.iloc[possible_matches_index].copy()
 
             possible_matches["dist"] = possible_matches.geometry.distance(gps.geometry)
@@ -119,8 +105,7 @@ class MapMatching:
             )
 
             candidates = possible_matches[
-                (possible_matches["dist"] <= max_distance)
-                & (possible_matches["alpha"] < max_angle)
+                (possible_matches["dist"] <= max_distance) & (possible_matches["alpha"] < max_angle)
             ].copy()
 
             if candidates.empty:
@@ -128,15 +113,9 @@ class MapMatching:
                 continue
 
             candidates["p_alpha"] = candidates["alpha"].apply(
-                lambda alpha: (
-                    0.1
-                    if alpha <= 5 or gps[fcd_state_col] in [0, 2]
-                    else 0.1 * exp(-(alpha - 5) / 5)
-                )
+                lambda alpha: 0.1 if alpha <= 5 or gps[fcd_state_col] in [0, 2] else 0.1 * exp(-(alpha - 5) / 5)
             )
-            candidates["p_distance"] = candidates["dist"].apply(
-                lambda dist: 0.183024 * exp(-dist / 5.46376)
-            )
+            candidates["p_distance"] = candidates["dist"].apply(lambda dist: 0.183024 * exp(-dist / 5.46376))
             candidates["prob"] = candidates["p_alpha"] * candidates["p_distance"]
 
             sum_prob = candidates["prob"].sum()
@@ -145,17 +124,13 @@ class MapMatching:
             idx_best = candidates["prob"].idxmax()
 
             best_candidate = candidates.loc[idx_best].copy()
-            relative_pos = best_candidate.geometry.project(
-                gps.geometry, normalized=True
+            relative_pos = best_candidate.geometry.project(gps.geometry, normalized=True)
+            best_candidate["matched_pos"] = best_candidate["start_pos"] + relative_pos * (
+                best_candidate["end_pos"] - best_candidate["start_pos"]
             )
-            best_candidate["matched_pos"] = best_candidate[
-                "start_pos"
-            ] + relative_pos * (best_candidate["end_pos"] - best_candidate["start_pos"])
             link_best = best_candidate["id_link"]
 
-            best_candidate["link_prob"] = candidates[
-                candidates["id_link"] == link_best
-            ]["prob"].sum()
+            best_candidate["link_prob"] = candidates[candidates["id_link"] == link_best]["prob"].sum()
 
             matched_results.append(
                 {
@@ -167,11 +142,9 @@ class MapMatching:
                 }
             )
             if all_matches:
-                candidates["matched_pos"] = candidates[
-                    "start_pos"
-                ] + candidates.geometry.project(gps.geometry, normalized=True) * (
-                    candidates["end_pos"] - candidates["start_pos"]
-                )
+                candidates["matched_pos"] = candidates["start_pos"] + candidates.geometry.project(
+                    gps.geometry, normalized=True
+                ) * (candidates["end_pos"] - candidates["start_pos"])
                 df_all_matches = (
                     candidates[["id_link", "matched_pos", "prob"]]
                     .groupby("id_link")

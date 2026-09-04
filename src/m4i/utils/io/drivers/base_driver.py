@@ -26,9 +26,7 @@ import polars as pl
 import warnings
 
 
-def inner_filter_to_query_expression(
-    filters, rename=None, quoting='"', op_boolean_symbols=False
-):
+def inner_filter_to_query_expression(filters, rename=None, quoting='"', op_boolean_symbols=False):
     """
     Converte un filtro interno (tupla o lista di triple) in un'espressione booleana.
 
@@ -38,16 +36,10 @@ def inner_filter_to_query_expression(
     """
     expressions = []
     if isinstance(filters, (tuple, list)):
-        filter_list = (
-            filters
-            if (len(filters) != 3 or not isinstance(filters[0], str))
-            else [filters]
-        )
+        filter_list = filters if (len(filters) != 3 or not isinstance(filters[0], str)) else [filters]
         for f in filter_list:
             if not (isinstance(f, (tuple, list)) and len(f) == 3):
-                raise ValueError(
-                    "Ogni filtro deve essere una tupla/lista con 3 elementi (colonna, operatore, valore)."
-                )
+                raise ValueError("Ogni filtro deve essere una tupla/lista con 3 elementi (colonna, operatore, valore).")
             column, operator, value = f
             if rename and column in rename:
                 column = rename[column]
@@ -60,9 +52,7 @@ def inner_filter_to_query_expression(
     return (" | " if op_boolean_symbols else " OR ").join(expressions)
 
 
-def filters_to_query_expression(
-    filters, rename=None, quoting='"', op_boolean_symbols=False
-):
+def filters_to_query_expression(filters, rename=None, quoting='"', op_boolean_symbols=False):
     """
     Converte una lista di gruppi di filtri in un'unica espressione booleana.
 
@@ -77,20 +67,14 @@ def filters_to_query_expression(
         return filters  # già una stringa di query
 
     if not isinstance(filters, (list, tuple)):
-        raise ValueError(
-            "Il parametro filters deve essere una stringa o una lista di gruppi di filtri."
-        )
+        raise ValueError("Il parametro filters deve essere una stringa o una lista di gruppi di filtri.")
 
     group_expressions = [
-        inner_filter_to_query_expression(
-            group, rename=rename, quoting=quoting, op_boolean_symbols=op_boolean_symbols
-        )
+        inner_filter_to_query_expression(group, rename=rename, quoting=quoting, op_boolean_symbols=op_boolean_symbols)
         for group in filters
     ]
 
-    return (" & " if op_boolean_symbols else " AND ").join(
-        f"({g})" for g in group_expressions
-    )
+    return (" & " if op_boolean_symbols else " AND ").join(f"({g})" for g in group_expressions)
 
 
 class BaseDriver:
@@ -122,9 +106,7 @@ class BaseDriver:
         raise NotImplementedError("Il driver deve implementare 'export_dataframe'.")
 
     @staticmethod
-    def adapt_dtype(
-        df, dtype: Optional[dict] = None, copy=True
-    ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
+    def adapt_dtype(df, dtype: Optional[dict] = None, copy=True) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
         if dtype is None:
             return df
         try:
@@ -145,16 +127,12 @@ class BaseDriver:
         return df
 
     @staticmethod
-    def apply_filters(
-        df, filters: Optional[Union[dict, str]] = None
-    ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
+    def apply_filters(df, filters: Optional[Union[dict, str]] = None) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
         if filters is not None:
             if isinstance(filters, str):
                 query = filters.replace("==", "=").replace("=", "").replace("<>", "!=")
             else:
-                query = filters_to_query_expression(
-                    filters, quoting="", op_boolean_symbols=True
-                )
+                query = filters_to_query_expression(filters, quoting="", op_boolean_symbols=True)
             df = df.query(query)
         return df
 
@@ -172,14 +150,11 @@ class BaseDriver:
             if not isinstance(gname, Tuple):
                 gname = (gname,)
             partition_dirs = [
-                "".join([str(y) for y in x])
-                for x in zip(partition_cols, ["=" * len(partition_cols)], gname)
+                "".join([str(y) for y in x]) for x in zip(partition_cols, ["=" * len(partition_cols)], gname)
             ]
             part_folder = file / Path(*partition_dirs)
             part_folder.mkdir(exist_ok=True, parents=True)
-            fname = part_folder / (
-                file.stem + "_" + "_".join(partition_dirs) + file.suffix
-            )
+            fname = part_folder / (file.stem + "_" + "_".join(partition_dirs) + file.suffix)
             if not support_append:
                 while (i := 0) is not None:
                     if not fname.exists():
@@ -210,8 +185,7 @@ class BaseDriver:
                 files = [
                     file
                     for file in files
-                    if file.is_file()
-                    and file.suffix.lower() in os.path.splitext(path)[1].lower()
+                    if file.is_file() and file.suffix.lower() in os.path.splitext(path)[1].lower()
                 ]
                 return pd.concat([func(file, *args, **kwargs) for file in files])
 
@@ -236,15 +210,11 @@ class BaseDriver:
     ) -> Union[gpd.GeoDataFrame, pd.DataFrame]:
 
         if isinstance(df, gpd.GeoDataFrame):
-            geometry_col = BaseDriver.get_geometry_col(
-                df=df, geometry_col=geometry_col, errors="raise"
-            )
+            geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="raise")
             if geometry_col in df.columns:
                 return df.set_crs(crs, allow_override=True) if df.crs is None else df
         if isinstance(df, pd.DataFrame):
-            geometry_col = BaseDriver.get_geometry_col(
-                df=df, geometry_col=geometry_col, errors="warn"
-            )
+            geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="warn")
             if geometry_col in df.columns:
                 sample = df[geometry_col].dropna().iloc[0]
                 if isinstance(sample, (bytes, bytearray)):
@@ -263,9 +233,7 @@ class BaseDriver:
                         gdf.to_crs(crs, inplace=True)
         elif isinstance(df, dict):
             df = pd.DataFrame.from_dict(df)
-            geometry_col = BaseDriver.get_geometry_col(
-                df=df, geometry_col=geometry_col, errors="warn"
-            )
+            geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="warn")
             if geometry_col is not None:
                 geoemtries = df.pop(geometry_col)
                 gdf = gpd.GeoDataFrame(df, geometry=geometries, crs=crs)
@@ -315,9 +283,7 @@ class BaseDriver:
         crs: str = None,
     ) -> pd.DataFrame:
         if isinstance(df, gpd.GeoDataFrame):
-            geometry_col = BaseDriver.get_geometry_col(
-                df=df, geometry_col=geometry_col, errors="raise"
-            )
+            geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="raise")
             if geometry_col in df.columns:
                 if df.crs is not None:
                     df.to_crs(crs, inplace=True) if crs else None
@@ -355,9 +321,7 @@ class BaseDriver:
         filename = os.path.basename(path)
         extension = os.path.splitext(filename)[1]
         if partitionBy and partition_values:
-            partitions_hive = [
-                str(p) + "=" + str(v) for p, v in zip(partitionBy, partition_values)
-            ]
+            partitions_hive = [str(p) + "=" + str(v) for p, v in zip(partitionBy, partition_values)]
         else:
             partitions_hive = []
         if partitions_hive:
@@ -376,9 +340,7 @@ class BaseDriver:
                 uid=uid,
                 pid=pid,
                 timestamp=timestamp,
-                partition="-".join((str(x) for x in partition_values))
-                if partition_values
-                else "",
+                partition="-".join((str(x) for x in partition_values)) if partition_values else "",
                 partitions_hive="-".join(partitions_hive) if partitions_hive else "",
                 i="0",
             )
@@ -390,9 +352,7 @@ class BaseDriver:
             uid=uid,
             pid=pid,
             timestamp=timestamp,
-            partition="-".join((str(x) for x in partition_values))
-            if partition_values
-            else "",
+            partition="-".join((str(x) for x in partition_values)) if partition_values else "",
             partitions_hive="-".join(partitions_hive) if partitions_hive else "",
             i="*",
         )
@@ -403,9 +363,7 @@ class BaseDriver:
             uid=uid,
             pid=pid,
             timestamp=timestamp,
-            partition="-".join((str(x) for x in partition_values))
-            if partition_values
-            else "",
+            partition="-".join((str(x) for x in partition_values)) if partition_values else "",
             partitions_hive="-".join(partitions_hive) if partitions_hive else "",
             i=str(int(i) + 1),
         )

@@ -54,25 +54,15 @@ class RedisIPC:
 
     def listen(self):
         """Ascolta i messaggi in arrivo e invoca le callback registrate."""
-        self.logger.debug(
-            f"Listening for messages on channels: {', '.join(self.callbacks.keys())}"
-        )
+        self.logger.debug(f"Listening for messages on channels: {', '.join(self.callbacks.keys())}")
         for message in self.pubsub.listen():
             if message["type"] == "message":
-                channel = (
-                    message["channel"].decode()
-                    if isinstance(message["channel"], bytes)
-                    else message["channel"]
-                )
+                channel = message["channel"].decode() if isinstance(message["channel"], bytes) else message["channel"]
                 data = pickle.loads(message["data"])
                 if isinstance(data, str):
-                    self.logger.debug(
-                        f"Received message: {{'channel': '{channel}', 'message': '{data}'}}"
-                    )
+                    self.logger.debug(f"Received message: {{'channel': '{channel}', 'message': '{data}'}}")
                 else:
-                    self.logger.debug(
-                        f"Received message: {{'channel': '{channel}', 'message': 'blob'}}"
-                    )
+                    self.logger.debug(f"Received message: {{'channel': '{channel}', 'message': 'blob'}}")
 
                 if channel in self.callbacks:
                     for cb in self.callbacks[channel]:
@@ -98,9 +88,7 @@ class RedisIPC:
 
     def running(self) -> bool:
         try:
-            client = redis.Redis(
-                host=self.host, port=self.port, db=self.db, socket_connect_timeout=1
-            )
+            client = redis.Redis(host=self.host, port=self.port, db=self.db, socket_connect_timeout=1)
             return client.ping()
         except (redis.ConnectionError, redis.TimeoutError):
             return False
@@ -110,9 +98,7 @@ class RedisIPC:
             s.settimeout(1.0)
             ret = s.connect_ex((self.host, self.port)) == 0
         if not ret:
-            self.logger.error(
-                f"Port {self.port} is not available. Please check if Redis is running."
-            )
+            self.logger.error(f"Port {self.port} is not available. Please check if Redis is running.")
             return False
 
 

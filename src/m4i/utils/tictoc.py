@@ -856,9 +856,7 @@ class TicToc:
             else:
                 iformat = iformat if iformat is not None else self.info_tot_format
 
-            fields: set = {
-                name for text, name, spec, conv in self._formatter.parse(iformat)
-            }
+            fields: set = {name for text, name, spec, conv in self._formatter.parse(iformat)}
 
             params = {}
 

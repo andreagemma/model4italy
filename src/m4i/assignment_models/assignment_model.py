@@ -72,18 +72,12 @@ class AssignmentModel(BaseM4IModel):
         self.global_t_start: int = max(0, 0 if start is None else start)
         end = self.loader.end if end is None else end
         self.global_t_end: int = min(1440, 1440 if end is None else end)
-        self.global_time_slice: int = int(
-            loader.ini.MSA_MAX_TIMESLICE if max_timeslice is None else max_timeslice
-        )
-        self.global_time_slice: int = int(
-            min(self.global_t_end - self.global_t_start, self.global_time_slice)
-        )
+        self.global_time_slice: int = int(loader.ini.MSA_MAX_TIMESLICE if max_timeslice is None else max_timeslice)
+        self.global_time_slice: int = int(min(self.global_t_end - self.global_t_start, self.global_time_slice))
 
         self.delta_t = self.loader.delta_t
 
-        self.global_intervals = list(
-            range(self.global_t_start, self.global_t_end, self.global_time_slice)
-        )
+        self.global_intervals = list(range(self.global_t_start, self.global_t_end, self.global_time_slice))
         self.global_num_intervals = len(self.global_intervals)
 
         self.simulator: BaseSimulator = simulator
@@ -95,9 +89,7 @@ class AssignmentModel(BaseM4IModel):
         self.calc_ass_matrix = calc_ass_matrix
 
         self.save_results = save_results
-        self.save_paths = (
-            save_paths and self.writer.has_write_paths() and self.save_results
-        )
+        self.save_paths = save_paths and self.writer.has_write_paths() and self.save_results
         self.save_agg_results = (
             save_agg_results
             and self.writer.has_write_agg_results()
@@ -123,30 +115,16 @@ class AssignmentModel(BaseM4IModel):
             and self.save_results
         )
 
-        self.save_state_ass_matrix = (
-            save_ass_matrix
-            and self.state_manager.has_write_state()
-            and self.calc_ass_matrix
-        )
-        self.save_state_graph = (
-            save_state_graph and self.state_manager.has_write_state()
-        )
-        self.load_state_graph = (
-            load_state_graph and self.state_manager.has_write_state()
-        )
-        self.save_state_paths = (
-            save_state_paths and self.state_manager.has_write_state()
-        )
-        self.load_state_paths = (
-            load_state_paths and self.state_manager.has_write_state()
-        )
+        self.save_state_ass_matrix = save_ass_matrix and self.state_manager.has_write_state() and self.calc_ass_matrix
+        self.save_state_graph = save_state_graph and self.state_manager.has_write_state()
+        self.load_state_graph = load_state_graph and self.state_manager.has_write_state()
+        self.save_state_paths = save_state_paths and self.state_manager.has_write_state()
+        self.load_state_paths = load_state_paths and self.state_manager.has_write_state()
         if not off_line_paths:
             self.off_line_paths = "params.fcd_paths_clustered"
         else:
             self.off_line_paths = off_line_paths
-        self.load_off_line_paths = load_off_line_paths and self.loader.has(
-            self.off_line_paths
-        )
+        self.load_off_line_paths = load_off_line_paths and self.loader.has(self.off_line_paths)
 
         self.OD: MatrixODT = None
         self.ODs: dict[str, MatrixODT] = None
@@ -202,8 +180,7 @@ class AssignmentModel(BaseM4IModel):
         self.origins: List[int] = self.loader.origins
         self.destinations: List[int] = self.loader.destinations
         self.eq_factors: dict[str, float] = {
-            mode: params.get("eq_factor", 1)
-            for mode, params in self.loader.modes.items()
+            mode: params.get("eq_factor", 1) for mode, params in self.loader.modes.items()
         }
 
         if self.save_state_graph:
@@ -230,18 +207,12 @@ class AssignmentModel(BaseM4IModel):
             self.real_time_start = self.current_time_start
             if self.global_num_intervals > 1:
                 self.current_time_start -= self.loader.ini.MSA_PRELOAD
-                self.current_time_start = max(
-                    [self.current_time_start, self.global_t_start, 0]
-                )
-            self.current_time_end = min(
-                self.real_time_start + self.global_time_slice, 1440
-            )
+                self.current_time_start = max([self.current_time_start, self.global_t_start, 0])
+            self.current_time_end = min(self.real_time_start + self.global_time_slice, 1440)
             self.real_time_end = self.current_time_end
             if self.global_num_intervals > 1:
                 self.current_time_end += self.loader.ini.MSA_POSTLOAD
-                self.current_time_end = min(
-                    [self.current_time_end, self.global_t_end, 1440]
-                )
+                self.current_time_end = min([self.current_time_end, self.global_t_end, 1440])
 
             self.loader.dparams["current_start_time"] = self.real_time_start
             self.loader.dparams["current_end_time"] = self.real_time_end
@@ -259,34 +230,22 @@ class AssignmentModel(BaseM4IModel):
                     f"Simulating ({self.interval + 1}/{self.global_num_intervals}) {rs}-{re} (Original: {cs}-{ce} Global {gs}-{ge}) ..."
                 )
             else:
-                self.log.info(
-                    f"Simulating {rs}-{re} (Original: {cs}-{ce} Global {gs}-{ge}) ..."
-                )
+                self.log.info(f"Simulating {rs}-{re} (Original: {cs}-{ce} Global {gs}-{ge}) ...")
                 self.log.info(f"Simulating {cs}-{ce} ...")
 
             self.task_step_done(f"{cs}-{ce} - Initialize simulation")
             if self.simulator:
-                self.simulator.initialize_assignment(
-                    self.current_time_start, self.current_time_end
-                )
+                self.simulator.initialize_assignment(self.current_time_start, self.current_time_end)
 
             self.task_step_done(f"{cs}-{ce} - Running simulation")
             self.run_internal_step()
 
             self.task_step_done(f"{cs}-{ce} - Finalizing simulation")
-            if (
-                self.interval < self.global_num_intervals - 1
-                or self.save_agg_results
-                or self.save_paths
-            ):
-                self.simulator.finalize_assignment(
-                    self.current_time_start, self.current_time_end
-                )
+            if self.interval < self.global_num_intervals - 1 or self.save_agg_results or self.save_paths:
+                self.simulator.finalize_assignment(self.current_time_start, self.current_time_end)
 
             if self.calc_ass_matrix:
-                self.ass_matrix: MatrixAss = MatrixAss(
-                    self.loader, self.current_num_intervals
-                )
+                self.ass_matrix: MatrixAss = MatrixAss(self.loader, self.current_num_intervals)
                 self.task_step_done(f"{cs}-{ce} - Calculating Assignment Matrix...")
                 self.calculate_ass_matrix()
             else:
@@ -316,9 +275,7 @@ class AssignmentModel(BaseM4IModel):
                     return
 
                 mode = None if self.interval == 0 else "a"
-                self.writer.write(
-                    df, "params.statistics", mode=mode, first_query=self.interval == 0
-                )
+                self.writer.write(df, "params.statistics", mode=mode, first_query=self.interval == 0)
                 self.log.info("Saved stats")
         except Exception as e:
             self.log.error("Failed to save statistics:", exc_info=e, stack_info=True)
@@ -372,11 +329,7 @@ class AssignmentModel(BaseM4IModel):
                 if df is not None and not df.empty:
                     ds_t = (pd.to_numeric(df["time"]) / 1000000000 % 86400) / 60
                     if df["time"].dt.tz is None:
-                        df = df.assign(
-                            time=df["time"]
-                            .dt.tz_localize(self.parser.ini.TZ_LOCAL)
-                            .copy()
-                        )
+                        df = df.assign(time=df["time"].dt.tz_localize(self.parser.ini.TZ_LOCAL).copy())
                     mode = None if self.interval == 0 else "a"
                     df["t"] = ds_t.astype("Int64")
                     saved = self.writer.write_agg_results(
@@ -393,9 +346,7 @@ class AssignmentModel(BaseM4IModel):
                 else:
                     self.log.warning("No aggregated results to save")
         except Exception as e:
-            self.log.error(
-                "Failed to save aggregated results:", exc_info=e, stack_info=True
-            )
+            self.log.error("Failed to save aggregated results:", exc_info=e, stack_info=True)
 
     def write_agg_results_stats(self):
         try:
@@ -418,9 +369,7 @@ class AssignmentModel(BaseM4IModel):
                 else:
                     self.log.warning("No aggregated stats to save")
         except Exception as e:
-            self.log.error(
-                "Failed to save aggregated stats:", exc_info=e, stack_info=True
-            )
+            self.log.error("Failed to save aggregated stats:", exc_info=e, stack_info=True)
 
     def write_trace_results(self):
         try:
@@ -476,9 +425,7 @@ class AssignmentModel(BaseM4IModel):
                 else:
                     self.log.warning("No signal results to save")
         except Exception as e:
-            self.log.error(
-                "Failed to save signal results:", exc_info=e, stack_info=True
-            )
+            self.log.error("Failed to save signal results:", exc_info=e, stack_info=True)
 
     def write_state_ass_matrix(self):
         try:
@@ -501,9 +448,7 @@ class AssignmentModel(BaseM4IModel):
         self.current_i_start = int(self.current_time_start / self.delta_t)
         self.current_i_end = int(self.current_time_end / self.delta_t)
         self.current_num_intervals = self.current_i_end - self.current_i_start
-        self.current_t_starts = [
-            self.delta_t * i for i in range(self.current_num_intervals)
-        ]
+        self.current_t_starts = [self.delta_t * i for i in range(self.current_num_intervals)]
 
         self.G.resize_attributes(
             new_total_time=self.current_num_intervals * self.delta_t,
@@ -513,9 +458,7 @@ class AssignmentModel(BaseM4IModel):
         self.m_paths = KPathList()
         if self.load_state_paths:
             self.log.info("Loading state (Paths)...")
-            for t_start, t in enumerate(
-                range(self.current_time_start, self.current_time_end, self.delta_t)
-            ):
+            for t_start, t in enumerate(range(self.current_time_start, self.current_time_end, self.delta_t)):
                 paths = self.state_manager.load_state("paths", partition=f"t={t}")
                 if paths is None:
                     self.m_paths = KPathList()
@@ -534,17 +477,11 @@ class AssignmentModel(BaseM4IModel):
             try:
                 tot_paths = self.loader.load(
                     self.off_line_paths,
-                    filters=[
-                        ("day_type", "==", self.parser.get("day_type_simulation"))
-                    ],
+                    filters=[("day_type", "==", self.parser.get("day_type_simulation"))],
                     from_output=True,
                 )
-                for t_start, t in enumerate(
-                    range(self.current_time_start, self.current_time_end, self.delta_t)
-                ):
-                    df_paths = tot_paths.query("t >= @t_start and t< @t").reset_index(
-                        drop=True
-                    )
+                for t_start, t in enumerate(range(self.current_time_start, self.current_time_end, self.delta_t)):
+                    df_paths = tot_paths.query("t >= @t_start and t< @t").reset_index(drop=True)
                     if df_paths is not None and not df_paths.empty:
                         df_paths["t"] = t
                         df_paths["t_start"] = t_start * self.delta_t
@@ -561,9 +498,7 @@ class AssignmentModel(BaseM4IModel):
                         for mode in self.modes:
                             tmp = df_no_mode.copy()
                             tmp["mode"] = mode
-                            df_paths = pd.concat(
-                                [df_paths, tmp], ignore_index=True, sort=False
-                            )
+                            df_paths = pd.concat([df_paths, tmp], ignore_index=True, sort=False)
                         df_paths.dropna(subset=["mode"], inplace=True)
                         df_paths = df_paths[
                             df_paths["source"].isin(self.loader.origins)
@@ -573,9 +508,7 @@ class AssignmentModel(BaseM4IModel):
                         self.m_paths.from_pandas(df_paths)
 
             except Exception as e:
-                self.log.error(
-                    "Failed to load off-line paths:", exc_info=e, stack_info=True
-                )
+                self.log.error("Failed to load off-line paths:", exc_info=e, stack_info=True)
             self.log.info("Loaded off-line paths")
 
         if self.simulator:
@@ -623,19 +556,13 @@ class AssignmentModel(BaseM4IModel):
                     self.calculate_paths()
                     k_calculated += 1
                 if iteration < self.max_k:
-                    self.log.info(
-                        "Ite: %s - Preloading (k=%d)...", iteration, k_calculated
-                    )
+                    self.log.info("Ite: %s - Preloading (k=%d)...", iteration, k_calculated)
                     for (o, d, t_start, mode), k_paths in self.m_paths.all_kpaths():
-                        f = self.ODs[mode][
-                            o, d, self.current_time_start + t_start
-                        ] * self.eq_factors.get(mode, 1)
+                        f = self.ODs[mode][o, d, self.current_time_start + t_start] * self.eq_factors.get(mode, 1)
                         k = len(k_paths)
                         for path in k_paths:
                             path["path_flow"] = f / k
-                    self.log.info(
-                        "Ite: %s - Updating network performance...", iteration
-                    )
+                    self.log.info("Ite: %s - Updating network performance...", iteration)
                     self.calc_rgap()
                     self.update_performance()
                     self.update_infos()
@@ -645,9 +572,7 @@ class AssignmentModel(BaseM4IModel):
             elif iteration == 0:
                 self.log.info("Ite: %s - Preloading...", iteration)
                 for (o, d, t_start, mode), k_paths in self.m_paths.all_kpaths():
-                    f = self.ODs[mode][
-                        o, d, self.current_time_start + t_start
-                    ] * self.eq_factors.get(mode, 1)
+                    f = self.ODs[mode][o, d, self.current_time_start + t_start] * self.eq_factors.get(mode, 1)
                     k = len(k_paths)
                     for path in k_paths:
                         path["path_flow"] = f / k
@@ -665,9 +590,7 @@ class AssignmentModel(BaseM4IModel):
             I nuovi percorsi aumenteranno di 1/k il proprio flusso
             """
             for (o, d, t_start, mode), k_paths in self.m_paths.all_kpaths():
-                f = self.ODs[mode][
-                    o, d, self.current_time_start + t_start
-                ] * self.eq_factors.get(mode, 1)
+                f = self.ODs[mode][o, d, self.current_time_start + t_start] * self.eq_factors.get(mode, 1)
                 if self.loader.ini.MSA_K_BALANCING > 0:
                     k = iteration - len(k_paths) + self.loader.ini.MSA_K_BALANCING
                 else:
@@ -678,9 +601,7 @@ class AssignmentModel(BaseM4IModel):
             for (o, d, t_start, mode), k_paths in self.m_paths.all_kpaths():
                 if o == d:
                     continue
-                f = self.ODs[mode][
-                    o, d, self.current_time_start + t_start
-                ] * self.eq_factors.get(mode, 1)
+                f = self.ODs[mode][o, d, self.current_time_start + t_start] * self.eq_factors.get(mode, 1)
                 if f > 0:
                     best = min(k_paths, key=lambda path: path["tot_cost"])
                     if self.loader.ini.MSA_K_BALANCING > 0:
@@ -713,21 +634,13 @@ class AssignmentModel(BaseM4IModel):
             for (o, d, t_start, mode), k_paths in self.m_paths.all_kpaths():
                 if o == d:
                     continue
-                f = self.ODs[mode][
-                    o, d, self.current_time_start + t_start
-                ] * self.eq_factors.get(mode, 1)
+                f = self.ODs[mode][o, d, self.current_time_start + t_start] * self.eq_factors.get(mode, 1)
                 if f > 0:
                     best = min(k_paths, key=lambda path: path["tot_cost"])
                     self.tot_tt_current += f * best["tot_cost"]
 
-            self.rgap = (
-                abs(self.tot_tt - self.tot_tt_current) / self.tot_tt_current
-                if self.tot_tt_current > 0
-                else 0
-            )
-            self.log.info(
-                "Ite: %s - Relative Gap on route times: %s", self.iteration, self.rgap
-            )
+            self.rgap = abs(self.tot_tt - self.tot_tt_current) / self.tot_tt_current if self.tot_tt_current > 0 else 0
+            self.log.info("Ite: %s - Relative Gap on route times: %s", self.iteration, self.rgap)
 
     def update_infos(self):
         info = {
@@ -751,12 +664,8 @@ class AssignmentModel(BaseM4IModel):
         }
         info["rgap_time"] = self.rgap
         self.tot_dom = sum([path["path_flow"] for path in self.m_paths.all_paths()])
-        self.tot_tt = sum(
-            [path["tot_cost"] * path["path_flow"] for path in self.m_paths.all_paths()]
-        )
-        self.tot_tt_current = (
-            self.tot_tt if self.tot_tt_current is None else self.tot_tt_current
-        )
+        self.tot_tt = sum([path["tot_cost"] * path["path_flow"] for path in self.m_paths.all_paths()])
+        self.tot_tt_current = self.tot_tt if self.tot_tt_current is None else self.tot_tt_current
         info["tot_tt"] = self.tot_tt
         info["tot_tt_current"] = self.tot_tt_current
         info["tot_domand"] = self.tot_dom
@@ -770,20 +679,14 @@ class AssignmentModel(BaseM4IModel):
         self.write_stats()
 
         self.log.info("Ite: %s - Total Flows: %s", self.iteration, info["tot_domand"])
-        self.log.info(
-            "Ite: %s - Last Veh*h: %s", self.iteration, info["tot_tt_current"] / 60
-        )
+        self.log.info("Ite: %s - Last Veh*h: %s", self.iteration, info["tot_tt_current"] / 60)
         self.log.info("Ite: %s - Total Veh*h: %s", self.iteration, info["tot_tt"] / 60)
         self.log.info("Ite: %s - Total Paths: %s", self.iteration, info["total_paths"])
-        self.log.info(
-            "Ite: %s - Unique Paths: %s", self.iteration, info["unique_paths"]
-        )
+        self.log.info("Ite: %s - Unique Paths: %s", self.iteration, info["unique_paths"])
         self.log.info("Ite: %s - K Paths: %s", self.iteration, info["k_paths"])
 
         if info["tot_vehicles"] is not None:
-            self.log.info(
-                "Ite: %s - Moving Vehicles: %s", self.iteration, info["tot_vehicles"]
-            )
+            self.log.info("Ite: %s - Moving Vehicles: %s", self.iteration, info["tot_vehicles"])
 
     def calculate_paths(self):
         self.task_step_done(
@@ -821,9 +724,7 @@ class AssignmentModel(BaseM4IModel):
 
         self.G.apply_links(reset)
 
-        update_costs = (self.iteration != self.max_ite - 1) or (
-            self.save_paths and self.writer.has_write_paths()
-        )
+        update_costs = (self.iteration != self.max_ite - 1) or (self.save_paths and self.writer.has_write_paths())
         # aggiorno i tempi nel grafo
         if self.simulator:
             self.simulator.update_performance(
@@ -834,9 +735,7 @@ class AssignmentModel(BaseM4IModel):
 
             if isinstance(self.simulator, MicroSimulator):
                 if update_costs:
-                    self.update_paths_costs(
-                        update_nodes=False, update_links=True, update_turns=False
-                    )
+                    self.update_paths_costs(update_nodes=False, update_links=True, update_turns=False)
             else:
                 if update_costs:
                     self.update_paths_costs(
@@ -852,9 +751,7 @@ class AssignmentModel(BaseM4IModel):
                     update_turns=self.turns_cost is not None,
                 )
 
-    def update_paths_costs(
-        self, update_nodes=True, update_links=True, update_turns=True
-    ):
+    def update_paths_costs(self, update_nodes=True, update_links=True, update_turns=True):
         self.log.info("Ite: %s - Updating costs...", self.iteration)
         for path in self.m_paths.all_paths():
             if len(path["links"]) == 0:
@@ -913,9 +810,7 @@ class AssignmentModel(BaseM4IModel):
             ret = []
             for (source, target, t_start, mode), paths in tasks:
                 for path in paths:
-                    f = OD[
-                        source, target, current_time_start + t_start
-                    ] * eq_factors.get(mode, 1)
+                    f = OD[source, target, current_time_start + t_start] * eq_factors.get(mode, 1)
                     if f <= 0:
                         continue
                     costs = tuple(
@@ -963,9 +858,7 @@ class AssignmentModel(BaseM4IModel):
                 for source, target, l, t_start, t, flow in params:
                     t_start = int(np.floor(t_start))
                     t_enter = int(t_start + np.floor(t / self.delta_t))
-                    self.ass_matrix.add(
-                        source, target, l=l, t_start=t_start, t_enter=t_enter, flow=flow
-                    )
+                    self.ass_matrix.add(source, target, l=l, t_start=t_start, t_enter=t_enter, flow=flow)
         else:
             for source, target, l, t_start, t, flow in fn_calc_mat_ass(
                 tasks,
@@ -980,9 +873,7 @@ class AssignmentModel(BaseM4IModel):
             ):
                 t_start = int(np.floor(t_start))
                 t_enter = int(t_start + np.floor(t / self.delta_t))
-                self.ass_matrix.add(
-                    source, target, l=l, t_start=t_start, t_enter=t_enter, flow=flow
-                )
+                self.ass_matrix.add(source, target, l=l, t_start=t_start, t_enter=t_enter, flow=flow)
         self.log.info("Assignment matrix calculated")
 
     def get_trace_results_dataframe(self):
@@ -1042,22 +933,13 @@ class AssignmentModel(BaseM4IModel):
             if geom in l:
                 if results is None or results.empty:
                     results[geom] = None
-                    results = gpd.GeoDataFrame(
-                        results, geometry=geom, crs=self.loader.ini.CRS_CALC
-                    )
+                    results = gpd.GeoDataFrame(results, geometry=geom, crs=self.loader.ini.CRS_CALC)
                     break
                 results[geom] = [
-                    MultiLineString(
-                        [
-                            multi_line_to_line(G.get_link(l_idx).get_value(geom))
-                            for l_idx in links
-                        ]
-                    )
+                    MultiLineString([multi_line_to_line(G.get_link(l_idx).get_value(geom)) for l_idx in links])
                     for links in results["links"]
                 ]
-                results = gpd.GeoDataFrame(
-                    results, geometry=geom, crs=self.loader.ini.CRS_CALC
-                )
+                results = gpd.GeoDataFrame(results, geometry=geom, crs=self.loader.ini.CRS_CALC)
                 break
 
         return results

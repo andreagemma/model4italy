@@ -33,9 +33,7 @@ class DBWriter(BaseWriter):
     def __init__(self):
         super().__init__()
 
-    def write_dataset(
-        self, df: Union[pd.DataFrame, gpd.GeoDataFrame], parameters, **kwargs
-    ) -> bool:
+    def write_dataset(self, df: Union[pd.DataFrame, gpd.GeoDataFrame], parameters, **kwargs) -> bool:
 
         if df is None:
             warnings.warn(f"No dataset to write for {parameters}")
@@ -72,9 +70,7 @@ class DBWriter(BaseWriter):
                 if pre_query.get("query"):
                     errors = pre_query.get("errors", "raise")
                     try:
-                        conn.execute(
-                            sa.text(f"SET LOCAL search_path TO {schema},public;")
-                        )
+                        conn.execute(sa.text(f"SET LOCAL search_path TO {schema},public;"))
                         pre = conn.begin_nested()
                         try:
                             Logger.debug(f"Executing pre-query for {pre_query}...")
@@ -85,9 +81,7 @@ class DBWriter(BaseWriter):
                             if isinstance(e, sa.exc.ProgrammingError) and isinstance(
                                 e.orig, psycopg.errors.UndefinedTable
                             ):
-                                Logger.warning(
-                                    f"Table not found in pre-query: {pre_query.get('query')}"
-                                )
+                                Logger.warning(f"Table not found in pre-query: {pre_query.get('query')}")
                             else:
                                 raise e
                     except Exception as e:

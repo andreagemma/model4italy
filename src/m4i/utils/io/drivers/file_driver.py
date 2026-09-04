@@ -58,9 +58,7 @@ class FileDriver(BaseDriver):
             if isinstance(filters, str):
                 df_filters = filters
             else:
-                df_filters = filters_to_query_expression(
-                    filters, quoting="", op_boolean_symbols=True
-                )
+                df_filters = filters_to_query_expression(filters, quoting="", op_boolean_symbols=True)
             sql_filters = pandas_query_to_sql(df_filters)
         else:
             filters = ""
@@ -103,11 +101,7 @@ class FileDriver(BaseDriver):
                         .to_pandas()
                     )
                 else:
-                    df = (
-                        pl.scan_csv(pathg.as_posix(), schema=schema)
-                        .collect()
-                        .to_pandas()
-                    )
+                    df = pl.scan_csv(pathg.as_posix(), schema=schema).collect().to_pandas()
             else:
                 # print("Uso DuckDB")
                 con = duckdb.connect()
@@ -181,12 +175,7 @@ class FileDriver(BaseDriver):
                         .to_pandas()
                     )
                 else:
-                    df = (
-                        pl.scan_parquet(pathg.as_posix(), schema=schema_or)
-                        .cast(schema)
-                        .collect()
-                        .to_pandas()
-                    )
+                    df = pl.scan_parquet(pathg.as_posix(), schema=schema_or).cast(schema).collect().to_pandas()
                 """
                 con = duckdb.connect()                            
                 query = f"SELECT * FROM read_parquet('{pathg.as_posix()}') {sql_filters}"
@@ -239,18 +228,9 @@ class FileDriver(BaseDriver):
                         .to_pandas()
                     )
                 else:
-                    df = (
-                        pl.scan_parquet(pathg.as_posix(), schema=schema_or)
-                        .cast(schema)
-                        .collect()
-                        .to_pandas()
-                    )
+                    df = pl.scan_parquet(pathg.as_posix(), schema=schema_or).cast(schema).collect().to_pandas()
                 geom = from_wkb(df.pop("geometry").apply(bytes))
-                df = (
-                    gpd.GeoDataFrame(df, geometry=geom, crs=crs)
-                    if crs
-                    else gpd.GeoDataFrame(df, geometry=geom)
-                )
+                df = gpd.GeoDataFrame(df, geometry=geom, crs=crs) if crs else gpd.GeoDataFrame(df, geometry=geom)
         elif ext in (".shp", ".gpkg"):
             if pathg.is_file():
                 layer = kwargs.pop("layer", None)
@@ -343,9 +323,7 @@ class FileDriver(BaseDriver):
                 # geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="ignore")
                 df = BaseDriver.to_dataframe(df, geometry_col=geometry_col, crs=crs)
                 if df is None:
-                    raise ValueError(
-                        "Impossible to export. The data is not a dataframe or geodataframe"
-                    )
+                    raise ValueError("Impossible to export. The data is not a dataframe or geodataframe")
                 if partition_cols:
                     if index:
                         df = df.reset_index()
@@ -363,14 +341,10 @@ class FileDriver(BaseDriver):
                             header = False
                     df.to_csv(pathg, index=index, mode=mode, header=header, **kwargs)
             elif ext == ".parquet":
-                geometry_col = BaseDriver.get_geometry_col(
-                    df=df, geometry_col=geometry_col, errors="ignore"
-                )
+                geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="ignore")
                 df = BaseDriver.to_dataframe(df, geometry_col=geometry_col, crs=crs)
                 if df is None:
-                    raise ValueError(
-                        "Impossible to export. The data is not a dataframe or geodataframe"
-                    )
+                    raise ValueError("Impossible to export. The data is not a dataframe or geodataframe")
                 write_parquet(
                     df,
                     path=pathg,
@@ -379,14 +353,10 @@ class FileDriver(BaseDriver):
                     index=index,
                 )
             elif ext == ".geoparquet":
-                geometry_col = BaseDriver.get_geometry_col(
-                    df=df, geometry_col=geometry_col, errors="warn"
-                )
+                geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="warn")
                 df = BaseDriver.to_geodataframe(df, geometry_col=geometry_col, crs=crs)
                 if df is None:
-                    raise ValueError(
-                        "Impossible to export. The data is not a dataframe or geodataframe"
-                    )
+                    raise ValueError("Impossible to export. The data is not a dataframe or geodataframe")
                 write_geoparquet(
                     df,
                     path=pathg,
@@ -396,14 +366,10 @@ class FileDriver(BaseDriver):
                     index=index,
                 )
             elif ext == ".shp":
-                geometry_col = BaseDriver.get_geometry_col(
-                    df=df, geometry_col=geometry_col, errors="warn"
-                )
+                geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="warn")
                 df = BaseDriver.to_geodataframe(df, geometry_col=geometry_col, crs=crs)
                 if df is None:
-                    raise ValueError(
-                        "Impossible to export. The data is not a dataframe or geodataframe"
-                    )
+                    raise ValueError("Impossible to export. The data is not a dataframe or geodataframe")
                 if index:
                     df = df.reset_index()
                 if partition_cols:
@@ -419,14 +385,10 @@ class FileDriver(BaseDriver):
                 else:
                     df.to_file(pathg.as_posix(), driver="ESRI Shapefile", mode=mode)
             elif ext in (".gpkg", ".geopackage"):
-                geometry_col = BaseDriver.get_geometry_col(
-                    df=df, geometry_col=geometry_col, errors="warn"
-                )
+                geometry_col = BaseDriver.get_geometry_col(df=df, geometry_col=geometry_col, errors="warn")
                 df = BaseDriver.to_geodataframe(df, geometry_col=geometry_col, crs=crs)
                 if df is None:
-                    raise ValueError(
-                        "Impossible to export. The data is not a dataframe or geodataframe"
-                    )
+                    raise ValueError("Impossible to export. The data is not a dataframe or geodataframe")
                 if index:
                     df = df.reset_index()
                 if partition_cols:
@@ -470,9 +432,7 @@ def write_geoparquet(
     path = Path(path)
 
     # ---------- Utility ----------
-    def _materialize_index(
-        df: pd.DataFrame, index_flag: bool
-    ) -> Tuple[pd.DataFrame, List[str]]:
+    def _materialize_index(df: pd.DataFrame, index_flag: bool) -> Tuple[pd.DataFrame, List[str]]:
         """Se index_flag=True, resetta l'indice e restituisce i nomi colonna creati.
         Gestisce indici senza nome e MultiIndex."""
         if not index_flag:
@@ -486,16 +446,11 @@ def write_geoparquet(
         else:
             names = list(idx.names)
             # assegna nomi mancanti
-            names = [
-                n if n is not None else f"__index_level_{i}__"
-                for i, n in enumerate(names)
-            ]
+            names = [n if n is not None else f"__index_level_{i}__" for i, n in enumerate(names)]
             out = df.reset_index(names=names)
             return out, names
 
-    def _gdf_to_arrow_with_wkb(
-        _gdf: gpd.GeoDataFrame, _geom: str, _index: bool
-    ) -> Tuple[pa.Table, List[str]]:
+    def _gdf_to_arrow_with_wkb(_gdf: gpd.GeoDataFrame, _geom: str, _index: bool) -> Tuple[pa.Table, List[str]]:
         # costruisci DataFrame tabellare
         base_df = pd.DataFrame(_gdf.drop(columns=_geom))
         base_df, index_cols = _materialize_index(base_df, _index)
@@ -557,17 +512,13 @@ def write_geoparquet(
                 return pa.Table.from_pandas(obj, preserve_index=False)
         except Exception:
             pass
-        raise TypeError(
-            f"Tipo non gestito per conversione in pyarrow.Table: {type(obj)}"
-        )
+        raise TypeError(f"Tipo non gestito per conversione in pyarrow.Table: {type(obj)}")
 
     # ---------- Validazioni ----------
     if mode not in ("w", "a"):
         raise ValueError("mode deve essere 'w' o 'a'")
     if geom_col not in gdf.columns:
-        raise ValueError(
-            f"Colonna geometrica '{geom_col}' non trovata nel GeoDataFrame."
-        )
+        raise ValueError(f"Colonna geometrica '{geom_col}' non trovata nel GeoDataFrame.")
 
     # ---------- Scrittura FILE ----------
     if not partition_cols:

@@ -35,8 +35,6 @@ class PathsCalculation(OP):
         )
         self.log.info(f"Paths calculation completed. {len(self.paths)} paths found.")
         df_paths = paths.to_pandas(G=self.G, crs_link=self.ini.CRS_CALC)
-        self.log.info(
-            f"Path conversion to DataFrame completed. {len(df_paths)} paths ready for output."
-        )
+        self.log.info(f"Path conversion to DataFrame completed. {len(df_paths)} paths ready for output.")
         self.log.info(f"Writing paths to output...")
         self.writer.write_paths(df_paths, mode="w")

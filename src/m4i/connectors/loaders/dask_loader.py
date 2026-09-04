@@ -29,7 +29,5 @@ class DaskLoader(BaseLoader):
         if location:
             src = join(location, src)
 
-        df = IO_DaskDataFrame.import_dataframe(
-            src, filters=filters, dtype=dtype, kwargs_driver=kwargs
-        )
+        df = IO_DaskDataFrame.import_dataframe(src, filters=filters, dtype=dtype, kwargs_driver=kwargs)
         return df

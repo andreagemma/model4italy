@@ -26,12 +26,8 @@ from ...log import Logger
 
 
 class GpkgWriter(BaseWriter):
-    def __init__(
-        self, params: Union[str, dict], settings: IniClass = None, loader: Loader = None
-    ):
-        super().__init__(
-            params=params, settings=settings, loader=loader, default_ext=".gpkg"
-        )
+    def __init__(self, params: Union[str, dict], settings: IniClass = None, loader: Loader = None):
+        super().__init__(params=params, settings=settings, loader=loader, default_ext=".gpkg")
 
     def _write(self, param, results, mode="w", **kwargs):
         if results is None:
@@ -60,9 +56,7 @@ class GpkgWriter(BaseWriter):
                     index=False,
                 )
 
-    def _load(
-        self, param, mapping: dict[str, str] = None, **kwargs
-    ) -> Union[pd.DataFrame, gpd.GeoDataFrame, dict]:
+    def _load(self, param, mapping: dict[str, str] = None, **kwargs) -> Union[pd.DataFrame, gpd.GeoDataFrame, dict]:
         location, src = self.get_location_src(param, **kwargs)
 
         if location is None:

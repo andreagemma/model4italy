@@ -73,9 +73,7 @@ class Path(dict):
                     name=nodes_cost, t=t, in_link=prev_l, out_link=l, graph=G, default=0
                 )
             if update_links:
-                cost += l.get_value(
-                    name=links_cost, t=t, in_link=prev_l, graph=G, default=0
-                )
+                cost += l.get_value(name=links_cost, t=t, in_link=prev_l, graph=G, default=0)
             yield cost
             prev_l = l
 

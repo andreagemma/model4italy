@@ -158,9 +158,7 @@ class AbstractGraph(ABC, dict):
         pass
 
     @abstractmethod
-    def add_link(
-        self, idx: Hashable, i: Hashable, j: Hashable, **kwargs
-    ) -> AbstractLink:
+    def add_link(self, idx: Hashable, i: Hashable, j: Hashable, **kwargs) -> AbstractLink:
         """
         Add a link to the graph.
         """
@@ -174,9 +172,7 @@ class AbstractGraph(ABC, dict):
         pass
 
     @abstractmethod
-    def add_turn(
-        self, idx: Hashable, in_link: Hashable, out_link: Hashable, **kwargs
-    ) -> AbstractTurn:
+    def add_turn(self, idx: Hashable, in_link: Hashable, out_link: Hashable, **kwargs) -> AbstractTurn:
         """
         Add a turn to the graph.
         """
@@ -197,9 +193,7 @@ class AbstractGraph(ABC, dict):
         pass
 
     @abstractmethod
-    def get_turn(
-        self, idx_or_in_link: Hashable, out_link: Optional[Hashable] = None
-    ) -> Optional[AbstractTurn]:
+    def get_turn(self, idx_or_in_link: Hashable, out_link: Optional[Hashable] = None) -> Optional[AbstractTurn]:
         """
         Get turns for given incoming and outgoing links.
         """

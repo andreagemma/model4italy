@@ -4,8 +4,8 @@ from ..utils.util import memory_usage
 import logging
 from .time_formatter import TimeFormatter
 
-class MemFormatter(TimeFormatter):
 
+class MemFormatter(TimeFormatter):
     def __init__(self, fmt=None, datefmt=None, elapsed_dfmt="%H:%M:%S", start_time=None):
         super().__init__(fmt, datefmt, elapsed_dfmt=elapsed_dfmt)
         self.elapsed_dfmt = elapsed_dfmt or datetime.isoformat()
@@ -36,7 +36,7 @@ class MemFormatter(TimeFormatter):
         self.last_log_time = t
 
         elapsed_time = timedelta(seconds=elapsed_seconds)
-        elapsed_datetime = (datetime.min + elapsed_time)
+        elapsed_datetime = datetime.min + elapsed_time
 
         if self.elapsed_dfmt:
             record.elapsed_datetime = elapsed_datetime.strftime(self.elapsed_dfmt)
@@ -44,4 +44,3 @@ class MemFormatter(TimeFormatter):
             record.elapsed_datetime = elapsed_datetime.strftime(datetime.isoformat())
 
         return super().format(record)
-    

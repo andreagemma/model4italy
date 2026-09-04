@@ -102,9 +102,7 @@ class KPathList(KPathContainer):
             )
         )
 
-    def paths(
-        self, source: Hashable, target: Hashable, t_start: Number, mode=None, **kwargs
-    ) -> Generator[Path]:
+    def paths(self, source: Hashable, target: Hashable, t_start: Number, mode=None, **kwargs) -> Generator[Path]:
         for path in self["paths"].get((source, target, t_start, mode), []):
             yield path
 
@@ -128,9 +126,7 @@ class KPathList(KPathContainer):
             for path in paths:
                 yield path
 
-    def all_kpaths(
-        self, **kwargs
-    ) -> Generator[Tuple[Tuple[Hashable, Hashable, int], List[Path]]]:
+    def all_kpaths(self, **kwargs) -> Generator[Tuple[Tuple[Hashable, Hashable, int], List[Path]]]:
         for (source, target, t_start, mode), paths in self["paths"].items():
             yield (source, target, t_start, mode), paths
 

@@ -24,13 +24,9 @@ class ODEstimatorOffline(ODEstimator):
         self.gamma3 = self.ini.OD_ESTIMATION_GAMMA3
         # Parametri della ricerca del passo con metodo della sezione aurea
         self.itesa = self.ini.OD_ESTIMATION_ITESA
-        self.lambdam = (
-            self.ini.OD_ESTIMATION_LAMBDA_LB
-        )  # Estremo inferiore della ricerca monodimensionale
+        self.lambdam = self.ini.OD_ESTIMATION_LAMBDA_LB  # Estremo inferiore della ricerca monodimensionale
         self.lambdaM = self.ini.OD_ESTIMATION_LAMBDA_UB  # Estremo superiore
-        self.epsilon = (
-            self.ini.OD_ESTIMATION_EPS
-        )  # Soglia di arresto dell'ottimizzazione monodimensionale
+        self.epsilon = self.ini.OD_ESTIMATION_EPS  # Soglia di arresto dell'ottimizzazione monodimensionale
         self.epsilon2 = self.ini.OD_ESTIMATION_EPS2
         self.sa = self.ini.OD_ESTIMATION_SA  # segmento minore della sezione aurea
         self.sb = 1 - self.ini.OD_ESTIMATION_SA  # segmento maggiore della sezione aurea
@@ -57,9 +53,7 @@ class ODEstimatorOffline(ODEstimator):
         self.tend = tend
         self.tstart1: int = max(0, self.tstart - int(self.ini.OD_ESTIMATION_WHISKERS))
         self.tend1: int = min(1440, int(self.tend + self.ini.OD_ESTIMATION_WHISKERS))
-        self.pre_int: int = int(
-            self.loader.ini.OD_ESTIMATION_WHISKERS / self.ini.DELTA_T
-        )
+        self.pre_int: int = int(self.loader.ini.OD_ESTIMATION_WHISKERS / self.ini.DELTA_T)
         self.t_intervals = list(range(self.tstart1, self.tend1, self.ini.DELTA_T))
         self.t_corr: list = list(range(tstart, int(tend), self.ini.DELTA_T))
         self.t_post: list = list(range(tstart, self.tend1, self.ini.DELTA_T))
@@ -86,9 +80,7 @@ class ODEstimatorOffline(ODEstimator):
                 self.t_intervals.index(interval) + 1,
             ):
                 flows_dep += self.M[self.t_intervals.index(interval), dep].mat * gi[dep]
-            tmp = self.counts.loc[
-                self.counts["timestamp"] == interval, ["id", "counts"]
-            ]
+            tmp = self.counts.loc[self.counts["timestamp"] == interval, ["id", "counts"]]
             if self.ite == 1:
                 check_flows_i = tmp.copy().reset_index(drop=True)
                 check_flows_i["flows"] = flows_dep.transpose()
@@ -130,13 +122,7 @@ class ODEstimatorOffline(ODEstimator):
                     self.gamma1
                     * (
                         qce.transpose()
-                        * (
-                            (
-                                gi[self.t_intervals.index(interval)]
-                                - gce[self.t_intervals.index(interval)]
-                            )
-                            ** 2
-                        )
+                        * ((gi[self.t_intervals.index(interval)] - gce[self.t_intervals.index(interval)]) ** 2)
                     ).sum()
                 )
 
@@ -152,9 +138,7 @@ class ODEstimatorOffline(ODEstimator):
                         * (
                             (
                                 flows[self.t_post.index(interval)]
-                                - self.counts[self.counts["timestamp"] == interval][
-                                    "counts"
-                                ].values
+                                - self.counts[self.counts["timestamp"] == interval]["counts"].values
                             )
                             ** 2
                         )
@@ -171,11 +155,7 @@ class ODEstimatorOffline(ODEstimator):
 
         for interval in self.t_corr:
             grad1 = self.gamma1 * (
-                qce.transpose()
-                * (
-                    gi[self.t_intervals.index(interval)]
-                    - gce[self.t_intervals.index(interval)]
-                )
+                qce.transpose() * (gi[self.t_intervals.index(interval)] - gce[self.t_intervals.index(interval)])
             )
             grad2_dep = np.zeros((1, len(gi[0])))
             for dep in range(
@@ -188,9 +168,7 @@ class ODEstimatorOffline(ODEstimator):
                         pic.transpose()
                         * (
                             flows[self.t_post.index(interval)]
-                            - self.counts[self.counts["timestamp"] == interval][
-                                "counts"
-                            ].values
+                            - self.counts[self.counts["timestamp"] == interval]["counts"].values
                         )
                     ).transpose()
                 ).transpose()
@@ -206,54 +184,26 @@ class ODEstimatorOffline(ODEstimator):
         gai = gi.copy()
         gbi = gi.copy()
         for interval in self.t_corr:
-            gai[self.t_intervals.index(interval)] = gi[
-                self.t_intervals.index(interval)
-            ] * (
-                1
-                - (ak * (self.grad[self.t_intervals.index(interval) - self.pre_int][0]))
+            gai[self.t_intervals.index(interval)] = gi[self.t_intervals.index(interval)] * (
+                1 - (ak * (self.grad[self.t_intervals.index(interval) - self.pre_int][0]))
             )
-            gbi[self.t_intervals.index(interval)] = gi[
-                self.t_intervals.index(interval)
-            ] * (
-                1
-                - (bk * (self.grad[self.t_intervals.index(interval) - self.pre_int][0]))
+            gbi[self.t_intervals.index(interval)] = gi[self.t_intervals.index(interval)] * (
+                1 - (bk * (self.grad[self.t_intervals.index(interval) - self.pre_int][0]))
             )
 
         aak = ak + self.sa * (bk - ak)  # inizializzazione del valore intermedio minore
         bbk = ak + self.sb * (bk - ak)
 
-        self.task_step_done(
-            message=f"Starting golden section search with ak={ak}, aak={aak}, bk={bk}, bbk={bbk}"
-        )
+        self.task_step_done(message=f"Starting golden section search with ak={ak}, aak={aak}, bk={bk}, bbk={bbk}")
         # Ricerca del passo ottimo
 
         for j in range(0, self.itesa):
             for interval in self.t_corr:
-                gai[self.t_intervals.index(interval)] = gi[
-                    self.t_intervals.index(interval)
-                ] * (
-                    1
-                    - (
-                        aak
-                        * (
-                            self.grad[self.t_intervals.index(interval) - self.pre_int][
-                                0
-                            ]
-                        )
-                    )
+                gai[self.t_intervals.index(interval)] = gi[self.t_intervals.index(interval)] * (
+                    1 - (aak * (self.grad[self.t_intervals.index(interval) - self.pre_int][0]))
                 )
-                gbi[self.t_intervals.index(interval)] = gi[
-                    self.t_intervals.index(interval)
-                ] * (
-                    1
-                    - (
-                        bbk
-                        * (
-                            self.grad[self.t_intervals.index(interval) - self.pre_int][
-                                0
-                            ]
-                        )
-                    )
+                gbi[self.t_intervals.index(interval)] = gi[self.t_intervals.index(interval)] * (
+                    1 - (bbk * (self.grad[self.t_intervals.index(interval) - self.pre_int][0]))
                 )
 
             ###CALCOLO FLUSSI PER GA e GI
@@ -267,12 +217,8 @@ class ODEstimatorOffline(ODEstimator):
                     max(0, self.t_intervals.index(interval) - self.pre_int),
                     self.t_intervals.index(interval) + 1,
                 ):
-                    fla_dep += (
-                        self.M[self.t_intervals.index(interval), dep].mat * gai[dep]
-                    )
-                    flb_dep += (
-                        self.M[self.t_intervals.index(interval), dep].mat * gbi[dep]
-                    )
+                    fla_dep += self.M[self.t_intervals.index(interval), dep].mat * gai[dep]
+                    flb_dep += self.M[self.t_intervals.index(interval), dep].mat * gbi[dep]
                 fla.append(fla_dep)
                 flb.append(flb_dep)
 
@@ -289,26 +235,14 @@ class ODEstimatorOffline(ODEstimator):
                     self.gamma1
                     * (
                         qce.transpose()
-                        * (
-                            (
-                                gai[self.t_intervals.index(interval)]
-                                - gce[self.t_intervals.index(interval)]
-                            )
-                            ** 2
-                        )
+                        * ((gai[self.t_intervals.index(interval)] - gce[self.t_intervals.index(interval)]) ** 2)
                     ).sum()
                 )
                 fb1 += (
                     self.gamma1
                     * (
                         qce.transpose()
-                        * (
-                            (
-                                gbi[self.t_intervals.index(interval)]
-                                - gce[self.t_intervals.index(interval)]
-                            )
-                            ** 2
-                        )
+                        * ((gbi[self.t_intervals.index(interval)] - gce[self.t_intervals.index(interval)]) ** 2)
                     ).sum()
                 )
             #### Calcolo FOB2 - Componente conteggi
@@ -322,9 +256,7 @@ class ODEstimatorOffline(ODEstimator):
                         * (
                             (
                                 fla[self.t_post.index(interval)]
-                                - self.counts[self.counts["timestamp"] == interval][
-                                    "counts"
-                                ].values
+                                - self.counts[self.counts["timestamp"] == interval]["counts"].values
                             )
                             ** 2
                         )
@@ -337,9 +269,7 @@ class ODEstimatorOffline(ODEstimator):
                         * (
                             (
                                 flb[self.t_post.index(interval)]
-                                - self.counts[self.counts["timestamp"] == interval][
-                                    "counts"
-                                ].values
+                                - self.counts[self.counts["timestamp"] == interval]["counts"].values
                             )
                             ** 2
                         )
@@ -355,8 +285,8 @@ class ODEstimatorOffline(ODEstimator):
             else:
                 bk = bbk  # Nuovo estremo superiore, posto uguale al valore intermedio superiore
                 bbk = aak  # Nuovo valore intermedio maggiore, posto uguale al valore intermedio minore
-                aak = (
-                    ak + self.sa * (bk - ak)
+                aak = ak + self.sa * (
+                    bk - ak
                 )  # Nuovo valore intermedio minore, calcolato sul nuovo segmento di estremi [ak, bk]
 
             self.task_step_done(
@@ -376,14 +306,8 @@ class ODEstimatorOffline(ODEstimator):
         lambdaopt = (bk + ak) / 2
         yi = gi.copy()
         for interval in self.t_corr:
-            yi[self.t_intervals.index(interval)] = gi[
-                self.t_intervals.index(interval)
-            ] * (
-                1
-                - (
-                    lambdaopt
-                    * (self.grad[self.t_intervals.index(interval) - self.pre_int][0])
-                )
+            yi[self.t_intervals.index(interval)] = gi[self.t_intervals.index(interval)] * (
+                1 - (lambdaopt * (self.grad[self.t_intervals.index(interval) - self.pre_int][0]))
             )
 
         gi_old = gi.copy()
@@ -391,37 +315,26 @@ class ODEstimatorOffline(ODEstimator):
         od_new = gi_old.copy()
 
         for interval in self.t_corr:
-            od_new[self.t_intervals.index(interval)] = gi_old[
-                self.t_intervals.index(interval)
-            ] + alfa * (
-                yi[self.t_intervals.index(interval)]
-                - gi_old[self.t_intervals.index(interval)]
+            od_new[self.t_intervals.index(interval)] = gi_old[self.t_intervals.index(interval)] + alfa * (
+                yi[self.t_intervals.index(interval)] - gi_old[self.t_intervals.index(interval)]
             )
-            od_new[self.t_intervals.index(interval)][
-                od_new[self.t_intervals.index(interval)] < 0
-            ] = 1
+            od_new[self.t_intervals.index(interval)][od_new[self.t_intervals.index(interval)] < 0] = 1
 
-        self.task_step_done(
-            message=f"Optimal step calculated: lambdaopt={lambdaopt}, alfa={alfa}"
-        )
+        self.task_step_done(message=f"Optimal step calculated: lambdaopt={lambdaopt}, alfa={alfa}")
         gi = od_new.copy()
         OD_new = self.OD.copy()
 
         template = list(self.ODseed.values())[0].mat
         for interval in self.t_corr:
             ind_zone = 0
-            new_m = np.reshape(
-                gi[self.t_intervals.index(interval)], [len(template), len(template)]
-            )
+            new_m = np.reshape(gi[self.t_intervals.index(interval)], [len(template), len(template)])
             tmp = OD_new[interval]
             for z in self.zone:
                 for j in self.zone:
                     pos = self.zone.index(j)
                     tmp[z, j] = new_m[ind_zone][pos]
                 ind_zone += 1
-        self.task_step_done(
-            message=f"OD matrix updated for intervals {self.t_corr[0]} to {self.t_corr[-1]}"
-        )
+        self.task_step_done(message=f"OD matrix updated for intervals {self.t_corr[0]} to {self.t_corr[-1]}")
 
         return OD_new
 

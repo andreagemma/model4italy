@@ -20,9 +20,7 @@ class DBLoader(BaseLoader):
     def __init__(self):
         super().__init__()
 
-    def load_dataset(
-        self, parameters, filters=None, dtype=None, **kwargs
-    ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
+    def load_dataset(self, parameters, filters=None, dtype=None, **kwargs) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
         location = parameters.get("location")
         src = parameters.get("src")
 
@@ -38,9 +36,7 @@ class DBLoader(BaseLoader):
             if isinstance(filters, str):
                 df_filters = filters
             else:
-                df_filters = filters_to_query_expression(
-                    filters, quoting="", op_boolean_symbols=True
-                )
+                df_filters = filters_to_query_expression(filters, quoting="", op_boolean_symbols=True)
             sql_filters = pandas_query_to_sql(df_filters)
             sql = f"{sql} {sql_filters}"
 

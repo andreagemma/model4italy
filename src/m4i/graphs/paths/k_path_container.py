@@ -29,9 +29,7 @@ class KPathContainer(PathContainer):
             for path in to_add.all_paths(**kwargs):
                 self.add_path(path, k=path.get("k") if override_k else None)
         else:
-            raise NotImplementedError(
-                f"la funzione merge per la {type} non è stata implementata"
-            )
+            raise NotImplementedError(f"la funzione merge per la {type} non è stata implementata")
 
     @abstractmethod
     def get_sources(
@@ -73,9 +71,7 @@ class KPathContainer(PathContainer):
     ) -> Tuple[Hashable]:
         raise NotImplementedError()
 
-    def paths(
-        self, source: Hashable, target: Hashable, t_start: Number, *args, **kwargs
-    ) -> Generator[Path]:
+    def paths(self, source: Hashable, target: Hashable, t_start: Number, *args, **kwargs) -> Generator[Path]:
         raise NotImplementedError()
 
     def path(
@@ -135,12 +131,7 @@ class KPathContainer(PathContainer):
         for geom in ("geom", "geometry"):
             if geom in l:
                 df_paths[geom] = [
-                    MultiLineString(
-                        [
-                            multi_line_to_line(G.get_link(l_idx).get_value(geom))
-                            for l_idx in links
-                        ]
-                    )
+                    MultiLineString([multi_line_to_line(G.get_link(l_idx).get_value(geom)) for l_idx in links])
                     for links in df_paths["links"]
                 ]
                 df_paths = gpd.GeoDataFrame(df_paths, geometry=geom, crs=crs_link)

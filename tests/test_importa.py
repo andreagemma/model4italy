@@ -46,3 +46,8 @@ def test_importa_specific_modules():
     assert hasattr(graphs, "DynamicGraph")
     assert hasattr(server, "start_server")
     assert hasattr(matrix, "MatrixOD")
+
+
+if __name__ == "__main__":
+    test_importa_all()
+    test_importa_specific_modules()

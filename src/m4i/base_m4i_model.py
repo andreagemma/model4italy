@@ -82,10 +82,10 @@ class BaseM4IModel(TaskBase):
             else:
                 self._ipc = None
         elif self.parser is not None and self._ipc is None and self.parser.ini.IPC_USE:
-                warnings.warn(
-                    "IPC is not initialized. Please provide a valid settings parameters file.",
-                    UserWarning,
-                )
+            warnings.warn(
+                "IPC is not initialized. Please provide a valid settings parameters file.",
+                UserWarning,
+            )
         return self._ipc
 
     def run():
@@ -93,7 +93,9 @@ class BaseM4IModel(TaskBase):
 
     @staticmethod
     def update_progress(
-        self: BaseM4IModel, message: str | None = None, progress: float | None= None  # noqa: PLW0211
+        self: BaseM4IModel,
+        message: str | None = None,
+        progress: float | None = None,  # noqa: PLW0211
     ):
         tp = self.task_total_progress
         if message is None:

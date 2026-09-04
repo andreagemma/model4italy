@@ -159,9 +159,7 @@ def trip_dijkstra(
         paths_links[l_idx] = [l_idx]
         paths_geoms[l_idx] = line_from_list(paths_geoms.get(l_idx, None), l["geometry"])
         initial_cost = calc_distance(paths_geoms[l_idx], trip)
-        initial_cost += w_distance_fcd * calc_distance_fcd(
-            paths_geoms[l_idx], trip_points
-        )
+        initial_cost += w_distance_fcd * calc_distance_fcd(paths_geoms[l_idx], trip_points)
         paths_costs[l_idx] = initial_cost
         node_preds[l_j] = l_idx
         node_costs[l_j] = initial_cost
@@ -187,9 +185,7 @@ def trip_dijkstra(
             # costo attuale
             new_cost = current_cost  # * len(paths_links[current_l_idx])
             act_t = t_start + new_cost
-            new_line = line_from_list(
-                paths_geoms.get(current_l_idx, None), next_l["geometry"]
-            )
+            new_line = line_from_list(paths_geoms.get(current_l_idx, None), next_l["geometry"])
             new_cost += calc_distance(next_l["geometry"], trip)
             new_cost += w_cost * next_l["t0"]
             new_cost_fcd = w_distance_fcd * calc_max_distance_fcd(new_line, trip_points)
@@ -243,9 +239,7 @@ def trip_dijkstra(
     return pl
 
 
-def nearest_point_row(
-    df_links: gpd.GeoDataFrame, fcd: gpd.GeoDataFrame, pt: Point
-) -> tuple:
+def nearest_point_row(df_links: gpd.GeoDataFrame, fcd: gpd.GeoDataFrame, pt: Point) -> tuple:
     neareset_node = None
 
     df_l = None
@@ -345,32 +339,20 @@ class BuildPaths:
                     else:
                         pto = Point(trip.geometry.coords[0])
                         if df_fcd is None:
-                            source = nearest_point_row(
-                                df_links=df_links, fcd=None, pt=pto
-                            )
+                            source = nearest_point_row(df_links=df_links, fcd=None, pt=pto)
                         else:
-                            source = nearest_point_row(
-                                df_links=df_links, fcd=df_fcd.iloc[0], pt=pto
-                            )
+                            source = nearest_point_row(df_links=df_links, fcd=df_fcd.iloc[0], pt=pto)
                     if hasattr(trip, "id_zone_d") and pd.notna(trip.id_zone_d):
                         target = int(trip.id_zone_d)
                     else:
                         ptd = Point(trip.geometry.coords[-1])
                         if df_fcd is None:
-                            target = nearest_point_row(
-                                df_links=df_links, fcd=None, pt=ptd
-                            )
+                            target = nearest_point_row(df_links=df_links, fcd=None, pt=ptd)
                         else:
-                            target = nearest_point_row(
-                                df_links=df_links, fcd=df_fcd.iloc[-1], pt=ptd
-                            )
+                            target = nearest_point_row(df_links=df_links, fcd=df_fcd.iloc[-1], pt=ptd)
 
-                    print(
-                        f"Calculating path for trip {trip.id_trip} from {source} to {target}"
-                    )
-                    paths: PathContainer = trip_dijkstra(
-                        graph=G, source=source, targets={target}, trip=trip.geometry
-                    )
+                    print(f"Calculating path for trip {trip.id_trip} from {source} to {target}")
+                    paths: PathContainer = trip_dijkstra(graph=G, source=source, targets={target}, trip=trip.geometry)
                     for path in paths.all_paths():
                         path["id_trip"] = trip.id_trip
                         path["dt_o"] = trip.dt_o
@@ -378,9 +360,7 @@ class BuildPaths:
                         path["t"] = int(
                             (
                                 trip.dt_o.timestamp()
-                                - trip.dt_o.replace(
-                                    hour=0, minute=0, second=0, microsecond=0
-                                ).timestamp()
+                                - trip.dt_o.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
                             )
                             / 60
                         )
@@ -395,9 +375,7 @@ class BuildPaths:
 
         old_crs = df_trips.crs
         if df_links.crs != self.crs_calc:
-            self.log.info(
-                f"Reprojecting links and graph from {df_links.crs} to {self.crs_calc}"
-            )
+            self.log.info(f"Reprojecting links and graph from {df_links.crs} to {self.crs_calc}")
             G = G.st_transform(df_links.crs, self.crs_calc)
             df_links = df_links.to_crs(self.crs_calc)
 
@@ -410,9 +388,7 @@ class BuildPaths:
         tot_paths = PathList()
         if df_fcd is not None:
             grp = df_fcd.groupby("id_trip")
-            tasks = [
-                (trip, grp.get_group(trip.id_trip).iloc[[0, -1], :]) for trip in tasks
-            ]
+            tasks = [(trip, grp.get_group(trip.id_trip).iloc[[0, -1], :]) for trip in tasks]
         else:
             tasks = [(trip, None) for trip in tasks]
         for paths in Parallel.execute(
