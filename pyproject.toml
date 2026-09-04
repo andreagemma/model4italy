@@ -19,8 +19,8 @@ dependencies = [
   # 1. Se l'utente è su Windows ed usa Python fino a 3.13, scarica Fiona normalmente da PyPI
   "fiona==1.10.1; sys_platform == 'win32' and python_version < '3.14'",
   
-  # 2. Se l'utente è su Windows ed usa Python 3.14, scarica la Wheel precompilata direttamente dal link di Gohlke
-  "fiona @ https://github.com; sys_platform == 'win32' and python_version == '3.14'",
+  # 2. Se l'utente è su Windows ed usa Python 3.14, scarica la Wheel precompilata direttamente dalle release di Gohlke
+  "fiona @ https://github.com/cgohlke/geospatial-wheels/releases/download/v2026.8.20/fiona-1.10.1-cp314-cp314-win_amd64.whl ; sys_platform == 'win32' and python_version == '3.14'",
   
   # 3. Se l'utente NON è su Windows (es. Linux o macOS), installa Fiona da PyPI senza problemi di compilazione C
   "fiona==1.10.1; sys_platform != 'win32'",
