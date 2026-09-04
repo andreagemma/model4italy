@@ -6,6 +6,26 @@ Model4Italy è uno strumento avanzato per la meso-simulazione e l'analisi del tr
 Installare la versione di python 3.12.
 Installare le librerie presenti in ```requirements.txt```
 
+### Dipendenza GDAL (obbligatoria)
+
+Model4Italy dipende da GDAL. GDAL deve essere installato separatamente:
+
+- come libreria di sistema (libgdal)
+- come pacchetto Python (`gdal`)
+
+Le due versioni devono essere compatibili tra loro (stessa major/minor, e in generale la stessa versione).
+
+Esempio Linux (Debian/Ubuntu):
+
+```sh
+sudo apt-get update
+sudo apt-get install -y gdal-bin libgdal-dev
+gdal-config --version
+python -m pip install "GDAL==$(gdal-config --version)"
+```
+
+Se `gdal-config` non e presente, installare prima i pacchetti di sistema GDAL.
+
 Se è la prima volta che viene eseguito il sistema sulla macchina e non è presente il file ```model4italy.db``` necessario come database interno della piattaforma eseguire il comando:
 ```sh
 python model4italy.py init_db
